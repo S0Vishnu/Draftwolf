@@ -114,11 +114,13 @@ app.whenReady().then(() => {
         const path = await import('path');
         const dirents = await fs.readdir(dirPath, { withFileTypes: true });
         // We'll map stat manually later if needed, but for list view this is fast
-        return dirents.map(dirent => ({
-            name: dirent.name,
-            isDirectory: dirent.isDirectory(),
-            path: path.join(dirPath, dirent.name)
-        }));
+        return dirents
+            .filter(dirent => dirent.name !== '.draft')
+            .map(dirent => ({
+                name: dirent.name,
+                isDirectory: dirent.isDirectory(),
+                path: path.join(dirPath, dirent.name)
+            }));
   })
 
   ipcMain.handle('fs:createFolder', async (_, folderPath) => {

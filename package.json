@@ -40,7 +40,14 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DraftFlow"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "S0Vishnu",
+        "repo": "Draftflow-app"
+      }
+    ]
   },
   "dependencies": {
     "@dicebear/collection": "^9.2.4",

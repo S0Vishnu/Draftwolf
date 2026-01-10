@@ -2,7 +2,11 @@ import React from 'react';
 import { Power, Wifi, HelpCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import './Footer.css';
 
-const Footer: React.FC = () => {
+interface FooterProps {
+    onShutDown?: () => void;
+}
+
+const Footer: React.FC<FooterProps> = ({ onShutDown }) => {
     const [isOnline, setIsOnline] = React.useState(navigator.onLine);
 
     React.useEffect(() => {
@@ -21,7 +25,7 @@ const Footer: React.FC = () => {
     return (
         <footer className="app-footer">
             <div className="footer-left">
-                <button className="footer-item" title="Shut Down"><Power size={14} /></button>
+                <button className="footer-item" title="Shut Down" onClick={onShutDown}><Power size={14} /></button>
                 <div className="footer-divider"></div>
                 <button className="footer-item" title={isOnline ? "Online" : "Offline"}>
                     <Wifi size={14} color={isOnline ? "#41D56A" : "#F64141"} />

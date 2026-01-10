@@ -16,9 +16,12 @@ const firebaseConfig = {
 
 import { Auth } from 'firebase/auth';
 
+import { Firestore, getFirestore } from 'firebase/firestore';
+
 console.log('Initializing Firebase...');
 let app;
 let auth: Auth;
+let db: Firestore;
 let googleProvider: GoogleAuthProvider;
 
 try {
@@ -28,10 +31,11 @@ try {
   
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
+  db = getFirestore(app);
   googleProvider = new GoogleAuthProvider();
   console.log('Firebase Initialized successfully.');
 } catch (e) {
   console.error('Firebase Initialization Failed:', e);
 }
 
-export { auth, googleProvider };
+export { auth, db, googleProvider };

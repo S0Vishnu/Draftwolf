@@ -64,7 +64,9 @@ export class DraftControlSystem {
       await fs.mkdir(this.versionsPath, { recursive: true });
       await fs.mkdir(path.join(this.draftPath, 'metadata'), { recursive: true });
       await fs.mkdir(path.join(this.draftPath, 'attachments'), { recursive: true });
-      
+
+      this.hideDraftFolder();
+
       const initialIndex: VersionIndex = {
         objects: {},
         latestVersion: null,
@@ -72,11 +74,32 @@ export class DraftControlSystem {
       };
       await this.writeIndex(initialIndex);
     } else {
-        // Ensure subdirs exist even if root exists
-        if (!existsSync(this.objectsPath)) await fs.mkdir(this.objectsPath, { recursive: true });
-        if (!existsSync(this.versionsPath)) await fs.mkdir(this.versionsPath, { recursive: true });
-        if (!existsSync(path.join(this.draftPath, 'metadata'))) await fs.mkdir(path.join(this.draftPath, 'metadata'), { recursive: true });
-        if (!existsSync(path.join(this.draftPath, 'attachments'))) await fs.mkdir(path.join(this.draftPath, 'attachments'), { recursive: true });
+      // Ensure subdirs exist even if root exists
+      if (!existsSync(this.objectsPath)) await fs.mkdir(this.objectsPath, { recursive: true });
+      if (!existsSync(this.versionsPath)) await fs.mkdir(this.versionsPath, { recursive: true });
+      if (!existsSync(path.join(this.draftPath, 'metadata'))) await fs.mkdir(path.join(this.draftPath, 'metadata'), { recursive: true });
+      if (!existsSync(path.join(this.draftPath, 'attachments'))) await fs.mkdir(path.join(this.draftPath, 'attachments'), { recursive: true });
+
+      // Ensure hidden state is enforced (idempotent-ish)
+      if (!this.isHiddenChecked) {
+        this.hideDraftFolder();
+      }
+    }
+  }
+
+  private isHiddenChecked = false;
+
+  private hideDraftFolder() {
+    if (process.platform === 'win32') {
+      // Use attrib +h +s +r to make it a hidden system folder (effectively read-only/protected in Explorer UI)
+      const { exec } = require('child_process');
+      exec(`attrib +h +s +r "${this.draftPath}"`, (error: any) => {
+        if (error) {
+          // console.error("Failed to secure .draft folder:", error);
+        } else {
+          this.isHiddenChecked = true;
+        }
+      });
     }
   }
 
@@ -96,7 +119,7 @@ export class DraftControlSystem {
 
     // 2. Copy if not exists
     if (!existsSync(destPath)) {
-        await fs.copyFile(filePath, destPath);
+      await fs.copyFile(filePath, destPath);
     }
 
     return `attachments/${filename}`;
@@ -119,7 +142,7 @@ export class DraftControlSystem {
     const hash = this.hashString(this.normalizePath(relativePath));
     const metaFilePath = path.join(this.draftPath, 'metadata', `${hash}.json`);
     if (existsSync(metaFilePath)) {
-        return await this.readJson(metaFilePath);
+      return await this.readJson(metaFilePath);
     }
     return null;
   }
@@ -130,47 +153,47 @@ export class DraftControlSystem {
   async moveMetadata(oldRelativePath: string, newRelativePath: string): Promise<void> {
     const oldHash = this.hashString(this.normalizePath(oldRelativePath));
     const newHash = this.hashString(this.normalizePath(newRelativePath));
-    
+
     const oldMetaPath = path.join(this.draftPath, 'metadata', `${oldHash}.json`);
     const newMetaPath = path.join(this.draftPath, 'metadata', `${newHash}.json`);
 
     if (existsSync(oldMetaPath)) {
-        await fs.rename(oldMetaPath, newMetaPath);
+      await fs.rename(oldMetaPath, newMetaPath);
     }
   }
 
   // --- Static Helpers ---
 
   static async findProjectRoot(startPath: string): Promise<string | null> {
-      let current = startPath;
-      const fs = await import('fs/promises');
-      const path = await import('path');
+    let current = startPath;
+    const fs = await import('fs/promises');
+    const path = await import('path');
 
-      while (true) {
-          const check = path.join(current, '.draft');
-          try {
-              await fs.access(check);
-              return current;
-          } catch {
-              // Not here
-          }
-          
-          const parent = path.dirname(current);
-          if (parent === current) return null; // Root reached
-          current = parent;
+    while (true) {
+      const check = path.join(current, '.draft');
+      try {
+        await fs.access(check);
+        return current;
+      } catch {
+        // Not here
       }
+
+      const parent = path.dirname(current);
+      if (parent === current) return null; // Root reached
+      current = parent;
+    }
   }
 
   // --- Utils ---
 
   private normalizePath(p: string): string {
-      // Normalize to forward slashes for consistent hashing across platforms/renames
-      // Also potentially handle case sensitivity if needed, but keeping it simple.
-      return p.replace(/\\/g, '/');
+    // Normalize to forward slashes for consistent hashing across platforms/renames
+    // Also potentially handle case sensitivity if needed, but keeping it simple.
+    return p.replace(/\\/g, '/');
   }
 
   private hashString(content: string): string {
-      return crypto.createHash('sha256').update(content).digest('hex');
+    return crypto.createHash('sha256').update(content).digest('hex');
   }
 
   /**
@@ -184,13 +207,13 @@ export class DraftControlSystem {
 
     // 1. Hash files and store new blobs
     for (const filePath of filesToTrack) {
-        // ... (existing has logic, copied below for context if needed, but we assume tool handles replacement block) ...
-      const relativePath = path.isAbsolute(filePath) 
-        ? path.relative(this.projectRoot, filePath) 
+      // ... (existing has logic, copied below for context if needed, but we assume tool handles replacement block) ...
+      const relativePath = path.isAbsolute(filePath)
+        ? path.relative(this.projectRoot, filePath)
         : filePath;
-      
+
       const fullPath = path.join(this.projectRoot, relativePath);
-      
+
       if (!existsSync(fullPath)) continue;
 
       const hash = await this.hashFile(fullPath);
@@ -213,43 +236,43 @@ export class DraftControlSystem {
     // Logic: 
     // If currentHead == latestVersion (or null) -> Major Bump (1.0 -> 2.0)
     // If currentHead != latestVersion (we are detached) -> Minor Bump (1.0 -> 1.1)
-    
+
     let nextVerNum = "1.0";
     const parentId = index.currentHead;
 
     if (parentId) {
-        let parentManifest: VersionManifest | null = null;
-        try {
-            parentManifest = await this.readJson(path.join(this.versionsPath, `${parentId}.json`));
-        } catch(e) { /* ignore */ }
+      let parentManifest: VersionManifest | null = null;
+      try {
+        parentManifest = await this.readJson(path.join(this.versionsPath, `${parentId}.json`));
+      } catch (e) { /* ignore */ }
 
-        if (parentManifest) {
-            const parts = parentManifest.versionNumber.split('.');
-            const pMajor = parseInt(parts[0]);
-            const pMinor = parts.length > 1 ? parseInt(parts[1]) : 0;
-            
-            if (index.currentHead === index.latestVersion) {
-                // Linear progression - Increment Major
-                nextVerNum = (pMajor + 1).toString();
-            } else {
-                // Branching/Restored - Increment Minor
-                const allManifests = await this.getHistory();
-                let maxMinor = pMinor;
-                for (const m of allManifests) {
-                    const mParts = m.versionNumber.split('.');
-                    const mMajor = parseInt(mParts[0]);
-                    const mMinor = mParts.length > 1 ? parseInt(mParts[1]) : 0;
-                    
-                    if (mMajor === pMajor) {
-                        if (mMinor > maxMinor) maxMinor = mMinor;
-                    }
-                }
-                nextVerNum = `${pMajor}.${maxMinor + 1}`;
+      if (parentManifest) {
+        const parts = parentManifest.versionNumber.split('.');
+        const pMajor = parseInt(parts[0]);
+        const pMinor = parts.length > 1 ? parseInt(parts[1]) : 0;
+
+        if (index.currentHead === index.latestVersion) {
+          // Linear progression - Increment Major
+          nextVerNum = (pMajor + 1).toString();
+        } else {
+          // Branching/Restored - Increment Minor
+          const allManifests = await this.getHistory();
+          let maxMinor = pMinor;
+          for (const m of allManifests) {
+            const mParts = m.versionNumber.split('.');
+            const mMajor = parseInt(mParts[0]);
+            const mMinor = mParts.length > 1 ? parseInt(mParts[1]) : 0;
+
+            if (mMajor === pMajor) {
+              if (mMinor > maxMinor) maxMinor = mMinor;
             }
+          }
+          nextVerNum = `${pMajor}.${maxMinor + 1}`;
         }
+      }
     } else {
-        // No parent, but maybe history exists? (e.g. deleted head)
-        // Reset to 1.0 or find max? Let's default to 1.0 for fresh start.
+      // No parent, but maybe history exists? (e.g. deleted head)
+      // Reset to 1.0 or find max? Let's default to 1.0 for fresh start.
     }
 
     // 2b. Create Version Manifest
@@ -314,7 +337,7 @@ export class DraftControlSystem {
         await fs.copyFile(blobPath, destPath);
       }
     }
-    
+
     // Update currentHead to point to the restored version for branching logic
     const index = await this.readIndex();
     index.currentHead = versionId;
@@ -341,16 +364,16 @@ export class DraftControlSystem {
     for (const hash of Object.values(manifest.files)) {
       if (index.objects[hash]) {
         index.objects[hash].refCount--;
-        
+
         // Garbage Collection: If no versions reference this blob, delete it.
         if (index.objects[hash].refCount <= 0) {
           const blobPath = path.join(this.objectsPath, hash);
           try {
             if (existsSync(blobPath)) {
-               await fs.unlink(blobPath);
+              await fs.unlink(blobPath);
             }
           } catch (e) {
-             console.error(`Failed to GC blob ${hash}`, e);
+            console.error(`Failed to GC blob ${hash}`, e);
           }
           delete index.objects[hash];
         }
@@ -359,9 +382,9 @@ export class DraftControlSystem {
 
     // 4. Update latestVersion pointer
     if (index.latestVersion === versionId) {
-       // Find the new latest version by scanning remaining files
-       const history = await this.getHistory(); // valid because we deleted the file already
-       index.latestVersion = history.length > 0 ? history[0].id : null;
+      // Find the new latest version by scanning remaining files
+      const history = await this.getHistory(); // valid because we deleted the file already
+      index.latestVersion = history.length > 0 ? history[0].id : null;
     }
 
     await this.writeIndex(index);
@@ -376,7 +399,7 @@ export class DraftControlSystem {
 
     const manifestPath = path.join(this.versionsPath, `${index.latestVersion}.json`);
     const manifest: VersionManifest = await this.readJson(manifestPath);
-    
+
     // This requires a full scan of the directory, which is expensive.
     // For this lightweight system, we assume user passes the files they care about 
     // or we scan a specific root. 
@@ -384,7 +407,7 @@ export class DraftControlSystem {
     // 1. Get List of all files in projectRoot (recursive).
     // 2. Hash them.
     // 3. Compare with manifest.files.
-    return { modified: [], new: [], deleted: [] }; 
+    return { modified: [], new: [], deleted: [] };
   }
 
   /**
@@ -392,10 +415,10 @@ export class DraftControlSystem {
    */
   async getHistory(): Promise<VersionManifest[]> {
     if (!existsSync(this.versionsPath)) return [];
-    
+
     const files = await fs.readdir(this.versionsPath);
     const manifests: VersionManifest[] = [];
-    
+
     for (const file of files) {
       if (file.endsWith('.json')) {
         try {
@@ -406,48 +429,48 @@ export class DraftControlSystem {
         }
       }
     }
-    
+
     // Sort by timestamp ascending (oldest first) to assign numbers correctly
-    manifests.sort((a, b) => 
+    manifests.sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
     // Read index once to get sizes
     let index: VersionIndex | null = null;
     try {
-        index = await this.readIndex();
+      index = await this.readIndex();
     } catch (e) { /* ignore */ }
 
     // Backfill missing version numbers for legacy commits and calculate size
     let maxMajor = 0;
 
     for (let i = 0; i < manifests.length; i++) {
-        if (!manifests[i].versionNumber) {
-            // Assign a legacy version number (e.g. 1, 2, 3)
-            manifests[i].versionNumber = (i + 1).toString();
-        }
-        
-        // Track max for future commits
-        const parts = manifests[i].versionNumber.split('.');
-        const maj = parseInt(parts[0]);
-        // Treat 1 as 1.0
-        if (!isNaN(maj) && maj > maxMajor) maxMajor = maj;
+      if (!manifests[i].versionNumber) {
+        // Assign a legacy version number (e.g. 1, 2, 3)
+        manifests[i].versionNumber = (i + 1).toString();
+      }
 
-        // Calculate Total Size
-        let totalSize = 0;
-        if (index && index.objects) {
-            for (const hash of Object.values(manifests[i].files)) {
-                if (index.objects[hash]) {
-                    totalSize += index.objects[hash].size;
-                }
-            }
+      // Track max for future commits
+      const parts = manifests[i].versionNumber.split('.');
+      const maj = parseInt(parts[0]);
+      // Treat 1 as 1.0
+      if (!isNaN(maj) && maj > maxMajor) maxMajor = maj;
+
+      // Calculate Total Size
+      let totalSize = 0;
+      if (index && index.objects) {
+        for (const hash of Object.values(manifests[i].files)) {
+          if (index.objects[hash]) {
+            totalSize += index.objects[hash].size;
+          }
         }
-        // @ts-ignore
-        manifests[i].totalSize = totalSize;
+      }
+      // @ts-ignore
+      manifests[i].totalSize = totalSize;
     }
 
     // Sort by timestamp descending (newest first) for UI
-    return manifests.sort((a, b) => 
+    return manifests.sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   }
@@ -464,18 +487,18 @@ export class DraftControlSystem {
     const manifest: VersionManifest = await this.readJson(manifestPath);
     // Normalize path just in case
     const normPath = relativeFilePath.split(path.sep).join(path.posix.sep); // Store is likely posix or consistent?
-    
+
     // We stored paths in keys. Let's try direct lookup first, then fallback to normalized.
     let hash = manifest.files[relativeFilePath];
     if (!hash) {
-       // Try finding by matching suffix or normalized if strict lookup fails
-       // But for now, assume strict matching as we passed what we got from scanning.
-       // Actually, we should check if keys are using forward slashes or backslashes.
-       // Windows might differ.
-       // Let's iterate if not found.
-       const target = relativeFilePath.replace(/\\/g, '/');
-       const foundKey = Object.keys(manifest.files).find(k => k.replace(/\\/g, '/') === target);
-       if (foundKey) hash = manifest.files[foundKey];
+      // Try finding by matching suffix or normalized if strict lookup fails
+      // But for now, assume strict matching as we passed what we got from scanning.
+      // Actually, we should check if keys are using forward slashes or backslashes.
+      // Windows might differ.
+      // Let's iterate if not found.
+      const target = relativeFilePath.replace(/\\/g, '/');
+      const foundKey = Object.keys(manifest.files).find(k => k.replace(/\\/g, '/') === target);
+      if (foundKey) hash = manifest.files[foundKey];
     }
 
     if (!hash) {
@@ -511,7 +534,7 @@ export class DraftControlSystem {
 
   private async readIndex(): Promise<VersionIndex> {
     if (!existsSync(this.indexPath)) {
-        return { objects: {}, latestVersion: null, currentHead: null };
+      return { objects: {}, latestVersion: null, currentHead: null };
     }
     return this.readJson(this.indexPath);
   }

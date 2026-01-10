@@ -153,12 +153,23 @@ const Home = () => {
         return entry;
     };
 
+
     const loadDirectory = async (path: string) => {
         if (!path) return;
+
+        // Security: Check for restricted paths
+        const parts = path.split(/[/\\]/);
+        if (parts.some(p => p === '.draft')) {
+            toast.error("Access restricted");
+            return;
+        }
+
         setIsLoading(true);
         try {
             const entries = await window.api.readDir(path);
-            let processed = await Promise.all(entries.map(fetchStats));
+            // Filter out .draft
+            const visibleEntries = entries.filter((e: FileEntry) => e.name !== '.draft');
+            let processed = await Promise.all(visibleEntries.map(fetchStats));
 
             if (sortConfig) {
                 processed = sortFiles(processed, sortConfig);
@@ -235,6 +246,10 @@ const Home = () => {
     const handleOpenFolder = async () => {
         const path = await window.api.openFolder();
         if (path) {
+            if (path.split(/[/\\]/).some(p => p === '.draft')) {
+                toast.error("Access restricted");
+                return;
+            }
             setRootDir(path); // Set the root directory for breadcrumbs
             setHistory([path]);
             setHistoryIndex(0);

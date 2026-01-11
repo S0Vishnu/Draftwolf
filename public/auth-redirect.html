@@ -1,184 +1,151 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8" />
-    <title>DraftFlow Auth</title>
-    <link rel="icon" href="public/icon.png">
-    <!-- Use modular SDK instead of compat -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import {
-            getAuth,
-            isSignInWithEmailLink,
-            signInWithEmailLink,
-            getRedirectResult,
-            signInWithRedirect,
-            GoogleAuthProvider
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    <title>DraftFlow Authentication</title>
+    <link rel="icon" href="icon.png" />
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD3BhG--fI6c8V3TSa5l-2uOBlvBZFt1SQ",
-            authDomain: "draftflow-905d4.firebaseapp.com",
-            projectId: "draftflow-905d4",
-            appId: "1:233410681710:web:33f6a0a6f39ba70c8dbf7f",
-        };
-
-        function log(msg) {
-            console.log(msg);
-            const logs = document.getElementById('logs');
-            if (logs) {
-                logs.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
-            }
-        }
-
-        function setStatus(msg) {
-            const status = document.getElementById('status');
-            if (status) status.innerText = msg;
-        }
-
-        try {
-            // Initialize Firebase
-            const app = initializeApp(firebaseConfig);
-            const auth = getAuth(app);
-
-            log("Firebase initialized (Modular API).");
-
-            getRedirectResult(auth)
-                .then(async (result) => {
-                    log("Redirect check result obtained.");
-
-                    // 1. SUCCESSFUL GOOGLE LOGIN
-                    if (result?.user) {
-                        setStatus("Sign in successful!");
-                        log(`User: ${result.user.email}`);
-
-                        // Clear any session flags
-                        sessionStorage.removeItem('auth_in_progress');
-
-                        const token = await result.user.getIdToken();
-                        log(`Token generated. Redirecting to myapp://...`);
-                        window.location.href = `myapp://auth?token=${encodeURIComponent(token)}`;
-                        return;
-                    }
-
-                    // 2. EMAIL LINK AUTH - Using modular API
-                    if (isSignInWithEmailLink(auth, window.location.href)) {
-                        setStatus("Verifying Email Link...");
-                        let email = new URLSearchParams(window.location.search).get('email');
-                        if (!email) {
-                            email = window.prompt("Confirm your email address");
-                        }
-                        if (email) {
-                            try {
-                                const userCredential = await signInWithEmailLink(auth, email, window.location.href);
-                                if (userCredential?.user) {
-                                    setStatus("Link Verified! Redirecting...");
-                                    const token = await userCredential.user.getIdToken();
-                                    window.location.href = `myapp://auth?token=${encodeURIComponent(token)}`;
-                                }
-                            } catch (emailError) {
-                                setStatus("Email Link Error");
-                                log("Email link error: " + emailError.message);
-                            }
-                        }
-                        return;
-                    }
-
-                    // 3. START GOOGLE LOGIN
-                    const params = new URLSearchParams(window.location.search);
-                    if (params.get('mode') === 'google') {
-                        // Check if we already tried and failed/returned null to avoid loop
-                        if (sessionStorage.getItem('auth_in_progress')) {
-                            log("Warning: 'auth_in_progress' is set, but no user result found.");
-                            sessionStorage.removeItem('auth_in_progress');
-                            setStatus("Authentication failed or cancelled.");
-                            log("Please try again. Ensure cookies are enabled.");
-                            return;
-                        }
-
-                        setStatus("Redirecting to Google...");
-                        log("Mode is google. Initiating redirect...");
-
-                        // Set flag to prevent loop
-                        sessionStorage.setItem('auth_in_progress', 'true');
-
-                        const provider = new GoogleAuthProvider();
-                        signInWithRedirect(auth, provider);
-                    } else {
-                        setStatus("Idle");
-                        log("No active mode.");
-                    }
-                })
-                .catch((error) => {
-                    setStatus("Error");
-                    log(error.message);
-                    console.error(error);
-                });
-
-        } catch (e) {
-            setStatus("Critical Script Error");
-            log(e.toString());
-            log("Stack: " + e.stack);
-        }
-    </script>
     <style>
         body {
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-            font-family: 'Segoe UI', sans-serif;
+            background: #111;
+            color: #eee;
+            font-family: system-ui, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
-            text-align: center;
-        }
-
-        #status {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        #logs {
-            font-family: monospace;
-            font-size: 0.9rem;
-            color: #888;
-            max-width: 80%;
-            word-wrap: break-word;
-            background: #252525;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 20px;
-            text-align: left;
         }
 
         .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.1);
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            border-left-color: #09f;
+            border: 4px solid rgba(255, 255, 255, .2);
+            border-top-color: #4da3ff;
             animation: spin 1s linear infinite;
+            margin-bottom: 20px;
         }
 
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
+            to {
                 transform: rotate(360deg);
             }
+        }
+
+        #status {
+            font-size: 1.2rem;
+        }
+
+        #logs {
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: .85rem;
+            color: #999;
+            max-width: 90%;
+            word-break: break-word;
         }
     </style>
 </head>
 
 <body>
     <div class="spinner"></div>
-    <div id="status">Initializing...</div>
+    <div id="status">Initializing…</div>
     <div id="logs"></div>
+
+    <script type="module">
+        import { initializeApp } from
+            "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import {
+            getAuth,
+            GoogleAuthProvider,
+            signInWithRedirect,
+            getRedirectResult,
+            onAuthStateChanged,
+            setPersistence,
+            browserLocalPersistence
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        (async () => {
+            const firebaseConfig = {
+                apiKey: "AIzaSyD3BhG--fI6c8V3TSa5l-2uOBlvBZFt1SQ",
+                authDomain: "draftflow-905d4.firebaseapp.com",
+                projectId: "draftflow-905d4",
+                appId: "1:233410681710:web:33f6a0a6f39ba70c8dbf7f",
+            };
+
+            const status = msg =>
+                document.getElementById("status").innerText = msg;
+
+            const log = msg => {
+                console.log(msg);
+                document.getElementById("logs").innerHTML += `<div>${msg}</div>`;
+            };
+
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const provider = new GoogleAuthProvider();
+
+            try {
+                // 🔒 Required for redirect auth stability
+                await setPersistence(auth, browserLocalPersistence);
+
+                status("Checking sign-in result…");
+
+                // 1️⃣ If we just returned from Google, this will exist
+                const result = await getRedirectResult(auth);
+
+                if (result?.user) {
+                    status("Sign-in successful");
+                    log(`User: ${result.user.email}`);
+
+                    const token = await result.user.getIdToken();
+                    log("Token acquired, redirecting to app…");
+
+                    window.location.href =
+                        `myapp://auth?token=${encodeURIComponent(token)}`;
+                    return;
+                }
+
+                // 2️⃣ First visit → immediately start Google login
+                const params = new URLSearchParams(window.location.search);
+                if (params.get("mode") === "google") {
+                    status("Redirecting to Google…");
+                    await signInWithRedirect(auth, provider);
+                    return;
+                }
+
+                // 3️⃣ Safety net: wait briefly if auth state is restoring
+                status("Finalizing sign-in…");
+
+                const user = await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(
+                        () => reject(new Error("Auth timeout")),
+                        8000
+                    );
+
+                    const unsub = onAuthStateChanged(auth, user => {
+                        if (user) {
+                            clearTimeout(timeout);
+                            unsub();
+                            resolve(user);
+                        }
+                    });
+                });
+
+                const token = await user.getIdToken();
+                window.location.href =
+                    `myapp://auth?token=${encodeURIComponent(token)}`;
+
+            } catch (err) {
+                status("Authentication error");
+                log(err.message);
+                console.error(err);
+            }
+        })();
+    </script>
 </body>
 
 </html>

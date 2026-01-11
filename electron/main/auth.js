@@ -44,7 +44,7 @@ class AuthManager extends EventEmitter {
         // This URL should be the hosted Firebase Login page that redirects to myapp://
         // For now, we use a placeholder or assume the user has configured one.
         // user instruction: "Assume Firebase web auth & redirect page already exist"
-        const FIREBASE_LOGIN_URL = 'https://draftflow-905d4.web.app/auth-redirect.html?mode=google'; // Points to the robust redirect handler
+        const FIREBASE_LOGIN_URL = 'https://draftflow-905d4.firebaseapp.com/auth-redirect.html?mode=google'; // Points to the robust redirect handler
 
         await shell.openExternal(FIREBASE_LOGIN_URL);
     }

@@ -58,6 +58,10 @@
     ]
   },
   "dependencies": {
+    "chokidar": "^3.6.0",
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
     "@dicebear/collection": "^9.2.4",
     "@fontsource/inter": "^5.2.8",
     "@radix-ui/react-dialog": "^1.0.5",
@@ -68,7 +72,6 @@
     "clsx": "^2.1.0",
     "date-fns": "^3.3.1",
     "firebase": "^12.7.0",
-    "keytar": "^7.9.0",
     "lucide-react": "^0.330.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -78,9 +81,7 @@
     "socket.io-client": "^4.7.4",
     "tailwind-merge": "^2.2.1",
     "three": "^0.161.0",
-    "zustand": "^4.5.0"
-  },
-  "devDependencies": {
+    "zustand": "^4.5.0",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
     "@types/node": "^18.19.17",

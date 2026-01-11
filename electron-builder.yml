@@ -9,6 +9,7 @@ files:
 win:
   executableName: DraftFlow
   target: nsis
+compression: maximum
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

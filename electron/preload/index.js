@@ -31,6 +31,21 @@ const api = {
     saveAttachment: (projectRoot, filePath) => electronAPI.ipcRenderer.invoke('draft:saveAttachment', { projectRoot, filePath }),
     saveMetadata: (projectRoot, relativePath, metadata) => electronAPI.ipcRenderer.invoke('draft:saveMetadata', { projectRoot, relativePath, metadata }),
     getMetadata: (projectRoot, relativePath) => electronAPI.ipcRenderer.invoke('draft:getMetadata', { projectRoot, relativePath })
+  },
+  auth: {
+    login: () => electronAPI.ipcRenderer.invoke('auth:login'),
+    logout: () => electronAPI.ipcRenderer.invoke('auth:logout'),
+    getToken: () => electronAPI.ipcRenderer.invoke('auth:getToken'),
+    onAuthSuccess: (callback) => {
+      const subscription = (_event, token) => callback(token);
+      electronAPI.ipcRenderer.on('auth:success', subscription);
+      return () => electronAPI.ipcRenderer.removeListener('auth:success', subscription);
+    },
+    onLogout: (callback) => {
+      const subscription = () => callback();
+      electronAPI.ipcRenderer.on('auth:logout', subscription);
+      return () => electronAPI.ipcRenderer.removeListener('auth:logout', subscription);
+    }
   }
 }
 

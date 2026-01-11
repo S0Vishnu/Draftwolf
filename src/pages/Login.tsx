@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleAuthProvider, signInWithCredential, sendSignInLinkToEmail } from 'firebase/auth';
 import { useSignInWithGoogle } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase';
 import { toast } from 'react-toastify';
@@ -19,10 +20,50 @@ const GoogleIcon = () => (
 
 const Login = () => {
     const [email, setEmail] = useState('');
+    const [emailLoading, setEmailLoading] = useState(false);
+    const [linkSent, setLinkSent] = useState(false);
     const [signInWithGoogle, googleUser, googleLoading, googleError] = useSignInWithGoogle(auth);
     const navigate = useNavigate();
 
-    // Effect to handle navigation on successful google login
+    // Listen for System Browser Auth Success
+    React.useEffect(() => {
+        if (!window.api || !window.api.auth) return;
+
+        const cleanup = window.api.auth.onAuthSuccess(async (token) => {
+            try {
+                toast.info("Verifying token...");
+                const credential = GoogleAuthProvider.credential(token);
+                await signInWithCredential(auth, credential);
+                toast.success("Logged in via System Browser!");
+                navigate('/home');
+            } catch (error: any) {
+                console.error("Token sign-in failed", error);
+                toast.error("Auth failed: " + error.message);
+            }
+        });
+
+        // Also check if we already have a token on mount (e.g. valid session from day before)
+        // Wait, init() in Main sends success event if valid token exists.
+        // But we might have missed it if we rendered late.
+        // Check manually:
+        window.api.auth.getToken().then(async (token) => {
+            if (token && !auth.currentUser) {
+                // Attempt silent login
+                try {
+                    const credential = GoogleAuthProvider.credential(token);
+                    await signInWithCredential(auth, credential);
+                    // Don't toast here as it's auto-login
+                    navigate('/home'); // Or let auth state listener handle it
+                } catch (e) {
+                    console.error("Auto-login failed:", e);
+                }
+            }
+        });
+
+        return cleanup;
+    }, [navigate]);
+
+    // Effect to handle navigation on successful google login (Legacy/Web fallback)
     React.useEffect(() => {
         if (googleUser) {
             navigate('/home');
@@ -42,14 +83,36 @@ const Login = () => {
         }
     }, [googleError]);
 
-    const handleEmailSignIn = (e: React.FormEvent) => {
+    const handleEmailSignIn = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email) {
             toast.warn("Please enter your email");
             return;
         }
-        // Proceed to OTP page with email state
-        navigate('/verify', { state: { email } });
+
+        try {
+            setEmailLoading(true);
+            const actionCodeSettings = {
+                // URL must be whitelisted in Firebase Console and point to the handler page
+                url: `https://draftflow-905d4.web.app/auth-redirect.html?email=${encodeURIComponent(email)}`,
+                // This must be true.
+                handleCodeInApp: true,
+            };
+
+            await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+
+            // Save email locally (optional if passing in URL, but good practice)
+            window.localStorage.setItem('emailForSignIn', email);
+
+            setLinkSent(true);
+            toast.success("Login link sent! Check your inbox.");
+
+        } catch (error: any) {
+            console.error("Email Link Error:", error);
+            toast.error("Failed to send link: " + error.message);
+        } finally {
+            setEmailLoading(false);
+        }
     };
 
     return (
@@ -63,7 +126,18 @@ const Login = () => {
 
                 <button
                     className="google-btn"
-                    onClick={() => signInWithGoogle()}
+                    onClick={() => {
+                        // Trigger Electron System Browser Login
+                        if (window.api && window.api.auth) {
+                            window.api.auth.login();
+                            // Show loading state here?
+                            // Since the user goes to browser, we might want to say "Check your browser"
+                            toast.info("Opening browser for login...");
+                        } else {
+                            console.error("Auth API not available");
+                            signInWithGoogle(); // Fallback if API missing (e.g. web mode)
+                        }
+                    }}
                     disabled={googleLoading}
                     style={{ opacity: googleLoading ? 0.7 : 1, cursor: googleLoading ? 'wait' : 'pointer' }}
                 >
@@ -77,19 +151,38 @@ const Login = () => {
                     <div className="line"></div>
                 </div>
 
-                <form onSubmit={handleEmailSignIn} className="email-form">
-                    <input
-                        type="email"
-                        placeholder="name@gmail.com"
-                        className="email-input"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
-                    <button type="submit" className="continue-btn">
-                        Continue
-                    </button>
-                </form>
+                {linkSent ? (
+                    <div className="email-sent-state" style={{ textAlign: 'center', margin: '20px 0' }}>
+                        <div style={{ fontSize: '40px', marginBottom: '10px' }}>📧</div>
+                        <h3 style={{ marginBottom: '10px' }}>Check your inbox</h3>
+                        <p style={{ color: '#888', marginBottom: '20px' }}>
+                            We sent a login link to <strong>{email}</strong>.<br />
+                            Click the link to sign in.
+                        </p>
+                        <button
+                            className="back-btn"
+                            style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', textDecoration: 'underline' }}
+                            onClick={() => setLinkSent(false)}
+                        >
+                            Back to login
+                        </button>
+                    </div>
+                ) : (
+                    <form onSubmit={handleEmailSignIn} className="email-form">
+                        <input
+                            type="email"
+                            placeholder="name@gmail.com"
+                            className="email-input"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            disabled={emailLoading}
+                        />
+                        <button type="submit" className="continue-btn" disabled={emailLoading}>
+                            {emailLoading ? 'Sending Link...' : 'Continue'}
+                        </button>
+                    </form>
+                )}
             </div>
         </div>
     );

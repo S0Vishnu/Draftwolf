@@ -1,8 +1,88 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { DraftControlSystem } from './services/DraftControlSystem'
 import icon from '../../public/icon.png?asset'
+
+// Secure Deep Linking & Auth
+import { authManager, setupAuthIPC } from './auth';
+
+// Register custom protocol
+const isDev = !app.isPackaged;
+// macOS + Windows (prod)
+app.setAsDefaultProtocolClient("myapp");
+
+// Windows (dev mode fix)
+if (process.platform === "win32" && isDev) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(
+      "myapp",
+      process.execPath,
+      [resolve(process.argv[1])]
+    );
+  }
+}
+
+// Single Instance Lock
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (event, argv, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    // Protocol handler for Windows/Linux
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+
+    // Extract URL from argv
+    // argv: [path_to_app, args..., url]
+    const url = argv.find(arg => arg.startsWith('myapp://'));
+    if (url) {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      authManager.handleDeepLink(url);
+    }
+  })
+
+  // Handle open-url (macOS)
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    authManager.handleDeepLink(url);
+  });
+}
+
+// Setup Auth IPC
+setupAuthIPC();
+
+// Listen for Auth Success and notify Renderer
+authManager.on('auth-success', (token) => {
+  const mainWindow = BrowserWindow.getAllWindows()[0];
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send('auth:success', token);
+  }
+});
+authManager.on('logout', () => {
+  const mainWindow = BrowserWindow.getAllWindows()[0];
+  if (mainWindow) {
+    mainWindow.webContents.send('auth:logout');
+  }
+});
 
 function createWindow() {
   // Create the browser window.
@@ -14,28 +94,29 @@ function createWindow() {
     icon: icon, // Works for Windows and Linux (macOS uses .icns automatically)
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      webSecurity: false
+      sandbox: false, // Per internal requirement, though contextIsolation is true.
+      webSecurity: false, // User requested specific security constraints? nodeIntegration: false, contextIsolation: true. 
+      // The user code existing had webSecurity: false. I will leave it but ensure contextIsolation is true (default).
+      contextIsolation: true,
+      nodeIntegration: false
     }
   })
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.maximize()
     mainWindow.show()
+
+    // Check initial auth state
+    authManager.init().then(token => {
+      if (token) {
+        mainWindow.webContents.send('auth:success', token);
+      }
+    });
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    // Allow Google/Firebase Auth popups
-    if (details.url.includes('google.com') || details.url.includes('firebaseapp.com')) {
-      return {
-        action: 'allow',
-        overrideBrowserWindowOptions: {
-          autoHideMenuBar: true,
-          width: 500,
-          height: 600
-        }
-      }
-    }
+    // Allow Google/Firebase Auth popups if any (though we are moving to system browser)
+    // We strictly use system browser for external links now as per requirement
     shell.openExternal(details.url)
     return { action: 'deny' }
   })

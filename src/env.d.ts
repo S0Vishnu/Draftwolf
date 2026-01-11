@@ -40,6 +40,13 @@ interface Window {
       delete: (projectRoot: string, versionId: string) => Promise<boolean>;
       extract: (projectRoot: string, versionId: string, relativePath: string, destPath: string) => Promise<boolean>;
     };
+    auth: {
+      login: () => Promise<void>;
+      logout: () => Promise<boolean>;
+      getToken: () => Promise<string | null>;
+      onAuthSuccess: (callback: (token: string) => void) => () => void;
+      onLogout: (callback: () => void) => () => void;
+    };
   };
 }
 

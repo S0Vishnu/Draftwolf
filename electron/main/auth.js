@@ -1,4 +1,4 @@
-import { ipcMain, shell, safeStorage } from 'electron';
+import { app, ipcMain, shell, safeStorage } from 'electron';
 import keytar from 'keytar';
 import { EventEmitter } from 'events';
 
@@ -44,7 +44,8 @@ class AuthManager extends EventEmitter {
         // This URL should be the hosted Firebase Login page that redirects to myapp://
         // For now, we use a placeholder or assume the user has configured one.
         // user instruction: "Assume Firebase web auth & redirect page already exist"
-        const FIREBASE_LOGIN_URL = 'https://draftflow-905d4.firebaseapp.com/auth-redirect.html?mode=google'; // Points to the robust redirect handler
+        // Use local dev server for auth when developing to test changes immediately
+        const FIREBASE_LOGIN_URL = 'https://draftflow-905d4.firebaseapp.com/auth-redirect.html?mode=google';
 
         await shell.openExternal(FIREBASE_LOGIN_URL);
     }

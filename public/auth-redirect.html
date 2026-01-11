@@ -94,50 +94,48 @@
 
                 status("Checking sign-in result…");
 
-                // 1️⃣ If we just returned from Google, this will exist
+                // 1️⃣ Check for Redirect Result (Google Credential)
                 const result = await getRedirectResult(auth);
 
-                if (result?.user) {
-                    status("Sign-in successful");
-                    log(`User: ${result.user.email}`);
+                if (result) {
+                    // ✅ FIXED: Get the Google ID Token (from IdP), NOT the Firebase ID Token
+                    // The Electron app needs this Google Token to call signInWithCredential/GoogleAuthProvider
+                    const credential = GoogleAuthProvider.credentialFromResult(result);
+                    const googleToken = credential?.idToken;
 
-                    const token = await result.user.getIdToken();
-                    log("Token acquired, redirecting to app…");
+                    if (googleToken) {
+                        status("Sign-in successful");
+                        log(`User: ${result.user.email}`);
+                        log("Google Token acquired, redirecting to app…");
 
-                    window.location.href =
-                        `myapp://auth?token=${encodeURIComponent(token)}`;
-                    return;
+                        window.location.href =
+                            `myapp://auth?token=${encodeURIComponent(googleToken)}`;
+                        return;
+                    } else {
+                        throw new Error("Google Sign-In succeeded, but no ID Token was returned. Check scopes.");
+                    }
                 }
 
                 // 2️⃣ First visit → immediately start Google login
                 const params = new URLSearchParams(window.location.search);
                 if (params.get("mode") === "google") {
                     status("Redirecting to Google…");
+                    // Force a new login to ensure we get a fresh Google Credential
                     await signInWithRedirect(auth, provider);
                     return;
                 }
 
-                // 3️⃣ Safety net: wait briefly if auth state is restoring
-                status("Finalizing sign-in…");
+                // 3️⃣ Fallback: weird state (logged in but no credential?).
+                // We cannot proceed because we need the Google Token which is not persisted in session.
+                status("No credentials found. Please restart login.");
+                log("Error: Session exists but Google Credential is lost. Redirecting to login...");
 
-                const user = await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(
-                        () => reject(new Error("Auth timeout")),
-                        8000
-                    );
-
-                    const unsub = onAuthStateChanged(auth, user => {
-                        if (user) {
-                            clearTimeout(timeout);
-                            unsub();
-                            resolve(user);
-                        }
-                    });
-                });
-
-                const token = await user.getIdToken();
-                window.location.href =
-                    `myapp://auth?token=${encodeURIComponent(token)}`;
+                // Optional: Auto-retry logic
+                setTimeout(() => {
+                    const cleanUrl = new URL(window.location.href);
+                    cleanUrl.searchParams.set("mode", "google");
+                    window.location.href = cleanUrl.toString();
+                }, 2000);
 
             } catch (err) {
                 status("Authentication error");

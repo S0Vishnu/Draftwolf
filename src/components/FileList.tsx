@@ -53,6 +53,7 @@ const FileList: React.FC<FileListProps> = ({
                     <div className="col col-name sortable" onClick={() => onSort('name')}>
                         Name {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </div>
+                    <div className="col col-version">Version</div>
                     <div className="col col-date sortable" onClick={() => onSort('mtime')}>
                         Date Modified {sortConfig?.key === 'mtime' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </div>
@@ -60,7 +61,6 @@ const FileList: React.FC<FileListProps> = ({
                         Size {sortConfig?.key === 'size' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </div>
                     <div className="col col-type">Type</div>
-                    <div className="col col-version">Version</div>
                 </div>
             )}
 

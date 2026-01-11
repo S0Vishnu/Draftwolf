@@ -110,12 +110,13 @@ const FileItem: React.FC<FileItemProps> = ({
                     )}
                 </div>
 
+                <div className="col col-version">
+                    {file.latestVersion ? <span className="version-badge-list">v{file.latestVersion}</span> : ''}
+                </div>
+
                 <div className="col col-date">{formatDate(file.mtime)}</div>
                 <div className="col col-size">{!file.isDirectory ? formatSize(file.size) : '--'}</div>
                 <div className="col col-type">{file.type || 'Unknown'}</div>
-                <div className="col col-version">
-                    {file.latestVersion ? <span className="version-badge">v{file.latestVersion}</span> : ''}
-                </div>
             </div>
         );
     }

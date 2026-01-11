@@ -39,6 +39,7 @@ interface Window {
       restore: (projectRoot: string, versionId: string) => Promise<boolean>;
       delete: (projectRoot: string, versionId: string) => Promise<boolean>;
       extract: (projectRoot: string, versionId: string, relativePath: string, destPath: string) => Promise<boolean>;
+      getFileVersion: (projectRoot: string, relativePath: string) => Promise<string | null>;
     };
     auth: {
       login: () => Promise<void>;

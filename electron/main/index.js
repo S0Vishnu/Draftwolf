@@ -474,3 +474,14 @@ ipcMain.handle('draft:extract', async (_, { projectRoot, versionId, relativePath
   }
 });
 
+ipcMain.handle('draft:getFileVersion', async (_, { projectRoot, relativePath }) => {
+  try {
+    const dcs = new DraftControlSystem(projectRoot);
+    const version = await dcs.getLatestVersionForFile(relativePath);
+    return version;
+  } catch (e) {
+    console.error('Draft Get File Version Failed:', e);
+    return null;
+  }
+});
+

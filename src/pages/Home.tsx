@@ -139,12 +139,24 @@ const Home = () => {
     const fetchStats = async (entry: FileEntry): Promise<FileEntry> => {
         try {
             const stats = await window.api.getStats(entry.path);
+
+            let latestVersion: string | undefined;
+            if (rootDir && entry.path.startsWith(rootDir) && !stats?.isDirectory) {
+                // Calculate relative path
+                let rel = entry.path.substring(rootDir.length);
+                if (rel.startsWith('\\') || rel.startsWith('/')) rel = rel.substring(1);
+
+                const v = await window.api.draft.getFileVersion(rootDir, rel);
+                if (v) latestVersion = v;
+            }
+
             if (stats) {
                 return {
                     ...entry,
                     size: stats.size,
                     mtime: new Date(stats.mtime),
-                    type: stats.isDirectory ? 'Folder' : (entry.name.split('.').pop()?.toUpperCase() || 'File') + ' File'
+                    type: stats.isDirectory ? 'Folder' : (entry.name.split('.').pop()?.toUpperCase() || 'File') + ' File',
+                    latestVersion
                 };
             }
         } catch (e) { console.error(e); }
@@ -168,32 +180,6 @@ const Home = () => {
             // Filter out .draft
             const visibleEntries = entries.filter((e: FileEntry) => e.name !== '.draft');
             let processed = await Promise.all(visibleEntries.map(fetchStats));
-
-            // Fetch versions if in a project
-            if (rootDir) {
-                try {
-                    const versions = await window.api.draft.getFileVersions(rootDir);
-                    processed = processed.map(f => {
-                        // Normalize path to match relative keys in versions map
-                        // Remove rootDir from path
-                        let relPath = f.path;
-                        if (relPath.startsWith(rootDir)) {
-                            relPath = relPath.substring(rootDir.length);
-                        }
-                        // Remove leading slash/backslash
-                        relPath = relPath.replace(/^[/\\]/, '');
-                        // Force forward slashes
-                        relPath = relPath.replace(/\\/g, '/');
-
-                        if (versions[relPath]) {
-                            return { ...f, latestVersion: versions[relPath] };
-                        }
-                        return f;
-                    });
-                } catch (err) {
-                    console.error("Failed to fetch versions:", err);
-                }
-            }
 
             if (sortConfig) {
                 processed = sortFiles(processed, sortConfig);

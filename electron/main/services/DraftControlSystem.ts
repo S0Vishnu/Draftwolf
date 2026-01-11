@@ -476,6 +476,25 @@ export class DraftControlSystem {
   }
 
   /**
+   * Get the latest version number for a specific file.
+   */
+  async getLatestVersionForFile(relativePath: string): Promise<string | null> {
+    const history = await this.getHistory();
+    // Normalize path just in case
+    const target = relativePath.replace(/\\/g, '/');
+
+    // Count how many versions contain this file
+    let count = 0;
+    for (const manifest of history) {
+      if (manifest.files[target]) {
+        count++;
+      }
+    }
+
+    return count > 0 ? count.toString() : null;
+  }
+
+  /**
    * Extract a specific file from a version to a destination.
    */
   async extractFile(versionId: string, relativeFilePath: string, destPath: string): Promise<void> {

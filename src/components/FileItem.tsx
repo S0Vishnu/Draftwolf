@@ -9,6 +9,7 @@ export interface FileEntry {
     size?: number;
     mtime?: Date;
     type?: string;
+    latestVersion?: string;
 }
 
 interface FileItemProps {
@@ -112,6 +113,9 @@ const FileItem: React.FC<FileItemProps> = ({
                 <div className="col col-date">{formatDate(file.mtime)}</div>
                 <div className="col col-size">{!file.isDirectory ? formatSize(file.size) : '--'}</div>
                 <div className="col col-type">{file.type || 'Unknown'}</div>
+                <div className="col col-version">
+                    {file.latestVersion ? <span className="version-badge">v{file.latestVersion}</span> : ''}
+                </div>
             </div>
         );
     }
@@ -126,6 +130,11 @@ const FileItem: React.FC<FileItemProps> = ({
             onContextMenu={onContextMenu}
         >
             <div className="card-icon">
+                {file.latestVersion && (
+                    <div className="version-indicator-tile">
+                        v{file.latestVersion}
+                    </div>
+                )}
                 {file.isDirectory ?
                     <Folder size={48} className="folder-icon-large" /> :
                     <File size={48} className="file-icon-large" />

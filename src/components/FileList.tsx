@@ -60,6 +60,7 @@ const FileList: React.FC<FileListProps> = ({
                         Size {sortConfig?.key === 'size' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </div>
                     <div className="col col-type">Type</div>
+                    <div className="col col-version">Version</div>
                 </div>
             )}
 

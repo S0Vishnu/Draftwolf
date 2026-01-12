@@ -32,6 +32,7 @@ interface Window {
     watchDir: (path: string) => Promise<boolean>;
     onFileChange: (callback: (data: { event: string; path: string }) => void) => () => void;
     confirm: (options: { message: string, title?: string, type?: string, buttons?: string[] }) => Promise<boolean>;
+    quitApp: () => void;
     draft: {
       init: (projectRoot: string) => Promise<boolean>;
       commit: (projectRoot: string, label: string, files: string[]) => Promise<{ success: boolean; versionId?: string; error?: string }>;

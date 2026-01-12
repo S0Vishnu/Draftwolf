@@ -163,9 +163,15 @@ const Home = () => {
         };
     }, [currentPath]);
 
-    const handleSignOut = () => {
-        signOut();
-        navigate('/');
+    const handleCloseApp = async () => {
+        try {
+            if (window.api && window.api.quitApp) {
+                window.api.quitApp();
+            }
+        } catch (error) {
+            console.error("Error closing app:", error);
+            toast.error("Failed to close app");
+        }
     };
 
     const closeWorkspace = () => {
@@ -888,7 +894,7 @@ const Home = () => {
                     />
                 )}
             </div>
-            <Footer onShutDown={handleSignOut} />
+            <Footer onShutDown={handleCloseApp} />
 
             {contextMenu && (
                 <ContextMenu

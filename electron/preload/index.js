@@ -21,6 +21,7 @@ const api = {
     return () => electronAPI.ipcRenderer.removeListener('fs:fileChanged', subscription);
   },
   confirm: (options) => electronAPI.ipcRenderer.invoke('dialog:confirm', options),
+  quitApp: () => electronAPI.ipcRenderer.send('app:quit'),
   draft: {
     init: (projectRoot) => electronAPI.ipcRenderer.invoke('draft:init', projectRoot),
     commit: (projectRoot, label, files) => electronAPI.ipcRenderer.invoke('draft:commit', { projectRoot, label, files }),

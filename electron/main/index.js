@@ -147,6 +147,10 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+  ipcMain.on('app:quit', () => {
+    app.quit();
+  })
+
   ipcMain.handle('dialog:openFile', async (_, options) => {
     const { canceled, filePaths } = await import('electron').then(mod =>
       mod.dialog.showOpenDialog({

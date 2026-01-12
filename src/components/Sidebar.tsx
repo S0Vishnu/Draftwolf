@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home as HomeIcon, Folder, Settings as SettingsIcon, User as UserIcon, Clock } from 'lucide-react';
+import { Home as HomeIcon, Folder, Settings as SettingsIcon, User as UserIcon, FileText } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -16,7 +16,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, onOpenFolder, onGoHome,
     const location = useLocation();
     const isActive = (path: string) => location.pathname === path;
 
-    const handleHomeClick = () => {
+    const handleRecentsClick = () => {
+        if (onGoHome) {
+            onGoHome();
+        } else {
+            if (location.pathname !== '/home') {
+                navigate('/home');
+            }
+        }
+    };
+
+    const handleWorkspaceClick = () => {
         if (location.pathname !== '/home') {
             navigate('/home');
         }
@@ -26,23 +36,23 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, onOpenFolder, onGoHome,
         <aside className={`sidebar ${!isOpen ? 'collapsed' : ''}`}>
             <div className="sidebar-content">
                 <div className="sidebar-top">
-                    {/* Home Icon: Active when on /home AND we have a working space open */}
+                    {/* Home / Recent Workspaces Button */}
                     <button
-                        className={`side-btn ${isActive('/home') && hasActiveWorkspace ? 'active' : ''}`}
-                        onClick={handleHomeClick}
-                        title="Workspace"
+                        className={`side-btn ${isActive('/home') && !hasActiveWorkspace ? 'active' : ''}`}
+                        onClick={handleRecentsClick}
+                        title="Recent Workspaces"
                     >
                         <HomeIcon size={22} />
                     </button>
 
-                    {/* Clock Icon: Active when on /home AND NO working space is open */}
-                    {onGoHome && (
+                    {/* Current Workspace Button - Only visible when workspace is active */}
+                    {hasActiveWorkspace && (
                         <button
-                            className={`side-btn ${isActive('/home') && !hasActiveWorkspace ? 'active' : ''}`}
-                            onClick={onGoHome}
-                            title="Recent Workspaces"
+                            className={`side-btn ${isActive('/home') && hasActiveWorkspace ? 'active' : ''}`}
+                            onClick={handleWorkspaceClick}
+                            title="Current Workspace"
                         >
-                            <Clock size={22} />
+                            <FileText size={22} />
                         </button>
                     )}
 

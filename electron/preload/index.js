@@ -18,8 +18,7 @@ const api = {
   downloadAddon: () => electronAPI.ipcRenderer.invoke('addon:download'),
   onFileChange: (callback) => {
     const subscription = (_event, value) => callback(value);
-    electronAPI.ipcRenderer.on('fs:fileChanged', subscription);
-    return () => electronAPI.ipcRenderer.removeListener('fs:fileChanged', subscription);
+    return electronAPI.ipcRenderer.on('fs:fileChanged', subscription);
   },
   confirm: (options) => electronAPI.ipcRenderer.invoke('dialog:confirm', options),
   quitApp: () => electronAPI.ipcRenderer.send('app:quit'),
@@ -41,13 +40,28 @@ const api = {
     getToken: () => electronAPI.ipcRenderer.invoke('auth:getToken'),
     onAuthSuccess: (callback) => {
       const subscription = (_event, token) => callback(token);
-      electronAPI.ipcRenderer.on('auth:success', subscription);
-      return () => electronAPI.ipcRenderer.removeListener('auth:success', subscription);
+      return electronAPI.ipcRenderer.on('auth:success', subscription);
     },
     onLogout: (callback) => {
       const subscription = () => callback();
-      electronAPI.ipcRenderer.on('auth:logout', subscription);
-      return () => electronAPI.ipcRenderer.removeListener('auth:logout', subscription);
+      return electronAPI.ipcRenderer.on('auth:logout', subscription);
+    }
+  },
+  updater: {
+    check: () => electronAPI.ipcRenderer.invoke('update:check'),
+    download: () => electronAPI.ipcRenderer.invoke('update:download'),
+    install: () => electronAPI.ipcRenderer.invoke('update:install'),
+    onAvailable: (callback) => {
+      const sub = (_event, info) => callback(info);
+      return electronAPI.ipcRenderer.on('update:available', sub);
+    },
+    onDownloaded: (callback) => {
+      const sub = (_event, info) => callback(info);
+      return electronAPI.ipcRenderer.on('update:downloaded', sub);
+    },
+    onProgress: (callback) => {
+      const sub = (_event, info) => callback(info);
+      return electronAPI.ipcRenderer.on('update-progress', sub);
     }
   }
 }

@@ -1,9 +1,11 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { DraftControlSystem } from './services/DraftControlSystem'
 import AdmZip from 'adm-zip'
 import icon from '../../public/icon.png?asset'
+import { autoUpdater } from 'electron-updater'
+import log from 'electron-log'
 
 // Secure Deep Linking & Auth
 import { authManager, setupAuthIPC } from './auth';
@@ -364,6 +366,59 @@ app.whenReady().then(() => {
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // Auto Updater
+  // Auto Updater
+  if (!is.dev) {
+    autoUpdater.autoDownload = false;
+    autoUpdater.logger = log;
+    log.transports.file.level = "info";
+    log.info("App starting...");
+
+    autoUpdater.on("download-progress", (progressObj) => {
+      log.info("Download Progress:", progressObj);
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.webContents.send("update-progress", progressObj);
+    });
+
+    autoUpdater.on("update-available", (info) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.webContents.send("update:available", info);
+    });
+
+    autoUpdater.on("update-downloaded", (info) => {
+      log.info("Update downloaded, ready to install");
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.webContents.send("update:downloaded", info);
+    });
+
+    autoUpdater.on("error", (err) => {
+      log.error("AutoUpdater Error:", err);
+    });
+
+    ipcMain.handle('update:check', () => {
+      log.info("Checking for updates...");
+      return autoUpdater.checkForUpdates();
+    });
+
+    ipcMain.handle('update:download', () => {
+      log.info("Downloading update...");
+      return autoUpdater.downloadUpdate();
+    });
+
+    ipcMain.handle('update:install', () => {
+      log.info("Installing update...");
+      // Close all windows first
+      BrowserWindow.getAllWindows().forEach((window) => {
+        window.close();
+      });
+
+      setTimeout(() => {
+        autoUpdater.quitAndInstall(true, true);
+      }, 500);
+      return true;
+    });
+  }
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

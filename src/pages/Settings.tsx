@@ -18,6 +18,7 @@ interface UserSettings {
     dndEnd: string;
     notificationsEnabled: boolean;
     avatarSeed: string;
+    checkUpdates: boolean;
 }
 
 const Settings = () => {
@@ -33,7 +34,8 @@ const Settings = () => {
         dndStart: '22:00',
         dndEnd: '08:00',
         notificationsEnabled: true,
-        avatarSeed: ''
+        avatarSeed: '',
+        checkUpdates: true
     };
 
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
@@ -437,6 +439,34 @@ const Settings = () => {
                                 </button>
                             </div>
 
+
+
+                            {/* System / Updates */}
+                            <div className="glass-panel">
+                                <h2 className="panel-title" style={{ marginBottom: '1.5rem' }}>
+                                    <RefreshCw size={24} style={{ color: '#ec4899' }} />
+                                    Updates
+                                </h2>
+
+                                <div className="setting-row">
+                                    <div className="setting-info">
+                                        <h3>Automatic Updates</h3>
+                                        <p>Check for updates on launch</p>
+                                    </div>
+                                    <label className="toggle-switch">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.checkUpdates ?? true}
+                                            onChange={e => updatePreference('checkUpdates', e.target.checked)}
+                                            className="toggle-input"
+                                        />
+                                        <span className="toggle-slider">
+                                            <span className="toggle-knob"></span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
                             {/* Privacy / Other */}
                             <div className="glass-panel">
                                 <h2 className="panel-title" style={{ marginBottom: '1rem' }}>
@@ -464,7 +494,7 @@ const Settings = () => {
                             Sign Out of Draftflow as {user?.email}
                         </button>
                     </div>
-                </main>
+                </main >
             </div >
         </div >
     );

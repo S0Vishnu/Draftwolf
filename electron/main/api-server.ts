@@ -41,6 +41,16 @@ export function startApiServer() {
                 return;
             }
 
+            // Init
+            if (url.pathname === '/draft/init' && req.method === 'POST') {
+                const { projectRoot } = await getBody();
+                const dcs = new DraftControlSystem(projectRoot);
+                await dcs.init();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+                return;
+            }
+
             // Commit
             if (url.pathname === '/draft/commit' && req.method === 'POST') {
                 const { projectRoot, label, files } = await getBody();

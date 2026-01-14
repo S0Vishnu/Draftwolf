@@ -20,11 +20,17 @@
     "typecheck": "tsc --noEmit"
   },
   "build": {
-    "appId": "com.example.draftflow",
+    "appId": "com.draftflow.app",
     "productName": "DraftFlow",
     "directories": {
       "output": "dist"
     },
+    "extraResources": [
+      {
+        "from": "aadons",
+        "to": "aadons"
+      }
+    ],
     "files": [
       "out/**"
     ],
@@ -39,7 +45,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "DraftFlow"
+      "shortcutName": "DraftFlow",
+      "artifactName": "${productName} ${version}.${ext}"
     },
     "protocols": [
       {

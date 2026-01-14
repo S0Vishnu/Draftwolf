@@ -181,6 +181,30 @@ class OBJECT_OT_DfRetrieve(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
 
+
+class OBJECT_OT_DfInit(bpy.types.Operator):
+    """Initialize DraftFlow in this directory"""
+    bl_idname = "draftflow.init"
+    bl_label = "Initialize Project"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        filepath = bpy.data.filepath
+        if not filepath:
+            self.report({'ERROR'}, "Save file first.")
+            return {'CANCELLED'}
+            
+        directory = os.path.dirname(filepath)
+        
+        res = send_request('/draft/init', {'projectRoot': directory})
+        if res and res.get('success'):
+            self.report({'INFO'}, "Project Initialized!")
+        else:
+            self.report({'ERROR'}, "Failed to initialize project via App.")
+            
+        return {'FINISHED'}
+
+
 class OBJECT_OT_DfOpenApp(bpy.types.Operator):
     """Open or Link to the DraftFlow App"""
     bl_idname = "draftflow.open_app"
@@ -236,6 +260,10 @@ class DF_PT_MainPanel(bpy.types.Panel):
         row.operator("draftflow.retrieve", icon="FILE_REFRESH")
         
         layout.separator()
+        layout.label(text="Setup")
+        layout.operator("draftflow.init", icon="FILE_NEW")
+        
+        layout.separator()
         layout.label(text="Application")
         layout.operator("draftflow.open_app", icon="WINDOW")
 
@@ -245,6 +273,7 @@ class DF_PT_MainPanel(bpy.types.Panel):
 classes = (
     OBJECT_OT_DfCommit,
     OBJECT_OT_DfRetrieve,
+    OBJECT_OT_DfInit,
     OBJECT_OT_DfOpenApp,
     DF_PT_MainPanel
 )

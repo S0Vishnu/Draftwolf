@@ -238,9 +238,22 @@ const Home = () => {
             }
 
             setFiles(processed);
-            setCurrentPath(path);
-            setSelectedPaths(new Set());
-            setLastSelectedPath(null);
+            if (path !== currentPath) {
+                setCurrentPath(path);
+                setSelectedPaths(new Set());
+                setLastSelectedPath(null);
+            } else {
+                // Refreshing: Preserve selection if files still exist
+                const existPaths = new Set(processed.map(p => p.path));
+                setSelectedPaths(prev => {
+                    const next = new Set<string>();
+                    prev.forEach(p => {
+                        if (existPaths.has(p)) next.add(p);
+                    });
+                    return next;
+                });
+                setLastSelectedPath(prev => (prev && existPaths.has(prev)) ? prev : null);
+            }
             setIsCreating(null);
         } catch (error: any) {
             console.error("Failed to load directory", error);

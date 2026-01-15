@@ -219,21 +219,26 @@ app.whenReady().then(() => {
     try {
       const fs = await import('fs/promises');
       await fs.mkdir(folderPath);
-      return true;
+      return { success: true };
     } catch (error) {
       console.error('Failed to create folder:', error);
-      return false;
+      let msg = 'Failed to create folder';
+      if (error.code === 'EEXIST') msg = 'Folder already exists';
+      return { success: false, error: msg };
     }
   })
 
   ipcMain.handle('fs:createFile', async (_, filePath) => {
     try {
       const fs = await import('fs/promises');
-      await fs.writeFile(filePath, '');
-      return true;
+      // Use 'wx' flag to fail if path exists
+      await fs.writeFile(filePath, '', { flag: 'wx' });
+      return { success: true };
     } catch (error) {
       console.error('Failed to create file:', error);
-      return false;
+      let msg = 'Failed to create file';
+      if (error.code === 'EEXIST') msg = 'File already exists';
+      return { success: false, error: msg };
     }
   })
 
@@ -252,6 +257,21 @@ app.whenReady().then(() => {
     try {
       const fs = await import('fs/promises');
       const path = await import('path');
+
+      // Check if destination exists
+      try {
+        await fs.access(newPath);
+        // If it exists, check if it's just a case change on the same file (Windows)
+        const isCaseRename = process.platform === 'win32' && oldPath.toLowerCase() === newPath.toLowerCase();
+        const isSameFile = oldPath === newPath;
+
+        if (!isCaseRename && !isSameFile) {
+          return { success: false, error: 'A file or folder with this name already exists' };
+        }
+      } catch (e) {
+        // Destination doesn't exist, proceed
+      }
+
       await fs.rename(oldPath, newPath);
 
       // Attempt to move metadata if we are in a tracked project
@@ -273,10 +293,10 @@ app.whenReady().then(() => {
         // Don't fail the rename operation just because metadata move failed
       }
 
-      return true;
+      return { success: true };
     } catch (error) {
       console.error('Failed to rename entry:', error);
-      return false;
+      return { success: false, error: 'Failed to rename entry' };
     }
   })
 

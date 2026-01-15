@@ -21,10 +21,10 @@ interface Window {
     openFile: () => Promise<string | null>;
     openFolder: () => Promise<string | null>;
     readDir: (path: string) => Promise<{ name: string; isDirectory: boolean; path: string }[]>;
-    createFolder: (path: string) => Promise<boolean>;
-    createFile: (path: string) => Promise<boolean>;
+    createFolder: (path: string) => Promise<{ success: boolean; error?: string }>;
+    createFile: (path: string) => Promise<{ success: boolean; error?: string }>;
     deleteEntry: (path: string) => Promise<boolean>;
-    renameEntry: (oldPath: string, newPath: string) => Promise<boolean>;
+    renameEntry: (oldPath: string, newPath: string) => Promise<{ success: boolean; error?: string }>;
     copyEntry: (sourcePath: string, destPath: string) => Promise<boolean>;
     showInFolder: (path: string) => Promise<boolean>;
     openPath: (path: string) => Promise<boolean>;

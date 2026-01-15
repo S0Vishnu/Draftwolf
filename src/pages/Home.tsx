@@ -539,13 +539,16 @@ const Home = () => {
     const handleRenameSubmit = async () => {
         if (!renamingFile || !currentPath || !renameValue) return;
         const newPath = `${currentPath}/${renameValue}`;
-        const success = await window.api.renameEntry(renamingFile, newPath);
-        if (success) {
+        const result = await window.api.renameEntry(renamingFile, newPath);
+        if (result.success) {
             setRenamingFile(null);
             refreshDirectory();
             toast.success('Renamed successfully');
         }
-        else toast.error("Failed to rename.");
+        else {
+            toast.error(result.error || "Failed to rename.");
+            cancelRenaming(); // Revert to original state on failure
+        }
     };
 
     const getUniqueName = (baseName: string, isFolder: boolean) => {
@@ -585,16 +588,16 @@ const Home = () => {
             return;
         }
         const targetPath = `${currentPath}/${creationName.trim()}`;
-        const success = isCreating === 'folder'
+        const result = isCreating === 'folder'
             ? await window.api.createFolder(targetPath)
             : await window.api.createFile(targetPath);
 
-        if (success) {
+        if (result.success) {
             setIsCreating(null);
             refreshDirectory();
             toast.success(`Created ${isCreating}`);
         } else {
-            toast.error("Failed to create item");
+            toast.error(result.error || "Failed to create item");
         }
     };
 

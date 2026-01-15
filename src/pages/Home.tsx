@@ -128,7 +128,12 @@ const Home = () => {
     const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean, targets: FileEntry[] }>({ isOpen: false, targets: [] });
 
     // Computed
-    const filteredFiles = files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredFiles = files.filter(f => {
+        const query = searchQuery.toLowerCase();
+        const matchesName = f.name.toLowerCase().includes(query);
+        const matchesTags = f.tags ? f.tags.some(t => t.toLowerCase().includes(query)) : false;
+        return matchesName || matchesTags;
+    });
 
     const [activeFile, setActiveFile] = useState<FileEntry | null>(null);
 
@@ -188,6 +193,8 @@ const Home = () => {
             const stats = await window.api.getStats(entry.path);
 
             let latestVersion: string | undefined;
+            let tags: string[] = [];
+
             if (rootDir && entry.path.startsWith(rootDir) && !stats?.isDirectory) {
                 // Calculate relative path
                 let rel = entry.path.substring(rootDir.length);
@@ -195,6 +202,12 @@ const Home = () => {
 
                 const v = await window.api.draft.getFileVersion(rootDir, rel);
                 if (v) latestVersion = v;
+
+                // @ts-ignore
+                const meta = await window.api.draft.getMetadata(rootDir, rel);
+                if (meta && meta.tags) {
+                    tags = meta.tags;
+                }
             }
 
             if (stats) {
@@ -203,7 +216,8 @@ const Home = () => {
                     size: stats.size,
                     mtime: new Date(stats.mtime),
                     type: stats.isDirectory ? 'Folder' : (entry.name.split('.').pop()?.toUpperCase() || 'File') + ' File',
-                    latestVersion
+                    latestVersion,
+                    tags
                 };
             }
         } catch (e) { console.error(e); }

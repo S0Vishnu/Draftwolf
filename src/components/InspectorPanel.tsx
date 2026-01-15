@@ -1,9 +1,12 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-    X, Folder, File, Info, CheckCircle, Layers, Paperclip,
-    Download, Trash2, GitBranch, RotateCcw, Plus, CheckSquare, Image as ImageIcon, Upload
+    X, Info, Layers, Paperclip, GitBranch, Image as ImageIcon,
+    Trash2, RotateCcw, Upload, Plus, CheckCircle, Download,
+    Tag
 } from 'lucide-react';
 import { FileEntry } from './FileItem';
+import FileIcon from './FileIcon';
 import '../styles/InspectorPanel.css';
 
 import ConfirmDialog from './ConfirmDialog';
@@ -43,6 +46,18 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+
+    // Tags State
+    const [tags, setTags] = useState<string[]>([]);
+    const [tagInput, setTagInput] = useState('');
+    const [showTagInput, setShowTagInput] = useState(false);
+    const tagInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (showTagInput && tagInputRef.current) {
+            tagInputRef.current.focus();
+        }
+    }, [showTagInput]);
 
 
     // Version State
@@ -92,9 +107,11 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 if (meta) {
                     setTodos(meta.tasks || []);
                     setAttachments(meta.attachments || []);
+                    setTags(meta.tags || []);
                 } else {
                     setTodos([]);
                     setAttachments([]);
+                    setTags([]);
                 }
             } catch (e) {
                 console.error("Failed to load metadata", e);
@@ -112,11 +129,40 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             // @ts-ignore
             await window.api.draft.saveMetadata(projectRoot, relPath, {
                 tasks: newTodos,
-                attachments: newAttachments
+                attachments: newAttachments,
+                tags: tags // Pass current tags
             });
         } catch (e) {
             console.error("Failed to save metadata", e);
         }
+    };
+
+    const saveTags = (newTags: string[]) => {
+        setTags(newTags);
+        // We need to persist via metadata
+        const relPath = getRelativePath();
+        if (!relPath || !projectRoot) return;
+
+        // Use current todos and attachments
+        // @ts-ignore
+        window.api.draft.saveMetadata(projectRoot, relPath, {
+            tasks: todos,
+            attachments: attachments,
+            tags: newTags
+        }).catch((e: any) => console.error(e));
+    };
+
+    const addTag = () => {
+        const val = tagInput.trim();
+        if (val && !tags.includes(val)) {
+            const newTags = [...tags, val];
+            saveTags(newTags);
+            setTagInput('');
+        }
+    };
+
+    const removeTag = (t: string) => {
+        saveTags(tags.filter(tag => tag !== t));
     };
 
     const saveTodos = (newTodos: TodoItem[]) => {
@@ -320,7 +366,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             nameWithoutExt = parts.join('.');
         }
 
-        const newFileName = `${nameWithoutExt}-v${customVerNum}${ext}`;
+        const newFileName = `${nameWithoutExt} -v${customVerNum}${ext} `;
         const parentDir = file.path.substring(0, file.path.lastIndexOf(file.name));
         const destPath = parentDir + newFileName;
 
@@ -329,7 +375,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 // @ts-ignore
                 await window.api.draft.extract(projectRoot, ver.id, relativePath, destPath);
             } catch (e: any) {
-                alert(`Failed to save: ${e.message || e}`);
+                alert(`Failed to save: ${e.message || e} `);
             }
             setConfirmState(prev => ({ ...prev, isOpen: false }));
         };
@@ -341,7 +387,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             setConfirmState({
                 isOpen: true,
                 title: 'File Exists',
-                message: `"${newFileName}" already exists. Do you want to overwrite it?`,
+                message: `"${newFileName}" already exists.Do you want to overwrite it ? `,
                 confirmText: 'Overwrite',
                 isDangerous: false,
                 onConfirm: performExtraction
@@ -395,7 +441,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         setConfirmState({
             isOpen: true,
             title: 'Delete All Other Versions?',
-            message: `Are you sure you want to delete ${versionsToDelete.length} older version(s)? This will keep only the current version (${currentVersion.versionNumber || currentVersion.id}). This action cannot be undone.`,
+            message: `Are you sure you want to delete ${versionsToDelete.length} older version(s) ? This will keep only the current version(${currentVersion.versionNumber || currentVersion.id}).This action cannot be undone.`,
             confirmText: 'Delete All Others',
             isDangerous: true,
             onConfirm: async () => {
@@ -582,10 +628,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 return (
                     <>
                         <div className="preview-large">
-                            {file.isDirectory ?
-                                <Folder size={64} className="preview-icon-folder" color="#5e6ad2" /> :
-                                <File size={64} className="preview-icon-file" color="#aaa" />
-                            }
+                            <FileIcon name={file.name} isDirectory={file.isDirectory} size={90} />
                         </div>
                         <div className="inspector-props">
                             <div className="prop-row">
@@ -607,6 +650,55 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                             <div className="prop-row">
                                 <label>Full Path</label>
                                 <div className="val path-val">{file.path}</div>
+                            </div>
+
+                            <div className="prop-row">
+                                <div className="tags-header">
+                                    <label>Tags</label>
+                                    {!showTagInput && (
+                                        <button
+                                            className="add-tag-icon-btn"
+                                            onClick={() => setShowTagInput(true)}
+                                            title="Add new tag"
+                                        >
+                                            <Plus size={12} />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="tags-wrapper">
+                                    {tags.map(t => (
+                                        <div key={t} className="info-tag-badge">
+                                            <Tag size={10} />
+                                            {t}
+                                            <span className="tag-remove" onClick={() => removeTag(t)}>
+                                                <X size={10} />
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                                {showTagInput && (
+                                    <input
+                                        ref={tagInputRef}
+                                        className="add-tag-input"
+                                        placeholder="Type tag name..."
+                                        value={tagInput}
+                                        onChange={e => setTagInput(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                addTag();
+                                            }
+                                            if (e.key === 'Escape') {
+                                                setShowTagInput(false);
+                                                setTagInput('');
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            if (!tagInput.trim()) {
+                                                setShowTagInput(false);
+                                            }
+                                        }}
+                                    />
+                                )}
                             </div>
                         </div>
                     </>

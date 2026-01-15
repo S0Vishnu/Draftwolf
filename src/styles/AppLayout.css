@@ -146,6 +146,7 @@
 }
 
 .search-container {
+    position: relative;
     flex: 1;
     max-width: 480px;
     height: 32px;
@@ -175,6 +176,7 @@
     color: white;
     outline: none;
     font-size: 13px;
+    padding-left: 28px;
 }
 
 .header-right {

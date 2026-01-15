@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
-import { Folder, File, Edit2, Trash2 } from 'lucide-react';
+import { Edit2, Trash2 } from 'lucide-react';
+import FileIcon from './FileIcon';
 
 export interface FileEntry {
     name: string;
@@ -10,6 +11,7 @@ export interface FileEntry {
     mtime?: Date;
     type?: string;
     latestVersion?: string;
+    tags?: string[];
 }
 
 interface FileItemProps {
@@ -85,10 +87,7 @@ const FileItem: React.FC<FileItemProps> = ({
                 onContextMenu={onContextMenu}
             >
                 <div className="col col-icon">
-                    {file.isDirectory ?
-                        <Folder size={18} className="folder-icon" /> :
-                        <File size={18} className="file-icon" />
-                    }
+                    <FileIcon name={file.name} isDirectory={file.isDirectory} size={18} />
                 </div>
 
                 <div className="col col-name">
@@ -136,10 +135,7 @@ const FileItem: React.FC<FileItemProps> = ({
                         v{file.latestVersion}
                     </div>
                 )}
-                {file.isDirectory ?
-                    <Folder size={48} className="folder-icon-large" /> :
-                    <File size={48} className="file-icon-large" />
-                }
+                <FileIcon name={file.name} isDirectory={file.isDirectory} size={58} />
             </div>
 
             <div className="card-name">

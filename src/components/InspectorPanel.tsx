@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     X, Folder, File, Info, CheckCircle, Layers, Paperclip,
-    Download, Trash2, GitBranch, RotateCcw, Plus, CheckSquare, Image as ImageIcon
+    Download, Trash2, GitBranch, RotateCcw, Plus, CheckSquare, Image as ImageIcon, Upload
 } from 'lucide-react';
 import { FileEntry } from './FileItem';
 import '../styles/InspectorPanel.css';
-import '../styles/InspectorPanel.css';
+
 import ConfirmDialog from './ConfirmDialog';
 import TodoList, { TodoItem, Priority } from './TodoList';
 
@@ -42,6 +42,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
     const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
 
 
     // Version State
@@ -511,6 +512,61 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         saveAttachments(attachments.filter(a => a.id !== id));
     };
 
+    // Drag and Drop Handlers
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isDragging) setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only stop dragging if we're leaving the container
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0 || !projectRoot) return;
+
+        const newAttachments: AttachmentItem[] = [];
+
+        for (const fileItem of files) {
+            // @ts-ignore
+            const filePath = fileItem.path;
+            if (!filePath) continue;
+
+            try {
+                // @ts-ignore
+                const result = await window.api.draft.saveAttachment(projectRoot, filePath);
+
+                if (result.success) {
+                    newAttachments.push({
+                        id: Date.now().toString() + Math.random().toString().slice(2),
+                        type: 'image',
+                        path: result.path,
+                        name: filePath.split(/[/\\]/).pop() || 'image',
+                        createdAt: Date.now()
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to save attachment:", err);
+            }
+        }
+
+        if (newAttachments.length > 0) {
+            const updatedAttachments = [...attachments, ...newAttachments];
+            setAttachments(updatedAttachments);
+            persistMetadata(todos, updatedAttachments);
+        }
+    };
+
     const renderContent = () => {
         if (!file) {
             return (
@@ -629,58 +685,69 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 );
             case 'attachments':
                 return (
-                    <div className="attachments-container" style={{ padding: 20 }}>
-                        <div style={{ marginBottom: 20 }}>
-                            <button className="upload-btn" onClick={handleAddAttachment} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px' }}>
-                                <Plus size={16} /> Add Image Reference
-                            </button>
-                        </div>
-
-                        <div className="attachments-grid" style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                            gap: 12
-                        }}>
-                            {attachments.length === 0 && <div className="text-muted" style={{ gridColumn: '1/-1', textAlign: 'center', fontSize: 13 }}>No attachments yet.</div>}
-                            {attachments.map(att => (
-                                <div
-                                    key={att.id}
-                                    className="attachment-item"
-                                    style={{
-                                        position: 'relative',
-                                        aspectRatio: '1',
-                                        background: '#1a1b20',
-                                        borderRadius: 8,
-                                        overflow: 'hidden',
-                                        border: '1px solid #2a2b36',
-                                        cursor: 'pointer'
-                                    }}
-                                    onClick={() => setPreviewImage(resolveAttachmentPath(att.path))}
-                                >
-                                    {att.type === 'image' && (
-                                        <img
-                                            src={resolveAttachmentPath(att.path)}
-                                            alt={att.name}
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                        />
-                                    )}
-                                    <div className="attachment-overlay"
-                                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                                        onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+                    <div
+                        className="attachments-container"
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        <div className={`attachments-dropzone ${isDragging ? 'drag-active' : ''}`}>
+                            <div className="attachments-grid">
+                                {attachments.map((att, i) => (
+                                    <div
+                                        key={att.id}
+                                        className="attachment-item"
+                                        onClick={() => setPreviewImage(resolveAttachmentPath(att.path))}
+                                        style={{ animationDelay: `${i * 50}ms` }}
                                     >
-                                        <button onClick={(e) => { e.stopPropagation(); deleteAttachment(att.id); }} style={{ position: 'absolute', background: 'crimson', border: 'none', color: '#fff', borderRadius: 4, padding: 6, cursor: 'pointer', top: 6, right: 6 }}>
-                                            <Trash2 size={16} />
-                                        </button>
+                                        {att.type === 'image' && (
+                                            <img
+                                                src={resolveAttachmentPath(att.path)}
+                                                alt={att.name}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            />
+                                        )}
+                                        <div className="attachment-overlay">
+                                            <button
+                                                className="delete-attachment-btn"
+                                                onClick={(e) => { e.stopPropagation(); deleteAttachment(att.id); }}
+                                                title="Remove attachment"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                            <div className="attachment-name">
+                                                {att.name}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{
-                                        position: 'absolute', bottom: 0, left: 0, right: 0,
-                                        background: 'rgba(0,0,0,0.8)', color: '#fff',
-                                        fontSize: 10, padding: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                                    }}>
-                                        {att.name}
+                                ))}
+                            </div>
+
+                            {attachments.length === 0 || isDragging ? (
+                                <div
+                                    className="upload-placeholder"
+                                    onClick={handleAddAttachment}
+                                    style={{ cursor: 'pointer', minHeight: attachments.length > 0 ? '150px' : '300px' }}
+                                >
+                                    <div className="upload-icon-circle">
+                                        <Upload size={24} />
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ color: '#e0e0e0', fontWeight: 500, marginBottom: 4 }}>
+                                            {isDragging ? 'Drop images here' : 'Click or Drop Images'}
+                                        </div>
+                                        {!isDragging && (
+                                            <div style={{ fontSize: 12, color: '#666' }}>
+                                                Supports JPG, PNG, GIF, WEBP
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                            ))}
+                            ) : (
+                                <button className="upload-btn" onClick={handleAddAttachment} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', marginTop: 'auto' }}>
+                                    <Plus size={16} /> Add Another Image
+                                </button>
+                            )}
                         </div>
                     </div>
                 );

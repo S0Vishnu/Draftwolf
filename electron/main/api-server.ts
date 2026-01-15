@@ -63,9 +63,16 @@ export function startApiServer() {
 
             // History
             if (url.pathname === '/draft/history' && req.method === 'POST') {
-                const { projectRoot } = await getBody();
+                const body = await getBody();
+                const { projectRoot } = body;
+                // Support both new and old parameter names to ensure filter is always captured
+                const filterPath = body.targetFile || body.relativePath;
+
+                console.log(`[API] History Request: Root="${projectRoot}", Filter="${filterPath}"`);
+
                 const dcs = new DraftControlSystem(projectRoot);
-                const history = await dcs.getHistory();
+                const history = await dcs.getHistory(filterPath);
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(history));
                 return;

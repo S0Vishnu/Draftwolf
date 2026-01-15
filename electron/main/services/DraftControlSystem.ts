@@ -413,7 +413,7 @@ export class DraftControlSystem {
   /**
    * Get history of versions.
    */
-  async getHistory(): Promise<VersionManifest[]> {
+  async getHistory(filterFile?: string): Promise<VersionManifest[]> {
     if (!existsSync(this.versionsPath)) return [];
 
     const files = await fs.readdir(this.versionsPath);
@@ -469,8 +469,25 @@ export class DraftControlSystem {
       manifests[i].totalSize = totalSize;
     }
 
+    let result = manifests;
+
+    if (filterFile) {
+      const target = this.normalizePath(filterFile);
+      result = result.filter(m => {
+        // Direct match
+        if (m.files[target]) return true;
+
+        // Normalized match
+        if (Object.keys(m.files).some(k => this.normalizePath(k) === target)) return true;
+
+        // Case-insensitive match (Robustness for Windows)
+        const lowerTarget = target.toLowerCase();
+        return Object.keys(m.files).some(k => this.normalizePath(k).toLowerCase() === lowerTarget);
+      });
+    }
+
     // Sort by timestamp descending (newest first) for UI
-    return manifests.sort((a, b) =>
+    return result.sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   }
@@ -509,19 +526,25 @@ export class DraftControlSystem {
 
     // We stored paths in keys. Let's try direct lookup first, then fallback to normalized.
     let hash = manifest.files[relativeFilePath];
+    const target = relativeFilePath.replace(/\\/g, '/');
+
     if (!hash) {
       // Try finding by matching suffix or normalized if strict lookup fails
-      // But for now, assume strict matching as we passed what we got from scanning.
-      // Actually, we should check if keys are using forward slashes or backslashes.
-      // Windows might differ.
-      // Let's iterate if not found.
-      const target = relativeFilePath.replace(/\\/g, '/');
       const foundKey = Object.keys(manifest.files).find(k => k.replace(/\\/g, '/') === target);
-      if (foundKey) hash = manifest.files[foundKey];
+      if (foundKey) {
+        hash = manifest.files[foundKey];
+      } else {
+        // Fallback: Case-insensitive match (robustness for Windows)
+        const lowerTarget = target.toLowerCase();
+        const foundKeyCI = Object.keys(manifest.files).find(k => k.replace(/\\/g, '/').toLowerCase() === lowerTarget);
+        if (foundKeyCI) hash = manifest.files[foundKeyCI];
+      }
     }
 
     if (!hash) {
-      throw new Error(`File ${relativeFilePath} not found in version ${versionId}.`);
+      // Debug info: show what we have vs what was requested
+      const keys = Object.keys(manifest.files).slice(0, 10).join(', '); // Limit to 10
+      throw new Error(`File ${relativeFilePath} (target: ${target}) not found in ${versionId}. Keys: [${keys}...]`);
     }
 
     const blobPath = path.join(this.objectsPath, hash);

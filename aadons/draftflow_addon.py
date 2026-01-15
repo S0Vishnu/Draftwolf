@@ -15,6 +15,7 @@ import urllib.error
 import os
 import subprocess
 import sys
+import shutil
 
 API_PORT = 45000
 API_URL = f"http://127.0.0.1:{API_PORT}"
@@ -32,11 +33,18 @@ def send_request(endpoint, data=None):
         req.data = jsondata # IMPLIES POST
         
     try:
-        with urllib.request.urlopen(req, timeout=2) as response:
+        with urllib.request.urlopen(req, timeout=30) as response:
             return json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        print(f"DraftFlow API Error: {e.code}")
+        try:
+            err_body = e.read().decode('utf-8')
+            return json.loads(err_body)
+        except:
+            return {'success': False, 'error': f"HTTP {e.code}"}
     except (urllib.error.URLError, TimeoutError) as e:
         print(f"DraftFlow Connection Error: {e}")
-        return None
+        return {'success': False, 'error': str(e)}
 
 def get_project_root(filepath):
     if not filepath:
@@ -82,7 +90,8 @@ class OBJECT_OT_DfCommit(bpy.types.Operator):
         if res and res.get('success'):
             self.report({'INFO'}, f"Version Saved! (ID: {res.get('versionId')})")
         else:
-            self.report({'ERROR'}, "Failed to communicate with DraftFlow.")
+            err = res.get('error', 'Unknown Error') if res else "Connection Error"
+            self.report({'ERROR'}, f"Msg: {err}")
             
         return {'FINISHED'}
 
@@ -112,37 +121,96 @@ class OBJECT_OT_DfRetrieve(bpy.types.Operator):
         if not root:
             return {'CANCELLED'}
         
-        # Calculate relative path
+        # 1. Identify File Info
+        filename = os.path.basename(filepath)
+        name, ext = os.path.splitext(filename)
+        
+        req_filepath = filepath
+        
+        # Logic to recover original name if we are inside a retrieved file
+        # Check for OLD pattern
+        if name.endswith('-retrieved-version') or '-retrieved-version-' in name:
+             split_key = '-retrieved-version'
+             if split_key in name:
+                 original_name_part = name.split(split_key)[0]
+                 req_filepath = os.path.join(os.path.dirname(filepath), original_name_part + ext)
+
+        # Check for NEW pattern: [name]-[version]-retrieved
+        elif name.endswith('-retrieved'):
+            # Strip '-retrieved'
+            temp = name[:-len('-retrieved')]
+            # Remove version part (last segment after -)
+            # e.g. "MyFile-v1.2" -> "MyFile"
+            if '-' in temp:
+                original_name_part = temp.rsplit('-', 1)[0]
+                req_filepath = os.path.join(os.path.dirname(filepath), original_name_part + ext)
+
+        # 2. Calculate Relative Path
         try:
-            rel_path = os.path.relpath(filepath, root)
+            rel_path = os.path.relpath(req_filepath, root)
         except ValueError:
             self.report({'ERROR'}, "File is on a different drive than project root.")
             return {'CANCELLED'}
 
-        # Request extraction to temp
+        # 3. Get Version Label for filename
+        version_str = "v" + version_id # default fallback
+        # Try to find user-friendly label from SafeVersionList
+        for v_id, v_name, v_desc in SafeVersionList.items:
+            if v_id == version_id:
+                # v_name format is "v1.0: Label (Date)"
+                # Extract the "v1.0" part
+                if ":" in v_name:
+                    version_str = v_name.split(":")[0].strip()
+                else:
+                    version_str = v_name # Fallback
+                break
+        
+        # Clean version string for filename (remove spaces, unsafe chars)
+        version_str = "".join(c for c in version_str if c.isalnum() or c in "._-")
+
+        # 4. Request Extraction
         res = send_request('/draft/extract-temp', {
             'projectRoot': root,
             'versionId': version_id,
-            'relativePath': rel_path.replace(os.sep, '/') # Normalize for JS
+            'relativePath': rel_path.replace(os.sep, '/') 
         })
         
         if res and res.get('success'):
             temp_path = res.get('path')
+            dir_path = os.path.dirname(filepath)
             
-            # Launch new Blender instance
-            # sys.argv[0] is often the blender executable in recent versions? 
-            # Or bpy.app.binary_path
-            blender_bin = bpy.app.binary_path
+            # Base name from the ORIGINAL file path
+            base_name_original = os.path.splitext(os.path.basename(req_filepath))[0]
             
-            self.report({'INFO'}, f"Opening stored version...")
+            # Construct new filename: [file]-[version]-retrieved
+            new_filename = f"{base_name_original}-{version_str}-retrieved{ext}"
+            new_path = os.path.join(dir_path, new_filename)
             
-            # Open new process
-            subprocess.Popen([blender_bin, temp_path])
+            counter = 0
+            final_path = new_path
             
-            # Close current session
-            bpy.ops.wm.quit_blender()
+            while True:
+                # Check if this exact file path is currently open in Blender
+                if final_path == filepath:
+                    # Prevent overwriting the currently open file
+                    counter += 1
+                    final_path = os.path.join(dir_path, f"{base_name_original}-{version_str}-retrieved-{counter}{ext}")
+                    continue
+                break
+            
+            try:
+                shutil.copy2(temp_path, final_path)
+                self.report({'INFO'}, f"Restored: {os.path.basename(final_path)}")
+                
+                blender_bin = bpy.app.binary_path
+                subprocess.Popen([blender_bin, final_path])
+                bpy.ops.wm.quit_blender()
+                
+            except Exception as e:
+                self.report({'ERROR'}, f"Copy failed: {e}")
         else:
-            self.report({'ERROR'}, "Failed to retrieve version file.")
+            err = res.get('error', 'Unknown Error') if res else "Connection Error"
+            self.report({'ERROR'}, f"Retrieve failed: {err}")
 
         return {'FINISHED'}
 
@@ -157,7 +225,55 @@ class OBJECT_OT_DfRetrieve(bpy.types.Operator):
             self.report({'ERROR'}, "DraftFlow project not found.")
             return {'CANCELLED'}
             
+        rel_path = None
+        if root and filepath:
+            # Handle retrieved files by stripping suffixes to find original
+            filename = os.path.basename(filepath)
+            name, ext = os.path.splitext(filename)
+            real_filepath = filepath
+
+            # Simplified recovery logic similar to execute()
+            if '-retrieved' in name:
+                # Try to strip standard suffix patterns
+                 clean_name = name
+                 if clean_name.endswith('-retrieved'):
+                     clean_name = clean_name[:-len('-retrieved')]
+                 
+                 # Try removing version suffix [-v1.0] if present
+                 if '-' in clean_name:
+                     parts = clean_name.rsplit('-', 1)
+                     # Heuristic: if last part looks like a version (starts with v or number)
+                     if parts[-1].startswith('v') or parts[-1].replace('.','').isdigit():
+                         clean_name = parts[0]
+                         
+                 real_filepath = os.path.join(os.path.dirname(filepath), clean_name + ext)
+
+            try:
+                # Strict path calculation
+                root_abs = os.path.abspath(root)
+                filepath_abs = os.path.abspath(real_filepath)
+                
+                if os.name == 'nt':
+                    if os.path.splitdrive(root_abs)[0].lower() != os.path.splitdrive(filepath_abs)[0].lower():
+                         # Fallback to current file if recovery failed and drives differ (unlikely but safe)
+                         filepath_abs = os.path.abspath(filepath) 
+
+                rel_path = os.path.relpath(filepath_abs, root_abs)
+                if rel_path.startswith('..'): rel_path = None # Outside root
+                    
+            except ValueError:
+                pass
+
+        if not rel_path:
+            self.report({'ERROR'}, "Could not resolve file path relative to project.")
+            return {'CANCELLED'}
+            
+        # Normalize to forward slashes for API
+        rel_path = rel_path.replace('\\', '/')
+
+        # Request FULL history (no targetFile) to match App logic and filter client-side
         history = send_request('/draft/history', {'projectRoot': root})
+        
         if history is None:
              self.report({'ERROR'}, "Could not connect to DraftFlow App.")
              return {'CANCELLED'}
@@ -165,6 +281,54 @@ class OBJECT_OT_DfRetrieve(bpy.types.Operator):
         if not history:
             self.report({'WARNING'}, "No version history found.")
             return {'CANCELLED'}
+
+        # Client-side filtering: Match by filename (Basename)
+        # This is robust against directory changes and path naming issues.
+        
+        # 1. Clean up the filename to find the "Original" name
+        import re
+        target_file = os.path.basename(filepath)
+        name, ext = os.path.splitext(target_file)
+        
+        # The retrieve operation creates files with pattern: "[original name] retrieved version.blend"
+        # We need to strip " retrieved version" and any version identifiers
+        clean_name = name
+        
+        # Strip " retrieved version" suffix (note the space)
+        if ' retrieved version' in clean_name.lower():
+            # Find the position and cut everything from there
+            idx = clean_name.lower().find(' retrieved version')
+            clean_name = clean_name[:idx]
+        
+        # Also handle the old pattern with hyphens: "name-v2-retrieved"
+        elif '-retrieved' in clean_name:
+            clean_name = clean_name.replace('-retrieved', '')
+            # Strip version suffixes like -v2, -v2.1
+            clean_name = re.sub(r'-v[\d\.]+$', '', clean_name)
+            # Strip simple number suffixes from duplicate downloads like -1
+            clean_name = re.sub(r'-\d+$', '', clean_name)
+        
+        target_file = clean_name + ext
+        target_lower = target_file.lower()
+        
+        filtered_history = []
+        
+        for v in history:
+            files = v.get('files', {})
+            # Check if any file in this version has the same filename
+            for f_path in files.keys():
+                f_name = os.path.basename(f_path)
+                if f_name.lower() == target_lower:
+                    filtered_history.append(v)
+                    break
+        
+        history = filtered_history 
+        
+        if not history:
+             self.report({'WARNING'}, f"No versions found for '{target_file}'")
+             return {'CANCELLED'} 
+
+        # Repopulate the list
             
         # Repopulate the list
         SafeVersionList.items = []
@@ -200,7 +364,8 @@ class OBJECT_OT_DfInit(bpy.types.Operator):
         if res and res.get('success'):
             self.report({'INFO'}, "Project Initialized!")
         else:
-            self.report({'ERROR'}, "Failed to initialize project via App.")
+            err = res.get('error', 'Unknown Error') if res else "Connection Error"
+            self.report({'ERROR'}, f"Init Failed: {err}")
             
         return {'FINISHED'}
 

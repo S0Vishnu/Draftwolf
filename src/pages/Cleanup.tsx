@@ -182,17 +182,6 @@ const Cleanup = () => {
                     </div>
                 </div>
 
-                <div className="search-bar-wrapper">
-                    <Search size={18} className="search-icon" />
-                    <input
-                        type="text"
-                        placeholder="Filter files..."
-                        className="cleanup-search"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-
                 <div className="file-list-header">
                     <span>File Path</span>
                     <span>Versions</span>
@@ -258,7 +247,7 @@ const Cleanup = () => {
                                     </td>
                                     <td>{v.label || '-'}</td>
                                     <td>{new Date(v.timestamp).toLocaleString()}</td>
-                                    <td>{formatBytes(v.totalSize || 0)}</td> // Note: totalSize might be full snapshot size, not diff
+                                    <td>{formatBytes(v.totalSize || 0)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -277,21 +266,38 @@ const Cleanup = () => {
             />
             <div className="cleanup-container">
                 <div className="cleanup-header">
-                    {(selectedModule || inspectingFile) && (
-                        <button className="back-link" onClick={handleBack} style={{ marginBottom: '10px', background: 'transparent', border: 'none', color: 'var(--ev-c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <ArrowLeft size={16} /> {inspectingFile ? 'Back to File List' : 'Back to Overview'}
-                        </button>
-                    )}
-                    <h1 className="cleanup-title">
-                        {inspectingFile ? 'File History' : (selectedModule === 'storage' ? 'Storage Analysis' : 'System Cleanup')}
-                    </h1>
-                    {!inspectingFile && (
-                        <p className="cleanup-subtitle">
-                            {selectedModule === 'storage'
-                                ? 'Detailed breakdown of space usage by file versions.'
-                                : 'Manage storage, backups, and deleted items to keep your workspace optimized.'}
-                        </p>
-                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%' }}>
+                        <div>
+                            {(selectedModule || inspectingFile) && (
+                                <button className="back-link" onClick={handleBack} style={{ marginBottom: '10px', background: 'transparent', border: 'none', color: 'var(--ev-c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <ArrowLeft size={16} /> {inspectingFile ? 'Back to File List' : 'Back to Overview'}
+                                </button>
+                            )}
+                            <h1 className="cleanup-title">
+                                {inspectingFile ? 'File History' : (selectedModule === 'storage' ? 'Storage Analysis' : 'System Cleanup')}
+                            </h1>
+                            {!inspectingFile && (
+                                <p className="cleanup-subtitle">
+                                    {selectedModule === 'storage'
+                                        ? 'Detailed breakdown of space usage by file versions.'
+                                        : 'Manage storage, backups, and deleted items to keep your workspace optimized.'}
+                                </p>
+                            )}
+                        </div>
+
+                        {selectedModule === 'storage' && !inspectingFile && (
+                            <div className="search-bar-wrapper" style={{ marginBottom: 0, width: '300px' }}>
+                                <Search size={18} className="search-icon" />
+                                <input
+                                    type="text"
+                                    placeholder="Filter files..."
+                                    className="cleanup-search"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {!selectedModule ? (

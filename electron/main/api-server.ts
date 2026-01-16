@@ -101,6 +101,16 @@ export function startApiServer() {
                 return;
             }
 
+            // Restore (overwrite)
+            if (url.pathname === '/draft/restore' && req.method === 'POST') {
+                const { projectRoot, versionId } = await getBody();
+                const dcs = new DraftControlSystem(projectRoot);
+                await dcs.restore(versionId);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+                return;
+            }
+
             res.writeHead(404);
             res.end(JSON.stringify({ error: 'Not Found' }));
 

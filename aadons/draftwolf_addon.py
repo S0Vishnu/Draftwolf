@@ -100,9 +100,9 @@ class OBJECT_OT_DfCommit(bpy.types.Operator):
 
 
 class OBJECT_OT_DfRetrieve(bpy.types.Operator):
-    """Retrieve a previous version and open it"""
+    """Restore a previous version (Overwrites current file)"""
     bl_idname = "draftwolf.retrieve"
-    bl_label = "Retrieve Version"
+    bl_label = "Restore Version"
     bl_options = {'REGISTER'}
     
     def get_items(self, context):
@@ -121,96 +121,59 @@ class OBJECT_OT_DfRetrieve(bpy.types.Operator):
         if not root:
             return {'CANCELLED'}
         
-        # 1. Identify File Info
+        # 1. Identify File Info (Recover original path logic)
         filename = os.path.basename(filepath)
         name, ext = os.path.splitext(filename)
-        
         req_filepath = filepath
         
         # Logic to recover original name if we are inside a retrieved file
-        # Check for OLD pattern
         if name.endswith('-retrieved-version') or '-retrieved-version-' in name:
              split_key = '-retrieved-version'
              if split_key in name:
                  original_name_part = name.split(split_key)[0]
                  req_filepath = os.path.join(os.path.dirname(filepath), original_name_part + ext)
-
-        # Check for NEW pattern: [name]-[version]-retrieved
         elif name.endswith('-retrieved'):
-            # Strip '-retrieved'
             temp = name[:-len('-retrieved')]
-            # Remove version part (last segment after -)
-            # e.g. "MyFile-v1.2" -> "MyFile"
             if '-' in temp:
                 original_name_part = temp.rsplit('-', 1)[0]
                 req_filepath = os.path.join(os.path.dirname(filepath), original_name_part + ext)
 
-        # 2. Calculate Relative Path
+        # 2. Perform Restore (Overwrite)
+        # Check if we are overwriting the currently open file
+        is_open_file = False
         try:
-            rel_path = os.path.relpath(req_filepath, root)
-        except ValueError:
-            self.report({'ERROR'}, "File is on a different drive than project root.")
-            return {'CANCELLED'}
+            if os.path.samefile(filepath, req_filepath):
+                is_open_file = True
+        except:
+            if os.path.normpath(filepath) == os.path.normpath(req_filepath):
+                is_open_file = True
 
-        # 3. Get Version Label for filename
-        version_str = "v" + version_id # default fallback
-        # Try to find user-friendly label from SafeVersionList
-        for v_id, v_name, v_desc in SafeVersionList.items:
-            if v_id == version_id:
-                # v_name format is "v1.0: Label (Date)"
-                # Extract the "v1.0" part
-                if ":" in v_name:
-                    version_str = v_name.split(":")[0].strip()
-                else:
-                    version_str = v_name # Fallback
-                break
+        if is_open_file:
+            # We must release the lock on Windows
+            # Create new file temporarily
+            bpy.ops.wm.read_homefile(app_template="") 
         
-        # Clean version string for filename (remove spaces, unsafe chars)
-        version_str = "".join(c for c in version_str if c.isalnum() or c in "._-")
-
-        # 4. Request Extraction
-        res = send_request('/draft/extract-temp', {
+        # Call API
+        res = send_request('/draft/restore', {
             'projectRoot': root,
-            'versionId': version_id,
-            'relativePath': rel_path.replace(os.sep, '/') 
+            'versionId': version_id
         })
         
         if res and res.get('success'):
-            temp_path = res.get('path')
-            dir_path = os.path.dirname(filepath)
-            
-            # Base name from the ORIGINAL file path
-            base_name_original = os.path.splitext(os.path.basename(req_filepath))[0]
-            
-            # Construct new filename: [file]-[version]-retrieved
-            new_filename = f"{base_name_original}-{version_str}-retrieved{ext}"
-            new_path = os.path.join(dir_path, new_filename)
-            
-            counter = 0
-            final_path = new_path
-            
-            while True:
-                # Check if this exact file path is currently open in Blender
-                if final_path == filepath:
-                    # Prevent overwriting the currently open file
-                    counter += 1
-                    final_path = os.path.join(dir_path, f"{base_name_original}-{version_str}-retrieved-{counter}{ext}")
-                    continue
-                break
-            
+            self.report({'INFO'}, f"Restored Version {version_id}")
+            # Re-open the restored file
             try:
-                shutil.copy2(temp_path, final_path)
-                self.report({'INFO'}, f"Restored: {os.path.basename(final_path)}")
-                
-                blender_bin = bpy.app.binary_path
-                subprocess.Popen([blender_bin, final_path])
-                bpy.ops.wm.quit_blender()
-                
+                bpy.ops.wm.open_mainfile(filepath=req_filepath)
             except Exception as e:
-                self.report({'ERROR'}, f"Copy failed: {e}")
+                self.report({'ERROR'}, f"Restored but failed to open: {e}")
         else:
             err = res.get('error', 'Unknown Error') if res else "Connection Error"
-            self.report({'ERROR'}, f"Retrieve failed: {err}")
+            self.report({'ERROR'}, f"Restore failed: {err}")
+            # If we closed it, try to re-open original (it might still be old version or broken)
+            if is_open_file:
+                 try:
+                    bpy.ops.wm.open_mainfile(filepath=req_filepath)
+                 except: pass
 
         return {'FINISHED'}
 

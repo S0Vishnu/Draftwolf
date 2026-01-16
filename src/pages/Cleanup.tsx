@@ -25,7 +25,7 @@ interface VersionDetail {
 const Cleanup = () => {
     const navigate = useNavigate();
     const [user] = useAuthState(auth);
-    const [selectedModule, setSelectedModule] = useState<string | null>(null);
+    const [selectedModule, setSelectedModule] = useState<string | null>('storage');
     const [storageReport, setStorageReport] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -36,36 +36,6 @@ const Cleanup = () => {
     const [versionsToDelete, setVersionsToDelete] = useState<Set<string>>(new Set());
 
     const rootDir = localStorage.getItem('rootDir');
-
-    const modules = [
-        {
-            id: 'storage',
-            title: 'Storage Optimization',
-            description: 'Analyze and clean up old versions, unused assets, and temporary files to free up space.',
-            icon: <HardDrive size={24} />,
-            colorClass: 'card-storage',
-            stats: {
-                label: 'Total Used',
-                value: storageReport ? formatBytes(storageReport.totalSize) : 'Calculating...'
-            }
-        },
-        {
-            id: 'backups',
-            title: 'Manage Backups',
-            description: 'Configure automated backups, view backup history, and restore from external archives.',
-            icon: <Archive size={24} />,
-            colorClass: 'card-backups',
-            stats: { label: 'Last Backup', value: '2 days ago' }
-        },
-        {
-            id: 'trash',
-            title: 'Trash Bin',
-            description: 'Review deleted items, restore accidentally removed files, or permanently empty the trash.',
-            icon: <Trash2 size={24} />,
-            colorClass: 'card-trash',
-            stats: { label: 'Items', value: '14' }
-        }
-    ];
 
     const fetchReport = () => {
         if (rootDir) {
@@ -136,16 +106,8 @@ const Cleanup = () => {
         if (inspectingFile) {
             setInspectingFile(null);
             setFileVersions([]);
-        } else if (selectedModule) {
-            setSelectedModule(null);
         } else {
             navigate('/home');
-        }
-    };
-
-    const handleModuleClick = (id: string) => {
-        if (id === 'storage') {
-            setSelectedModule('storage');
         }
     };
 
@@ -268,24 +230,22 @@ const Cleanup = () => {
                 <div className="cleanup-header">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%' }}>
                         <div>
-                            {(selectedModule || inspectingFile) && (
+                            {(inspectingFile) && (
                                 <button className="back-link" onClick={handleBack} style={{ marginBottom: '10px', background: 'transparent', border: 'none', color: 'var(--ev-c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <ArrowLeft size={16} /> {inspectingFile ? 'Back to File List' : 'Back to Overview'}
+                                    <ArrowLeft size={16} /> Back to File List
                                 </button>
                             )}
                             <h1 className="cleanup-title">
-                                {inspectingFile ? 'File History' : (selectedModule === 'storage' ? 'Storage Analysis' : 'System Cleanup')}
+                                {inspectingFile ? 'File History' : 'Storage Optimization'}
                             </h1>
                             {!inspectingFile && (
                                 <p className="cleanup-subtitle">
-                                    {selectedModule === 'storage'
-                                        ? 'Detailed breakdown of space usage by file versions.'
-                                        : 'Manage storage, backups, and deleted items to keep your workspace optimized.'}
+                                    Analyze and clean up old versions, unused assets, and temporary files to free up space.
                                 </p>
                             )}
                         </div>
 
-                        {selectedModule === 'storage' && !inspectingFile && (
+                        {!inspectingFile && (
                             <div className="search-bar-wrapper" style={{ marginBottom: 0, width: '300px' }}>
                                 <Search size={18} className="search-icon" />
                                 <input
@@ -300,31 +260,9 @@ const Cleanup = () => {
                     </div>
                 </div>
 
-                {!selectedModule ? (
-                    <div className="cleanup-grid">
-                        {modules.map((module) => (
-                            <div
-                                key={module.id}
-                                className={`cleanup-card ${module.colorClass}`}
-                                onClick={() => handleModuleClick(module.id)}
-                            >
-                                <div className="card-icon">
-                                    {module.icon}
-                                </div>
-                                <h3 className="card-title">{module.title}</h3>
-                                <p className="card-description">{module.description}</p>
-                                <div className="card-stats">
-                                    <span>{module.stats.label}</span>
-                                    <span className="stat-value">{module.stats.value}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="module-content">
-                        {selectedModule === 'storage' && renderStorageDetail()}
-                    </div>
-                )}
+                <div className="module-content">
+                    {renderStorageDetail()}
+                </div>
             </div>
         </div>
     );

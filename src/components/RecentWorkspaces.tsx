@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { FolderOpen, X, Clock, FolderPlus } from 'lucide-react';
+import { FolderOpen, X, Clock, FolderPlus, Pin, PinOff } from 'lucide-react';
 import '../styles/RecentWorkspaces.css';
 
 interface RecentWorkspace {
@@ -14,13 +14,17 @@ interface RecentWorkspacesProps {
     onOpen: (path: string) => void;
     onRemove: (path: string) => void;
     onOpenFolder: () => void;
+    pinnedPaths?: string[];
+    onTogglePin?: (path: string) => void;
 }
 
 const RecentWorkspaces: React.FC<RecentWorkspacesProps> = ({
     recents,
     onOpen,
     onRemove,
-    onOpenFolder
+    onOpenFolder,
+    pinnedPaths = [],
+    onTogglePin
 }) => {
 
     // Sort by last opened
@@ -50,40 +54,55 @@ const RecentWorkspaces: React.FC<RecentWorkspacesProps> = ({
                     </h2>
 
                     <div className="workspaces-grid">
-                        {sortedRecents.map((workspace) => (
-                            <div
-                                key={workspace.path}
-                                className="workspace-card"
-                                onClick={() => onOpen(workspace.path)}
-                            >
-                                <div className="card-header">
-                                    <div className="workspace-icon">
-                                        <FolderOpen size={24} />
-                                    </div>
-                                    <div className="card-info">
-                                        <h3 className="workspace-name">
-                                            {workspace.name || workspace.path.split(/[/\\]/).pop()}
-                                        </h3>
-                                        <div className="workspace-path" title={workspace.path}>
-                                            {workspace.path}
+                        {sortedRecents.map((workspace) => {
+                            const isPinned = pinnedPaths.includes(workspace.path);
+                            return (
+                                <div
+                                    key={workspace.path}
+                                    className="workspace-card"
+                                    onClick={() => onOpen(workspace.path)}
+                                >
+                                    <div className="card-header">
+                                        <div className="workspace-icon">
+                                            <FolderOpen size={24} />
+                                        </div>
+                                        <div className="card-info">
+                                            <h3 className="workspace-name">
+                                                {workspace.name || workspace.path.split(/[/\\]/).pop()}
+                                            </h3>
+                                            <div className="workspace-path" title={workspace.path}>
+                                                {workspace.path}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="card-actions">
-                                    <button
-                                        className="remove-btn"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onRemove(workspace.path);
-                                        }}
-                                        title="Remove from history"
-                                    >
-                                        <X size={16} />
-                                    </button>
+                                    <div className="card-actions">
+                                        {onTogglePin && (
+                                            <button
+                                                className={`action-icon-btn ${isPinned ? 'active' : ''}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onTogglePin(workspace.path);
+                                                }}
+                                                title={isPinned ? "Unpin" : "Pin"}
+                                            >
+                                                {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+                                            </button>
+                                        )}
+                                        <button
+                                            className="action-icon-btn remove-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onRemove(workspace.path);
+                                            }}
+                                            title="Remove from history"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </>
             )}

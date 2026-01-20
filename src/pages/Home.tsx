@@ -45,6 +45,31 @@ const Home = () => {
         localStorage.setItem('recentWorkspaces', JSON.stringify(recentWorkspaces));
     }, [recentWorkspaces]);
 
+    // Pinned Folders
+    const [pinnedFolders, setPinnedFolders] = useState<{ path: string, name: string }[]>(() => {
+        try {
+            const saved = localStorage.getItem('pinnedFolders');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) { return []; }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('pinnedFolders', JSON.stringify(pinnedFolders));
+    }, [pinnedFolders]);
+
+    const addToPinned = (path: string) => {
+        setPinnedFolders(prev => {
+            if (prev.some(f => f.path === path)) return prev;
+            return [...prev, { path, name: path.split(/[/\\]/).pop() || path }];
+        });
+    };
+
+    const removeFromPinned = (path: string) => {
+        setPinnedFolders(prev => prev.filter(f => f.path !== path));
+    };
+
+    const isPinned = (path: string) => pinnedFolders.some(f => f.path === path);
+
     const addToRecents = (path: string) => {
         setRecentWorkspaces(prev => {
             const filtered = prev.filter(w => w.path !== path);
@@ -425,7 +450,7 @@ const Home = () => {
     const handleSelectFile = (e: React.MouseEvent, file: FileEntry) => {
         // Only handle left click
         if (e.button !== 0) return;
-        
+
         e.stopPropagation();
 
         // Prevent refresh if clicking the same file that is already selected
@@ -784,6 +809,19 @@ const Home = () => {
         showInExplorer: () => {
             const targets = getSelectedFiles();
             if (targets.length === 1) window.api.showInFolder(targets[0].path);
+        },
+        pin: () => {
+            const targets = getSelectedFiles();
+            if (targets.length === 1 && targets[0].isDirectory) {
+                const path = targets[0].path;
+                if (isPinned(path)) {
+                    removeFromPinned(path);
+                    toast.success("Unpinned from sidebar");
+                } else {
+                    addToPinned(path);
+                    toast.success("Pinned to sidebar");
+                }
+            }
         }
     };
 
@@ -803,10 +841,13 @@ const Home = () => {
         if (!contextMenu) return [];
         if (contextMenu.target) {
             const isMulti = selectedPaths.size > 1;
+            const isPinnedFolder = contextMenu.target ? isPinned(contextMenu.target.path) : false;
+
             return [
                 { label: 'Open', action: menuActions.open, disabled: isMulti },
                 { label: 'Open Details', action: menuActions.preview, disabled: isMulti },
                 { label: 'Show in Explorer', action: menuActions.showInExplorer, disabled: isMulti },
+                { label: isPinnedFolder ? 'Unpin from Sidebar' : 'Pin to Sidebar', action: menuActions.pin, disabled: isMulti || !contextMenu.target.isDirectory },
                 { label: 'Rename', action: menuActions.rename, shortcut: 'F2', disabled: isMulti },
                 { label: 'Cut', action: menuActions.cut, shortcut: 'Ctrl+X' },
                 { label: 'Copy', action: menuActions.copy, shortcut: 'Ctrl+C' },
@@ -929,8 +970,9 @@ const Home = () => {
                     onOpenFolder={handleOpenFolder}
                     onGoHome={closeWorkspace}
                     hasActiveWorkspace={!!currentPath}
-                    recentProjects={recentWorkspaces}
+                    pinnedFolders={pinnedFolders}
                     onSelectProject={openWorkspace}
+                    activePath={currentPath}
                 />
 
                 <main className="main-content">
@@ -1009,6 +1051,11 @@ const Home = () => {
                             onOpen={openWorkspace}
                             onRemove={removeFromRecents}
                             onOpenFolder={handleOpenFolder}
+                            pinnedPaths={pinnedFolders.map(f => f.path)}
+                            onTogglePin={(path) => {
+                                if (isPinned(path)) removeFromPinned(path);
+                                else addToPinned(path);
+                            }}
                         />
                     )}
                 </main>

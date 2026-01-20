@@ -16,6 +16,7 @@
     font-weight: 700;
     margin: 0 0 12px 0;
     background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.5px;
@@ -136,13 +137,15 @@
     right: 12px;
     opacity: 0;
     transition: opacity 0.2s;
+    display: flex;
+    gap: 4px;
 }
 
 .workspace-card:hover .card-actions {
     opacity: 1;
 }
 
-.remove-btn {
+.action-icon-btn {
     background: transparent;
     border: none;
     color: var(--text-muted);
@@ -155,7 +158,17 @@
     transition: all 0.2s;
 }
 
-.remove-btn:hover {
+.action-icon-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+
+.action-icon-btn.active {
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.action-icon-btn.remove-btn:hover {
     background: rgba(239, 68, 68, 0.1);
     color: var(--danger);
 }

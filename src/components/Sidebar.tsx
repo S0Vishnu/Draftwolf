@@ -9,18 +9,20 @@ interface SidebarProps {
     onOpenFolder?: () => void;
     onGoHome?: () => void;
     hasActiveWorkspace?: boolean;
-    recentProjects?: { path: string; name: string }[];
+    pinnedFolders?: { path: string; name: string }[];
     onSelectProject?: (path: string) => void;
+    activePath?: string | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-    isOpen, 
-    user, 
-    onOpenFolder, 
-    onGoHome, 
+const Sidebar: React.FC<SidebarProps> = ({
+    isOpen,
+    user,
+    onOpenFolder,
+    onGoHome,
     hasActiveWorkspace = false,
-    recentProjects = [],
-    onSelectProject 
+    pinnedFolders = [],
+    onSelectProject,
+    activePath
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -83,22 +85,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                     >
                         <Users size={22} />
                     </button>
-                    
-                    {/* Divider for Projects */}
-                    {recentProjects.length > 0 && <div className="sidebar-divider" />}
+
+                    {/* Divider for Pinned Folders */}
+                    {pinnedFolders.length > 0 && <div className="sidebar-divider" />}
                 </div>
 
-                {/* Projects List */}
+                {/* Pinned Folders List */}
                 <div className="sidebar-projects">
-                    {recentProjects.map((project, index) => (
+                    {pinnedFolders.map((folder, index) => (
                         <button
-                            key={`${project.path}-${index}`}
-                            className="side-btn project-btn"
-                            onClick={() => onSelectProject && onSelectProject(project.path)}
-                            title={project.name}
+                            key={`${folder.path}-${index}`}
+                            className={`side-btn project-btn ${activePath === folder.path ? 'active' : ''}`}
+                            onClick={() => onSelectProject && onSelectProject(folder.path)}
+                            title={folder.name}
                         >
                             <span className="project-letter">
-                                {project.name.charAt(0).toUpperCase()}
+                                {folder.name.charAt(0).toUpperCase()}
                             </span>
                         </button>
                     ))}

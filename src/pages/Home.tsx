@@ -18,6 +18,11 @@ import { toast } from 'react-toastify';
 import '../styles/AuthShared.css';
 import Footer from '../components/Footer';
 
+const joinPath = (dir: string, file: string) => {
+    const separator = dir.includes('/') ? '/' : '\\';
+    return dir.endsWith(separator) ? `${dir}${file}` : `${dir}${separator}${file}`;
+};
+
 const Home = () => {
     const [user] = useAuthState(auth);
 
@@ -342,15 +347,28 @@ const Home = () => {
                 setLastSelectedPath(null);
             } else {
                 // Refreshing: Preserve selection if files still exist
-                const existPaths = new Set(processed.map(p => p.path));
+                // Use normalized paths for comparison (lowercase + forward slashes) to handle Windows case-insensitivity and separator inconsistencies
+                const normalizePath = (p: string) => p.toLowerCase().replace(/[\\/]/g, '/');
+                const existPathsMap = new Map<string, string>();
+                processed.forEach(p => existPathsMap.set(normalizePath(p.path), p.path));
+
                 setSelectedPaths(prev => {
                     const next = new Set<string>();
                     prev.forEach(p => {
-                        if (existPaths.has(p)) next.add(p);
+                        const normP = normalizePath(p);
+                        if (existPathsMap.has(normP)) {
+                            // Use the path from the new file list to ensure exact match
+                            next.add(existPathsMap.get(normP)!);
+                        }
                     });
                     return next;
                 });
-                setLastSelectedPath(prev => (prev && existPaths.has(prev)) ? prev : null);
+
+                setLastSelectedPath(prev => {
+                    if (!prev) return null;
+                    const normPrev = normalizePath(prev);
+                    return existPathsMap.has(normPrev) ? existPathsMap.get(normPrev)! : null;
+                });
             }
             setIsCreating(null);
         } catch (error: any) {
@@ -671,7 +689,7 @@ const Home = () => {
 
     const handleRenameSubmit = async () => {
         if (!renamingFile || !currentPath || !renameValue) return;
-        const newPath = `${currentPath}/${renameValue}`;
+        const newPath = joinPath(currentPath, renameValue);
         const result = await window.api.renameEntry(renamingFile, newPath);
         if (result.success) {
             const oldPath = renamingFile;
@@ -732,7 +750,7 @@ const Home = () => {
             cancelCreation();
             return;
         }
-        const targetPath = `${currentPath}/${creationName.trim()}`;
+        const targetPath = joinPath(currentPath, creationName.trim());
         const result = isCreating === 'folder'
             ? await window.api.createFolder(targetPath)
             : await window.api.createFile(targetPath);
@@ -783,7 +801,7 @@ const Home = () => {
             if (!appClipboard || !currentPath) return;
             for (const src of appClipboard.paths) {
                 const srcName = src.split(/[/\\]/).pop() || 'unknown';
-                let dest = `${currentPath}/${srcName}`;
+                let dest = joinPath(currentPath, srcName);
 
                 // Collision handling
                 if (appClipboard.op === 'copy') {
@@ -800,7 +818,7 @@ const Home = () => {
                         finalName = `${base} (${counter})${ext}`;
                         counter++;
                     }
-                    dest = `${currentPath}/${finalName}`;
+                    dest = joinPath(currentPath, finalName);
                     await window.api.copyEntry(src, dest);
                 }
                 else {

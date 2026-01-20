@@ -10,7 +10,12 @@ interface FileListProps {
     renameValue: string;
     sortConfig: { key: keyof FileEntry, direction: 'asc' | 'desc' } | null;
 
+    // View Options
+    showExtensions?: boolean;
+
     // Creation State
+
+    // ... rest
     isCreating: 'folder' | 'file' | null;
     creationName: string;
 
@@ -32,7 +37,7 @@ interface FileListProps {
 
 const FileList: React.FC<FileListProps> = ({
     files, viewMode, selectedPaths, renamingFile, renameValue, sortConfig,
-    isCreating, creationName,
+    isCreating, creationName, showExtensions = true,
     onSort, onSelect, onNavigate, onRenameChange, onRenameSubmit, onRenameCancel, onContextMenu, onVersionClick,
     onCreationChange, onCreationSubmit, onCreationCancel
 }) => {
@@ -79,6 +84,7 @@ const FileList: React.FC<FileListProps> = ({
                         selected={true}
                         renaming={true}
                         renameValue={creationName}
+                        showExtensions={showExtensions}
                         onSelect={() => { }}
                         onNavigate={() => { }}
                         onRenameChange={onCreationChange}
@@ -96,6 +102,7 @@ const FileList: React.FC<FileListProps> = ({
                         selected={selectedPaths.has(file.path)}
                         renaming={renamingFile === file.path}
                         renameValue={renameValue}
+                        showExtensions={showExtensions}
                         onSelect={(e) => onSelect(e, file)}
                         onNavigate={() => onNavigate(file.path)}
                         onRenameChange={onRenameChange}

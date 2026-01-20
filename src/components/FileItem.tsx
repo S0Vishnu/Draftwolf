@@ -1,6 +1,5 @@
 
 import React, { useRef, useEffect } from 'react';
-import { Edit2, Trash2 } from 'lucide-react';
 import FileIcon from './FileIcon';
 
 export interface FileEntry {
@@ -27,6 +26,7 @@ interface FileItemProps {
     onRenameCancel: () => void;
     onContextMenu: (e: React.MouseEvent) => void;
     onVersionClick?: (e: React.MouseEvent) => void;
+    showExtensions?: boolean;
 }
 
 const FileItem: React.FC<FileItemProps> = ({
@@ -41,7 +41,8 @@ const FileItem: React.FC<FileItemProps> = ({
     onRenameSubmit,
     onRenameCancel,
     onContextMenu,
-    onVersionClick
+    onVersionClick,
+    showExtensions = true
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -78,6 +79,23 @@ const FileItem: React.FC<FileItemProps> = ({
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
+    const getDisplayName = () => {
+        if (file.isDirectory || showExtensions) return file.name;
+        const parts = file.name.split('.');
+        if (parts.length > 1) {
+            // Check if it starts with dot (hidden file), usually we don't strip extension then?
+            // But if showHiddenFiles is true, we see them.
+            // If file is just ".gitignore", parts=["", "gitignore"].
+            if (parts[0] === '' && parts.length === 2) return file.name;
+
+            parts.pop();
+            return parts.join('.');
+        }
+        return file.name;
+    };
+
+    const displayName = getDisplayName();
+
     // --- List View Render ---
     if (viewMode === 'list') {
         return (
@@ -107,7 +125,7 @@ const FileItem: React.FC<FileItemProps> = ({
                             />
                         </div>
                     ) : (
-                        <span className="name-text" title={file.name}>{file.name}</span>
+                        <span className="name-text" title={file.name}>{displayName}</span>
                     )}
                 </div>
 
@@ -133,7 +151,7 @@ const FileItem: React.FC<FileItemProps> = ({
         >
             <div className="card-icon">
                 {file.latestVersion && (
-                    <div 
+                    <div
                         className="version-indicator-tile clickable"
                         onClick={(e) => {
                             e.stopPropagation();
@@ -162,7 +180,7 @@ const FileItem: React.FC<FileItemProps> = ({
                         />
                     </div>
                 ) : (
-                    <span title={file.name}>{file.name}</span>
+                    <span title={file.name}>{displayName}</span>
                 )}
             </div>
         </div>

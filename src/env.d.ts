@@ -18,7 +18,7 @@ interface Window {
     };
   };
   api: {
-    openFile: () => Promise<string | null>;
+    openFile: (options?: any) => Promise<string | null>;
     openFolder: () => Promise<string | null>;
     readDir: (path: string) => Promise<{ name: string; isDirectory: boolean; path: string }[]>;
     createFolder: (path: string) => Promise<{ success: boolean; error?: string }>;
@@ -28,19 +28,27 @@ interface Window {
     copyEntry: (sourcePath: string, destPath: string) => Promise<boolean>;
     showInFolder: (path: string) => Promise<boolean>;
     openPath: (path: string) => Promise<boolean>;
+    openExternal: (url: string) => Promise<void>;
     getStats: (path: string) => Promise<{ size: number; mtime: Date; birthtime: Date; isFile: boolean; isDirectory: boolean } | null>;
     watchDir: (path: string) => Promise<boolean>;
+    downloadAddon: () => Promise<any>;
     onFileChange: (callback: (data: { event: string; path: string }) => void) => () => void;
     confirm: (options: { message: string, title?: string, type?: string, buttons?: string[] }) => Promise<boolean>;
     quitApp: () => void;
+    getAppVersion: () => Promise<string>;
     draft: {
       init: (projectRoot: string) => Promise<boolean>;
       commit: (projectRoot: string, label: string, files: string[]) => Promise<{ success: boolean; versionId?: string; error?: string }>;
-      getHistory: (projectRoot: string) => Promise<{ id: string; label: string; timestamp: string; files: Record<string, string> }[]>;
+      getHistory: (projectRoot: string, relativePath?: string) => Promise<{ id: string; label: string; timestamp: string | number; files: Record<string, string>; totalSize?: number; parent?: string; parents?: string[]; parentId?: string }[]>;
       restore: (projectRoot: string, versionId: string) => Promise<boolean>;
       delete: (projectRoot: string, versionId: string) => Promise<boolean>;
       extract: (projectRoot: string, versionId: string, relativePath: string, destPath: string) => Promise<boolean>;
+      saveAttachment: (projectRoot: string, filePath: string) => Promise<{ success: boolean; path: string }>;
+      saveMetadata: (projectRoot: string, relativePath: string, metadata: any) => Promise<boolean>;
+      getMetadata: (projectRoot: string, relativePath: string) => Promise<any>;
       getFileVersion: (projectRoot: string, relativePath: string) => Promise<string | null>;
+      getCurrentHead: (projectRoot: string) => Promise<string | null>;
+      getStorageReport: (projectRoot: string) => Promise<any>;
     };
     auth: {
       login: () => Promise<void>;
@@ -48,6 +56,15 @@ interface Window {
       getToken: () => Promise<string | null>;
       onAuthSuccess: (callback: (token: string) => void) => () => void;
       onLogout: (callback: () => void) => () => void;
+    };
+    updater: {
+      check: () => Promise<any>;
+      download: () => Promise<any>;
+      install: () => Promise<void>;
+      onAvailable: (callback: (info: any) => void) => () => void;
+      onDownloaded: (callback: (info: any) => void) => () => void;
+      onProgress: (callback: (info: any) => void) => () => void;
+      onError: (callback: (error: string) => void) => () => void;
     };
   };
 }

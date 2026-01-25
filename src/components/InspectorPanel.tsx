@@ -1,39 +1,21 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-    X, Info, Layers, Paperclip, GitBranch,
-    Trash2, RotateCcw, Upload, Plus, CheckCircle, Download,
-    Tag
+    X, Info, Layers, Paperclip,
+    CheckCircle
 } from 'lucide-react';
-import { FileEntry } from './FileItem';
-import FileIcon from './FileIcon';
 import '../styles/InspectorPanel.css';
 
 import ConfirmDialog from './ConfirmDialog';
 import TodoList, { TodoItem, Priority } from './TodoList';
-
-interface InspectorPanelProps {
-    file: FileEntry | null;
-    projectRoot: string;
-    onClose: () => void;
-    onRename?: (e: React.MouseEvent) => void;
-    onDelete?: (e: React.MouseEvent) => void;
-    onRefresh?: () => void;
-}
+import InfoTab from './inspector/InfoTab';
+import VersionsTab from './inspector/VersionsTab';
+import AttachmentsTab from './inspector/AttachmentsTab';
+import { InspectorPanelProps, AttachmentItem } from './inspector/types';
 
 type Tab = 'info' | 'tasks' | 'versions' | 'attachments';
 
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 800;
-
-
-interface AttachmentItem {
-    id: string;
-    type: 'image';
-    path: string; // Internal path e.g. "attachments/..."
-    name: string;
-    createdAt: number;
-}
 
 const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onClose, onRefresh }) => {
     const [activeTab, setActiveTab] = useState<Tab>('versions');
@@ -50,16 +32,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
     // Tags State
     const [tags, setTags] = useState<string[]>([]);
-    const [tagInput, setTagInput] = useState('');
-    const [showTagInput, setShowTagInput] = useState(false);
-    const tagInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (showTagInput && tagInputRef.current) {
-            tagInputRef.current.focus();
-        }
-    }, [showTagInput]);
-
 
     // Version State
     const [history, setHistory] = useState<any[]>([]);
@@ -103,7 +75,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             if (!relPath) return;
 
             try {
-                // @ts-ignore
                 const meta = await window.api.draft.getMetadata(projectRoot, relPath);
                 if (meta) {
                     setTodos(meta.tasks || []);
@@ -127,7 +98,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         if (!relPath || !projectRoot) return;
 
         try {
-            // @ts-ignore
             await window.api.draft.saveMetadata(projectRoot, relPath, {
                 tasks: newTodos,
                 attachments: newAttachments,
@@ -145,7 +115,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         if (!relPath || !projectRoot) return;
 
         // Use current todos and attachments
-        // @ts-ignore
         window.api.draft.saveMetadata(projectRoot, relPath, {
             tasks: todos,
             attachments: attachments,
@@ -153,12 +122,10 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         }).catch((e: any) => console.error(e));
     };
 
-    const addTag = () => {
-        const val = tagInput.trim();
+    const addTag = (val: string) => {
         if (val && !tags.includes(val)) {
             const newTags = [...tags, val];
             saveTags(newTags);
-            setTagInput('');
         }
     };
 
@@ -199,20 +166,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         };
     }, [isResizing]);
 
-    const formatSize = (bytes?: number) => {
-        if (bytes === undefined) return '--';
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-    };
-
-    const formatDate = (date?: Date) => {
-        if (!date) return '--';
-        return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) +
-            ' - ' + date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    };
 
     // Versions
     useEffect(() => {
@@ -225,10 +178,8 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 }
 
                 try {
-                    // @ts-ignore
-                    const filtered: any[] = await window.api.draft.getHistory(projectRoot, relPath);
-                    // @ts-ignore
-                    const currentHead: string | null = await window.api.draft.getCurrentHead(projectRoot);
+                    const filtered = await window.api.draft.getHistory(projectRoot, relPath);
+                    const currentHead = await window.api.draft.getCurrentHead(projectRoot);
 
                     if (currentHead && filtered.some(v => v.id === currentHead)) {
                         setActiveVersionId(currentHead);
@@ -249,7 +200,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     }, [activeTab, projectRoot, file, getRelativePath]);
 
     const recursiveScan = async (dir: string): Promise<string[]> => {
-        // @ts-ignore
         const entries = await window.api.readDir(dir);
         let files: string[] = [];
         for (const entry of entries) {
@@ -277,7 +227,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
             console.log('📦 Creating version for:', filesToVersion);
 
-            // @ts-ignore
             const result = await window.api.draft.commit(projectRoot, versionLabel, filesToVersion);
             if (result && result.success && result.versionId) {
                 setActiveVersionId(result.versionId);
@@ -288,7 +237,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
             const relPath = getRelativePath();
             if (relPath) {
-                // @ts-ignore
                 const filtered = await window.api.draft.getHistory(projectRoot, relPath);
                 setHistory(filtered);
                 onRefresh?.();
@@ -309,7 +257,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             confirmText: 'Restore',
             isDangerous: true,
             onConfirm: async () => {
-                // @ts-ignore
                 await window.api.draft.restore(projectRoot, vId);
                 setActiveVersionId(vId);
                 onRefresh?.();
@@ -338,7 +285,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
         const performExtraction = async () => {
             try {
-                // @ts-ignore
                 await window.api.draft.extract(projectRoot, ver.id, relativePath, destPath);
             } catch (e: any) {
                 alert(`Failed to save: ${e.message || e} `);
@@ -347,7 +293,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         };
 
         // Check availability
-        // @ts-ignore
         const stats = await window.api.getStats(destPath);
         if (stats) {
             setConfirmState({
@@ -371,12 +316,10 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             confirmText: 'Delete',
             isDangerous: true,
             onConfirm: async () => {
-                // @ts-ignore
                 await window.api.draft.delete(projectRoot, vId);
 
                 const relPath = getRelativePath();
                 if (relPath) {
-                    // @ts-ignore
                     const filtered = await window.api.draft.getHistory(projectRoot, relPath);
                     setHistory(filtered);
                     onRefresh?.();
@@ -407,14 +350,12 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 try {
                     // Delete all versions except the current one
                     for (const ver of versionsToDelete) {
-                        // @ts-ignore
                         await window.api.draft.delete(projectRoot, ver.id);
                     }
 
                     // Refresh the history
                     const relPath = getRelativePath();
                     if (relPath) {
-                        // @ts-ignore
                         const filtered = await window.api.draft.getHistory(projectRoot, relPath);
                         setHistory(filtered);
                     } else {
@@ -460,7 +401,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             return;
         }
 
-        // @ts-ignore
         const filePath = await window.api.openFile({
             filters: [
                 { name: 'Images', extensions: ['jpg', 'png', 'gif', 'jpeg', 'webp', 'svg'] },
@@ -469,7 +409,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         });
 
         if (filePath) {
-            // @ts-ignore
             const result = await window.api.draft.saveAttachment(projectRoot, filePath);
 
             if (result.success) {
@@ -510,7 +449,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     };
 
     // Drag and Drop Handlers
-    // Drag and Drop Handlers
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -541,7 +479,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             if (!filePath) continue;
 
             try {
-                // @ts-ignore
                 const result = await window.api.draft.saveAttachment(projectRoot, filePath);
 
                 if (result.success) {
@@ -565,16 +502,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         }
     };
 
-    const scrollToVersion = (verNum: number) => {
-        const el = document.getElementById(`version-item-${verNum}`);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            // Highlight effect
-            el.classList.add('highlight-flash');
-            setTimeout(() => el.classList.remove('highlight-flash'), 1800);
-        }
-    };
-
     const renderContent = () => {
         if (!file) {
             return (
@@ -588,82 +515,12 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         switch (activeTab) {
             case 'info':
                 return (
-                    <>
-                        <div className="preview-large">
-                            <FileIcon name={file.name} isDirectory={file.isDirectory} size={90} />
-                        </div>
-                        <div className="inspector-props">
-                            <div className="prop-row">
-                                <label>Name</label>
-                                <div className="val">{file.name}</div>
-                            </div>
-                            <div className="prop-row">
-                                <label>Type</label>
-                                <div className="val">{file.type}</div>
-                            </div>
-                            <div className="prop-row">
-                                <label>Size</label>
-                                <div className="val">{formatSize(file.size)}</div>
-                            </div>
-                            <div className="prop-row">
-                                <label>Modified</label>
-                                <div className="val">{formatDate(file.mtime)}</div>
-                            </div>
-                            <div className="prop-row">
-                                <label>Full Path</label>
-                                <div className="val path-val">{file.path}</div>
-                            </div>
-
-                            <div className="prop-row">
-                                <div className="tags-header">
-                                    <label>Tags</label>
-                                    {!showTagInput && (
-                                        <button
-                                            className="add-tag-icon-btn"
-                                            onClick={() => setShowTagInput(true)}
-                                            title="Add new tag"
-                                        >
-                                            <Plus size={12} />
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="tags-wrapper">
-                                    {tags.map(t => (
-                                        <div key={t} className="info-tag-badge">
-                                            <Tag size={10} />
-                                            {t}
-                                            <span className="tag-remove" onClick={() => removeTag(t)}>
-                                                <X size={10} />
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                                {showTagInput && (
-                                    <input
-                                        ref={tagInputRef}
-                                        className="add-tag-input"
-                                        placeholder="Type tag name..."
-                                        value={tagInput}
-                                        onChange={e => setTagInput(e.target.value)}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') {
-                                                addTag();
-                                            }
-                                            if (e.key === 'Escape') {
-                                                setShowTagInput(false);
-                                                setTagInput('');
-                                            }
-                                        }}
-                                        onBlur={() => {
-                                            if (!tagInput.trim()) {
-                                                setShowTagInput(false);
-                                            }
-                                        }}
-                                    />
-                                )}
-                            </div>
-                        </div>
-                    </>
+                    <InfoTab
+                        file={file}
+                        tags={tags}
+                        onAddTag={addTag}
+                        onRemoveTag={removeTag}
+                    />
                 );
             case 'tasks':
                 return (
@@ -676,177 +533,34 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 );
             case 'versions':
                 return (
-                    <div className="versions-list">
-                        {isCreating && (
-                            <div className="creation-form">
-                                <textarea
-                                    className="creation-input"
-                                    placeholder="Version Label (e.g. Added textures)"
-                                    value={versionLabel}
-                                    onChange={e => setVersionLabel(e.target.value)}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleCreateVersion();
-                                        }
-                                    }}
-                                    onInput={(e) => {
-                                        const target = e.currentTarget;
-                                        target.style.height = 'auto';
-                                        target.style.height = target.scrollHeight + 'px';
-                                    }}
-                                    rows={1}
-                                    autoFocus
-                                />
-                                <div className="creation-actions">
-                                    <button onClick={() => setIsCreating(false)} className="btn-cancel">Cancel</button>
-                                    <button onClick={handleCreateVersion} disabled={loading} className="btn-commit">{loading ? 'Saving...' : 'Commit'}</button>
-                                </div>
-                            </div>
-                        )}
-                        {history.map((ver, idx) => {
-                            if (!ver) return null;
-                            const verNum = history.length - idx;
-
-                            // Try to find actual parent version number
-                            const parentId = ver.parent || (ver.parents && ver.parents[0]) || ver.parentId;
-                            let displayParentNum: number | null = null;
-
-                            if (parentId) {
-                                const pIdx = history.findIndex(v => v.id === parentId);
-                                if (pIdx !== -1) {
-                                    displayParentNum = history.length - pIdx;
-                                }
-                            }
-
-                            // Fallback to previous in list if no parent info or parent not in filtered list
-                            const finalParentNum = displayParentNum !== null ? displayParentNum : (idx < history.length - 1 ? verNum - 1 : null);
-
-                            return (
-                                <div
-                                    key={idx}
-                                    id={`version-item-${verNum}`}
-                                    className={`version-item ${ver.id === activeVersionId ? 'active' : ''}`}
-                                >
-                                    <div className="version-left">
-                                        <div className="version-badge" title={`ID: ${ver.id}`}>
-                                            {idx === 0 && <GitBranch size={12} style={{ marginRight: 6 }} />}
-                                            v{verNum}
-                                        </div>
-                                    </div>
-                                    <div className="version-content">
-                                        <div className="version-title">{ver.label || 'Untitled Version'}</div>
-                                        <div className="version-meta">
-                                            <span>{ver.timestamp ? new Date(ver.timestamp).toLocaleString(undefined, {
-                                                year: 'numeric', month: 'short', day: 'numeric',
-                                                hour: '2-digit', minute: '2-digit'
-                                            }) : 'Unknown date'}</span>
-                                            <span className="version-meta-row">
-                                                {Object.keys(ver.files || {}).length} files • {formatSize(ver.totalSize || 0)}
-                                                {finalParentNum !== null && (
-                                                    <span
-                                                        className="version-from-indicator clickable"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            scrollToVersion(finalParentNum);
-                                                        }}
-                                                        title={`Scroll to version ${finalParentNum}`}
-                                                    >
-                                                        from v{finalParentNum}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="version-actions-right">
-                                        <button
-                                            className="version-action-btn"
-                                            onClick={() => handleDownload(ver, verNum)}
-                                            title={file.isDirectory ? "Cannot download directory" : "Download this file version"}
-                                            disabled={file.isDirectory}
-                                            style={file.isDirectory ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                                        >
-                                            <Download size={14} />
-                                        </button>
-                                        <button className="version-action-btn" onClick={() => handleDeleteVersion(ver.id)} title="Delete"><Trash2 size={14} /></button>
-                                        <button className="version-action-btn" onClick={() => handleRestore(ver.id)} title="Restore (Overwrites current)"><RotateCcw size={14} /></button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        {history.length === 0 && !isCreating && (
-                            <div className="empty-state">No versions found. Create one above!</div>
-                        )}
-                    </div>
+                    <VersionsTab
+                        history={history}
+                        isCreating={isCreating}
+                        setIsCreating={setIsCreating}
+                        versionLabel={versionLabel}
+                        setVersionLabel={setVersionLabel}
+                        onCreateVersion={handleCreateVersion}
+                        loading={loading}
+                        activeVersionId={activeVersionId}
+                        file={file}
+                        onDownload={handleDownload}
+                        onDelete={handleDeleteVersion}
+                        onRestore={handleRestore}
+                    />
                 );
             case 'attachments':
                 return (
-                    <div
-                        className="attachments-container"
+                    <AttachmentsTab
+                        attachments={attachments}
+                        onAdd={handleAddAttachment}
+                        onDelete={deleteAttachment}
+                        onPreview={setPreviewImage}
+                        onResolvePath={resolveAttachmentPath}
+                        isDragging={isDragging}
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
-                    >
-                        <div className={`attachments-dropzone ${isDragging ? 'drag-active' : ''}`}>
-                            <div className="attachments-grid">
-                                {attachments.map((att, i) => (
-                                    <div
-                                        key={att.id}
-                                        className="attachment-item"
-                                        onClick={() => setPreviewImage(resolveAttachmentPath(att.path))}
-                                        style={{ animationDelay: `${i * 50}ms` }}
-                                    >
-                                        {att.type === 'image' && (
-                                            <img
-                                                src={resolveAttachmentPath(att.path)}
-                                                alt={att.name}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            />
-                                        )}
-                                        <div className="attachment-overlay">
-                                            <button
-                                                className="delete-attachment-btn"
-                                                onClick={(e) => { e.stopPropagation(); deleteAttachment(att.id); }}
-                                                title="Remove attachment"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                            <div className="attachment-name">
-                                                {att.name}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {attachments.length === 0 || isDragging ? (
-                                <div
-                                    className="upload-placeholder"
-                                    onClick={handleAddAttachment}
-                                    style={{ cursor: 'pointer', minHeight: attachments.length > 0 ? '150px' : '300px' }}
-                                >
-                                    <div className="upload-icon-circle">
-                                        <Upload size={24} />
-                                    </div>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <div style={{ color: '#e0e0e0', fontWeight: 500, marginBottom: 4 }}>
-                                            {isDragging ? 'Drop images here' : 'Click or Drop Images'}
-                                        </div>
-                                        {!isDragging && (
-                                            <div style={{ fontSize: 12, color: '#666' }}>
-                                                Supports JPG, PNG, GIF, WEBP
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <button className="upload-btn" onClick={handleAddAttachment} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', marginTop: 'auto' }}>
-                                    <Plus size={16} /> Add Another Image
-                                </button>
-                            )}
-                        </div>
-                    </div>
+                    />
                 );
             default:
                 return null;

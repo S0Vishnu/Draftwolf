@@ -47,8 +47,8 @@ function App() {
         console.error("Error reading settings", e);
       }
 
-      if (shouldCheck && (window as any).api?.updater) {
-        (window as any).api.updater.check();
+      if (shouldCheck && window.api?.updater) {
+        window.api.updater.check();
       }
     };
 
@@ -57,9 +57,9 @@ function App() {
     // Event Listeners
 
     // Event Listeners
-    if ((window as any).api?.updater) {
+    if (window.api?.updater) {
       // ... existing handlers ...
-      const cleanupAvailable = (window as any).api.updater.onAvailable((info: any) => {
+      const cleanupAvailable = window.api.updater.onAvailable((info: any) => {
         setUpdateState({
           isOpen: true,
           version: info.version,
@@ -68,7 +68,7 @@ function App() {
         });
       });
 
-      const cleanupProgress = (window as any).api.updater.onProgress((info: any) => {
+      const cleanupProgress = window.api.updater.onProgress((info: any) => {
         setUpdateState((prev: any) => ({
           ...prev,
           status: 'downloading',
@@ -76,7 +76,7 @@ function App() {
         }));
       });
 
-      const cleanupDownloaded = (window as any).api.updater.onDownloaded((info: any) => {
+      const cleanupDownloaded = window.api.updater.onDownloaded((info: any) => {
         setUpdateState((prev: any) => ({
           ...prev,
           version: info.version,
@@ -85,8 +85,8 @@ function App() {
         }));
       });
 
-      if ((window as any).api.updater.onError) {
-        const cleanupError = (window as any).api.updater.onError((error: string) => {
+      if (window.api.updater.onError) {
+        const cleanupError = window.api.updater.onError((error: string) => {
           alert(`Update Failed: ${error}`);
           setUpdateState((prev: any) => ({ ...prev, isOpen: false, status: 'available' }));
         });
@@ -112,7 +112,9 @@ function App() {
   const handleUpdate = async () => {
     try {
       setUpdateState((prev: any) => ({ ...prev, status: 'downloading' }));
-      await (window as any).api.updater.download();
+      if (window.api?.updater) {
+        await window.api.updater.download();
+      }
     } catch (e: any) {
       console.error("Download failed to start:", e);
       alert(`Download Error: ${e.message}`);
@@ -125,7 +127,9 @@ function App() {
   };
 
   const handleRestart = () => {
-    (window as any).api.updater.install();
+    if (window.api?.updater) {
+      window.api.updater.install();
+    }
   };
 
   if (loading) {

@@ -636,6 +636,16 @@ ipcMain.handle('draft:storageReport', async (_, projectRoot) => {
   }
 });
 
+ipcMain.handle('draft:validate', async (_, projectRoot) => {
+  try {
+    const dcs = new DraftControlSystem(projectRoot);
+    return await dcs.validateIntegrity();
+  } catch (e) {
+    console.error('Draft Validate Failed:', e);
+    return { valid: false, errors: [e.message] };
+  }
+});
+
 ipcMain.handle('addon:download', async () => {
   const { dialog } = await import('electron');
   const path = await import('path');

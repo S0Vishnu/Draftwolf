@@ -30,6 +30,7 @@ const api = {
     getHistory: (projectRoot, relativePath) => electronAPI.ipcRenderer.invoke('draft:history', { projectRoot, relativePath }),
     restore: (projectRoot, versionId) => electronAPI.ipcRenderer.invoke('draft:restore', { projectRoot, versionId }),
     delete: (projectRoot, versionId) => electronAPI.ipcRenderer.invoke('draft:delete', { projectRoot, versionId }),
+    renameVersion: (projectRoot, versionId, newLabel) => electronAPI.ipcRenderer.invoke('draft:renameVersion', { projectRoot, versionId, newLabel }),
     extract: (projectRoot, versionId, relativePath, destPath) => electronAPI.ipcRenderer.invoke('draft:extract', { projectRoot, versionId, relativePath, destPath }),
     saveAttachment: (projectRoot, filePath) => electronAPI.ipcRenderer.invoke('draft:saveAttachment', { projectRoot, filePath }),
     saveMetadata: (projectRoot, relativePath, metadata) => electronAPI.ipcRenderer.invoke('draft:saveMetadata', { projectRoot, relativePath, metadata }),

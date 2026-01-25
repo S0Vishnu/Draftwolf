@@ -585,6 +585,20 @@ export class DraftControlSystem {
   }
 
   /**
+   * Rename a version's label.
+   */
+  async renameVersion(versionId: string, newLabel: string): Promise<void> {
+    const manifestPath = path.join(this.versionsPath, `${versionId}.json`);
+    if (!existsSync(manifestPath)) {
+      throw new Error(`Version ${versionId} not found.`);
+    }
+
+    const manifest: VersionManifest = await this.readJson(manifestPath);
+    manifest.label = newLabel;
+    await this.writeJson(manifestPath, manifest);
+  }
+
+  /**
    * Get history of versions.
    */
   async getHistory(filterFile?: string): Promise<VersionManifest[]> {

@@ -605,6 +605,17 @@ ipcMain.handle('draft:extract', async (_, { projectRoot, versionId, relativePath
   }
 });
 
+ipcMain.handle('draft:renameVersion', async (_, { projectRoot, versionId, newLabel }) => {
+  try {
+    const dcs = new DraftControlSystem(projectRoot);
+    await dcs.renameVersion(versionId, newLabel);
+    return true;
+  } catch (e) {
+    console.error('Draft Rename Version Failed:', e);
+    return false;
+  }
+});
+
 ipcMain.handle('draft:getFileVersion', async (_, { projectRoot, relativePath }) => {
   try {
     const dcs = new DraftControlSystem(projectRoot);

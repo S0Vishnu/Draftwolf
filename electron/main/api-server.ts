@@ -111,6 +111,16 @@ export function startApiServer() {
                 return;
             }
 
+            // Rename Version
+            if (url.pathname === '/draft/rename-version' && req.method === 'POST') {
+                const { projectRoot, versionId, newLabel } = await getBody();
+                const dcs = new DraftControlSystem(projectRoot);
+                await dcs.renameVersion(versionId, newLabel);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+                return;
+            }
+
             res.writeHead(404);
             res.end(JSON.stringify({ error: 'Not Found' }));
 

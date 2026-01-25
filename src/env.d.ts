@@ -42,6 +42,7 @@ interface Window {
       getHistory: (projectRoot: string, relativePath?: string) => Promise<{ id: string; label: string; timestamp: string | number; files: Record<string, string>; totalSize?: number; parent?: string; parents?: string[]; parentId?: string }[]>;
       restore: (projectRoot: string, versionId: string) => Promise<boolean>;
       delete: (projectRoot: string, versionId: string) => Promise<boolean>;
+      renameVersion: (projectRoot: string, versionId: string, newLabel: string) => Promise<boolean>;
       extract: (projectRoot: string, versionId: string, relativePath: string, destPath: string) => Promise<boolean>;
       saveAttachment: (projectRoot: string, filePath: string) => Promise<{ success: boolean; path: string }>;
       saveMetadata: (projectRoot: string, relativePath: string, metadata: any) => Promise<boolean>;

@@ -372,6 +372,24 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         });
     };
 
+    const handleRenameVersion = async (vId: string, newLabel: string) => {
+        if (!projectRoot || !newLabel.trim()) return;
+
+        try {
+            await window.api.draft.renameVersion(projectRoot, vId, newLabel.trim());
+
+            // Refresh the history
+            const relPath = getRelativePath();
+            if (relPath) {
+                const filtered = await window.api.draft.getHistory(projectRoot, relPath);
+                setHistory(filtered);
+            }
+        } catch (e) {
+            console.error('Failed to rename version:', e);
+            alert('Failed to rename version. Check console for details.');
+        }
+    };
+
     // Todo Logic
     const handleAddTodo = (text: string, priority: Priority, tags: string[]) => {
         const item: TodoItem = {
@@ -546,6 +564,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                         onDownload={handleDownload}
                         onDelete={handleDeleteVersion}
                         onRestore={handleRestore}
+                        onRename={handleRenameVersion}
                     />
                 );
             case 'attachments':

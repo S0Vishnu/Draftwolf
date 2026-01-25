@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Trash2, RotateCcw, Download, GitCommit } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Trash2, RotateCcw, Download, GitCommit, Edit2 } from 'lucide-react';
 import { FileEntry } from '../FileItem';
 
 interface VersionsTabProps {
@@ -15,6 +15,7 @@ interface VersionsTabProps {
     onDownload: (ver: any, verNum: number) => void;
     onDelete: (id: string) => void;
     onRestore: (id: string) => void;
+    onRename: (id: string, newLabel: string) => void;
 }
 
 const LANE_COLORS = [
@@ -45,8 +46,11 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
     file,
     onDownload,
     onDelete,
-    onRestore
+    onRestore,
+    onRename
 }) => {
+    const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
+    const [editingLabel, setEditingLabel] = useState<string>('');
 
     const formatSize = (bytes?: number) => {
         if (bytes === undefined) return '--';
@@ -252,9 +256,38 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                                 style={{ marginLeft: contentLeftMargin }}
                             >
                                 <div className="commit-upper">
-                                    <span className="commit-message" title={node.label || 'Untitled'}>
-                                        {node.label || 'Untitled Version'}
-                                    </span>
+                                    {editingVersionId === node.id ? (
+                                        <input
+                                            type="text"
+                                            className="version-rename-input"
+                                            value={editingLabel}
+                                            onChange={(e) => setEditingLabel(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    onRename(node.id, editingLabel);
+                                                    setEditingVersionId(null);
+                                                } else if (e.key === 'Escape') {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    setEditingVersionId(null);
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                if (editingLabel !== node.label) {
+                                                    onRename(node.id, editingLabel);
+                                                }
+                                                setEditingVersionId(null);
+                                            }}
+                                            autoFocus
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    ) : (
+                                        <span className="commit-message" title={node.label || 'Untitled'}>
+                                            {node.label || 'Untitled Version'}
+                                        </span>
+                                    )}
                                     <span className="commit-id">v{verNum}</span>
                                 </div>
                                 <div className="commit-lower">
@@ -264,6 +297,17 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                                 </div>
 
                                 <div className="commit-actions">
+                                    <button
+                                        className="version-action-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingVersionId(node.id);
+                                            setEditingLabel(node.label || 'Untitled Version');
+                                        }}
+                                        title="Rename"
+                                    >
+                                        <Edit2 size={13} />
+                                    </button>
                                     <button
                                         className="version-action-btn"
                                         onClick={(e) => { e.stopPropagation(); onDownload(node, verNum); }}

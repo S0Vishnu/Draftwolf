@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     X, Info, Layers, Paperclip,
-    CheckCircle
+    CheckCircle, Plus
 } from 'lucide-react';
 import '../styles/InspectorPanel.css';
 
@@ -633,7 +633,15 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                                     Delete All Others
                                 </button>
                             )}
-                            {file && <button className="upload-btn" onClick={() => setIsCreating(true)}>+ New Version</button>}
+                            {file && (
+                                <button
+                                    className="upload-btn icon-only"
+                                    onClick={() => setIsCreating(true)}
+                                    title="Create New Version"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>

@@ -270,14 +270,26 @@
 }
 
 @keyframes flashHighlight {
-    0% { opacity: 0; transform: scale(0.99); }
-    20% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(1); }
+    0% {
+        opacity: 0;
+        transform: scale(0.99);
+    }
+
+    20% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(1);
+    }
 }
 
 .highlight-flash {
     position: relative;
-    z-index: 1; /* Creates a stacking context so ::after z-index: -1 stays within this row */
+    z-index: 1;
+    /* Creates a stacking context so ::after z-index: -1 stays within this row */
 }
 
 .highlight-flash::after {
@@ -287,7 +299,8 @@
     left: -12px;
     right: -12px;
     bottom: 4px;
-    background-color: rgba(110, 123, 242, 0.15); /* Theme Blue */
+    background-color: rgba(110, 123, 242, 0.15);
+    /* Theme Blue */
     border: 1px solid rgba(110, 123, 242, 0.3);
     border-radius: 8px;
     pointer-events: none;
@@ -685,36 +698,201 @@
     transform: scale(1.1);
 }
 
-.upload-placeholder {
+/* ... existing styles ... */
+
+.upload-btn.icon-only {
+    padding: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Graph Visualization */
+.versions-list {
+    padding: 20px 0;
+    /* Remove horizontal padding to allow full width for graph */
+    position: relative;
+    /* min-height: 200px; */
+}
+
+.graph-container {
+    position: relative;
+    padding: 0 16px;
+}
+
+.version-graph-svg {
+    position: absolute;
+    top: 0;
+    left: 16px;
+    /* align with padding */
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.version-row {
+    position: relative;
+    min-height: 44px;
+    /* Fixed height for consistent graph */
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+    z-index: 1;
+}
+
+/* Minimal Node */
+.commit-node {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    position: absolute;
+    border: 2px solid #0d0e12;
+    z-index: 2;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+.version-row:hover .commit-node {
+    transform: scale(1.3);
+}
+
+/* Minimal Card - with structure */
+.commit-card {
+    background: #14151a;
+    /* Very dark gentle background */
+    border: 1px solid #25262e;
+    border-radius: 6px;
+    padding: 0 12px;
+    margin-left: 0;
+    flex: 1;
+    min-width: 0;
+    cursor: default;
+    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    position: relative;
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
     height: 100%;
+    /* Fill the row height */
+}
+
+.commit-card.active {
+    background: #1a1b23;
+    border-color: #4a5db5;
+    box-shadow: 0 0 0 1px rgba(74, 93, 181, 0.2);
+}
+
+.commit-card:hover:not(.active) {
+    background: #1a1b20;
+    border-color: #333;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.commit-card:active:not(.active) {
+    transform: translateY(0);
+}
+
+.commit-upper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+    width: 100%;
+}
+
+.commit-message {
+    font-size: 13px;
+    color: #e0e0e0;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+    flex: 1;
+}
+
+.commit-card.active .commit-message {
+    color: #fff;
+}
+
+.commit-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #555;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 2px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.commit-card.active .commit-id {
+    color: #8fa1ff;
+    background: rgba(74, 93, 181, 0.15);
+}
+
+.commit-lower {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
     color: #666;
-    gap: 16px;
-    min-height: 200px;
-    transition: all 0.3s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    margin-top: 2px;
 }
 
-.drag-active .upload-placeholder {
-    color: #6e7bf2;
-    transform: scale(1.05);
+.commit-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%) translateX(10px);
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    background: #1a1b20;
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid #2a2b36;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    z-index: 10;
 }
 
-.upload-icon-circle {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.05);
+.commit-card:hover .commit-actions,
+.commit-card:focus-within .commit-actions {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+/* Ensure actions don't overlap if row is small */
+.version-action-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
+    border-radius: 4px;
+    color: #777;
+    transition: all 0.1s;
 }
 
-.attachments-dropzone:hover .upload-icon-circle,
-.drag-active .upload-icon-circle {
-    background: rgba(110, 123, 242, 0.1);
-    color: #6e7bf2;
+.version-action-btn:hover {
+    background-color: #2a2c35;
+    color: #fff;
+}
+
+.empty-state {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-size: 13px;
+}
+
+/* Creation Form override for inside list */
+.creation-form {
+    margin: 0 16px 20px 16px;
 }

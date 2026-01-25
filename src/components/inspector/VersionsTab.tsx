@@ -29,10 +29,10 @@ const LANE_COLORS = [
     '#ffb86c', // Orange
 ];
 
-const ROW_HEIGHT = 56;
-const LANE_WIDTH = 16;
+const ROW_HEIGHT = 44;
+const LANE_WIDTH = 14;
 const LEFT_PADDING = 8;
-const DOT_SIZE = 8;
+const DOT_SIZE = 7;
 
 const VersionsTab: React.FC<VersionsTabProps> = ({
     history,

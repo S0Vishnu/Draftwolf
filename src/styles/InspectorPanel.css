@@ -99,7 +99,7 @@
     scrollbar-color: #333 transparent;
 
     .inspector-header {
-        height: 52px;
+        height: 48px;
         padding: 0 16px;
         display: flex;
         justify-content: space-between;
@@ -745,11 +745,11 @@
 
 .version-row {
     position: relative;
-    min-height: 44px;
+    min-height: 38px;
     /* Fixed height for consistent graph */
     display: flex;
     align-items: center;
-    padding: 4px 0;
+    padding: 2px 0;
     z-index: 1;
 }
 
@@ -771,11 +771,11 @@
 
 /* Minimal Card - with structure */
 .commit-card {
-    background: #14151a;
-    /* Very dark gentle background */
-    border: 1px solid #25262e;
+    background: transparent;
+    /* Transparent by default for cleaner look */
+    border: 1px solid transparent;
     border-radius: 6px;
-    padding: 0 12px;
+    padding: 0 8px;
     margin-left: 0;
     flex: 1;
     min-width: 0;
@@ -792,12 +792,12 @@
 .commit-card.active {
     background: #1a1b23;
     border-color: #4a5db5;
-    box-shadow: 0 0 0 1px rgba(74, 93, 181, 0.2);
+    outline: none;
 }
 
 .commit-card:hover:not(.active) {
     background: #1a1b20;
-    border-color: #333;
+    border-color: #2a2b36;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
@@ -810,7 +810,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2px;
+    margin-bottom: 0px;
     width: 100%;
 }
 
@@ -849,20 +849,23 @@
 
 .commit-id {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: #555;
-    background: rgba(255, 255, 255, 0.03);
-    padding: 2px 5px;
+    font-size: 9px;
+    color: #444;
+    padding: 0 4px;
     border-radius: 3px;
     flex-shrink: 0;
-    position: absolute;
-    top: 0;
-    right: 0;
+    margin-left: auto;
+    opacity: 0.5;
+}
+
+.commit-card:hover .commit-id {
+    opacity: 1;
+    color: #666;
 }
 
 .commit-card.active .commit-id {
     color: #8fa1ff;
-    background: rgba(74, 93, 181, 0.15);
+    opacity: 1;
 }
 
 .commit-lower {
@@ -872,7 +875,8 @@
     color: #666;
     white-space: nowrap;
     overflow: hidden;
-    margin-top: 2px;
+    margin-top: 1px;
+    opacity: 0.7;
 }
 
 .commit-actions {
@@ -884,11 +888,12 @@
     gap: 4px;
     opacity: 0;
     transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
-    background: #1a1b20;
+    background: rgba(26, 27, 32, 0.9);
+    backdrop-filter: blur(8px);
     padding: 4px;
     border-radius: 6px;
     border: 1px solid #2a2b36;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     z-index: 10;
 }
 

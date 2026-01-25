@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
-import { Trash2, Search, ArrowLeft } from 'lucide-react';
+import { Trash2, Search, ArrowLeft, ArrowUp, ArrowDown, Filter, CheckSquare, Square, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Cleanup.css';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -22,13 +22,26 @@ interface VersionDetail {
     totalSize: number;
 }
 
+type SortKey = 'path' | 'versionCount' | 'latestDate' | 'totalHistorySize';
+type SortDirection = 'asc' | 'desc';
+
 const Cleanup = () => {
     const navigate = useNavigate();
     const [user] = useAuthState(auth);
     const [selectedModule, setSelectedModule] = useState<string | null>('storage');
     const [storageReport, setStorageReport] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Filter & Sort State
     const [searchTerm, setSearchTerm] = useState('');
+    const [extensionFilter, setExtensionFilter] = useState('');
+    const [extensionMode, setExtensionMode] = useState<'include' | 'exclude'>('include');
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
+        key: 'totalHistorySize',
+        direction: 'desc'
+    });
 
     // Detail View State
     const [inspectingFile, setInspectingFile] = useState<FileReport | null>(null);
@@ -50,6 +63,19 @@ const Cleanup = () => {
     useEffect(() => {
         fetchReport();
     }, [rootDir]);
+
+    // Click outside dropdown handler
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
 
     // Handle File Click -> Inspect Versions
     const handleFileClick = async (file: FileReport) => {
@@ -120,9 +146,59 @@ const Cleanup = () => {
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     }
 
-    const filteredFiles = storageReport?.files.filter((f: FileReport) =>
-        f.path.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
+    const handleSort = (key: SortKey) => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const toggleSelectAllVersions = () => {
+        if (versionsToDelete.size === fileVersions.length) {
+            setVersionsToDelete(new Set());
+        } else {
+            setVersionsToDelete(new Set(fileVersions.map(v => v.id)));
+        }
+    };
+
+    const filteredAndSortedFiles = useMemo(() => {
+        if (!storageReport?.files) return [];
+
+        let result = storageReport.files;
+
+        // 1. Search
+        if (searchTerm) {
+            result = result.filter((f: FileReport) =>
+                f.path.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
+        // 2. Extension Filter
+        if (extensionFilter) {
+            const exts = extensionFilter.split(',').map(e => e.trim().toLowerCase().replace(/^\./, ''));
+            if (exts.length > 0 && exts[0] !== '') {
+                result = result.filter((f: FileReport) => {
+                    const ext = f.path.split('.').pop()?.toLowerCase() || '';
+                    const match = exts.includes(ext);
+                    return extensionMode === 'include' ? match : !match;
+                });
+            }
+        }
+
+        // 3. Sort
+        return [...result].sort((a: any, b: any) => {
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            if (sortConfig.key === 'totalHistorySize' || sortConfig.key === 'versionCount') {
+                return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+            }
+            return sortConfig.direction === 'asc' ?
+                String(aValue).localeCompare(String(bValue)) :
+                String(bValue).localeCompare(String(aValue));
+        });
+
+    }, [storageReport, searchTerm, extensionFilter, extensionMode, sortConfig]);
 
     const renderStorageDetail = () => {
         if (!storageReport) return <div className="loading-spinner">Loading analysis...</div>;
@@ -144,24 +220,77 @@ const Cleanup = () => {
                     </div>
                 </div>
 
-                <div className="file-list-header">
-                    <span>File Path</span>
-                    <span>Versions</span>
-                    <span>Last Modified</span>
-                    <span>History Size</span>
-                </div>
-                <div className="file-list">
-                    {filteredFiles.map((file: FileReport, index: number) => (
-                        <div key={index} className="file-row clickable" onClick={() => handleFileClick(file)}>
-                            <span className="file-path" title={file.path}>{file.path}</span>
-                            <span className="file-versions badge">{file.versionCount}</span>
-                            <span className="file-date">{new Date(file.latestDate).toLocaleDateString()}</span>
-                            <span className="file-size">{formatBytes(file.totalHistorySize)}</span>
+                <div className="filter-toolbar">
+                    <div className="filter-group">
+                        <Filter size={16} />
+                        <div className="dropdown-container" ref={dropdownRef}>
+                            <div
+                                className={`custom-dropdown ${isDropdownOpen ? 'open' : ''}`}
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            >
+                                <span>{extensionMode === 'include' ? 'Include Extensions' : 'Exclude Extensions'}</span>
+                                <ChevronDown size={14} className={`dropdown-arrow ${isDropdownOpen ? 'rotate' : ''}`} />
+                            </div>
+                            {isDropdownOpen && (
+                                <div className="dropdown-menu">
+                                    <div
+                                        className={`dropdown-item ${extensionMode === 'include' ? 'active' : ''}`}
+                                        onClick={() => { setExtensionMode('include'); setIsDropdownOpen(false); }}
+                                    >
+                                        Include Extensions
+                                    </div>
+                                    <div
+                                        className={`dropdown-item ${extensionMode === 'exclude' ? 'active' : ''}`}
+                                        onClick={() => { setExtensionMode('exclude'); setIsDropdownOpen(false); }}
+                                    >
+                                        Exclude Extensions
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    ))}
-                    {filteredFiles.length === 0 && (
-                        <div className="empty-state">No files found matching "{searchTerm}"</div>
-                    )}
+                        <input
+                            type="text"
+                            placeholder="e.g. psd, png (comma separated)"
+                            className="filter-input"
+                            value={extensionFilter}
+                            onChange={e => setExtensionFilter(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div className="file-list-container">
+                    <div className="file-list-header">
+                        <div className="header-cell sortable" onClick={() => handleSort('path')}>
+                            File Path {sortConfig.key === 'path' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                        </div>
+                        <div className="header-cell sortable" onClick={() => handleSort('versionCount')}>
+                            Versions {sortConfig.key === 'versionCount' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                        </div>
+                        <div className="header-cell sortable" onClick={() => handleSort('latestDate')}>
+                            Last Modified {sortConfig.key === 'latestDate' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                        </div>
+                        <div className="header-cell sortable" onClick={() => handleSort('totalHistorySize')}>
+                            History Size {sortConfig.key === 'totalHistorySize' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                        </div>
+                    </div>
+                    <div className="file-list">
+                        {filteredAndSortedFiles.map((file: FileReport, index: number) => (
+                            <div key={index} className="file-row clickable" onClick={() => handleFileClick(file)}>
+                                <span className="file-path" title={file.path}>{file.path}</span>
+                                <span className="file-versions">
+                                    <span className="badge">{file.versionCount}</span>
+                                </span>
+                                <span className="file-date">{new Date(file.latestDate).toLocaleDateString()}</span>
+                                <span className="file-size">{formatBytes(file.totalHistorySize)}</span>
+                            </div>
+                        ))}
+                        {filteredAndSortedFiles.length === 0 && (
+                            <div className="empty-state">
+                                <Search size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                                <p>No files found matching "{searchTerm}"</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         );
@@ -187,7 +316,14 @@ const Cleanup = () => {
                     <table className="version-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '50px' }}>Select</th>
+                                <th style={{ width: '50px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={fileVersions.length > 0 && versionsToDelete.size === fileVersions.length}
+                                        onChange={toggleSelectAllVersions}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                </th>
                                 <th>Version</th>
                                 <th>Label</th>
                                 <th>Date</th>
@@ -231,8 +367,8 @@ const Cleanup = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%' }}>
                         <div>
                             {(inspectingFile) && (
-                                <button className="back-link" onClick={handleBack} style={{ marginBottom: '10px', background: 'transparent', border: 'none', color: 'var(--ev-c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <ArrowLeft size={16} /> Back to File List
+                                <button className="back-link" onClick={handleBack}>
+                                    <ArrowLeft size={18} /> Back to File List
                                 </button>
                             )}
                             <h1 className="cleanup-title">

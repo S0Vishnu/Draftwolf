@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/AppLayout.css';
 import Login from './pages/Login';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from './firebase';
+
 import OTPVerification from './pages/OTPVerification';
 import Home from './pages/Home';
 import Settings from './pages/Settings';
@@ -13,6 +16,7 @@ import UpdateModal from './components/UpdateModal';
 
 
 function App() {
+  const [user, loading] = useAuthState(auth);
   const [updateState, setUpdateState] = useState({
     isOpen: false,
     version: '',
@@ -124,16 +128,42 @@ function App() {
     (window as any).api.updater.install();
   };
 
+  if (loading) {
+    return (
+      <div style={{
+        height: '100vh',
+        width: '100vw',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#09090b',
+        color: 'white'
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: '4px solid rgba(255,255,255,0.1)',
+          borderTop: '4px solid #fff',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }}></div>
+        <style>{`
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          `}</style>
+      </div>
+    );
+  }
+
   return (
     <>
       <Router>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={user ? <Navigate to="/home" replace /> : <Login />} />
           <Route path="/verify" element={<OTPVerification />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/cleanup" element={<Cleanup />} />
-          <Route path="/community" element={<Community />} />
+          <Route path="/home" element={user ? <Home /> : <Navigate to="/" replace />} />
+          <Route path="/settings" element={user ? <Settings /> : <Navigate to="/" replace />} />
+          <Route path="/cleanup" element={user ? <Cleanup /> : <Navigate to="/" replace />} />
+          <Route path="/community" element={user ? <Community /> : <Navigate to="/" replace />} />
         </Routes>
       </Router>
       <UpdateModal

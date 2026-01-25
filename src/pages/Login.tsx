@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithCredential, sendSignInLinkToEmail } from 'firebase/auth';
-import { useSignInWithGoogle, useAuthState } from 'react-firebase-hooks/auth';
+import { useSignInWithGoogle } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase';
 import { toast } from 'react-toastify';
 import logoFull from '../assets/logo_full.svg';
@@ -19,20 +19,20 @@ const GoogleIcon = () => (
 );
 
 const Login = () => {
-    const [user, authLoading] = useAuthState(auth);
+    // const [user, authLoading] = useAuthState(auth); // Logic moved to App.tsx
     const [email, setEmail] = useState('');
     const [emailLoading, setEmailLoading] = useState(false);
     const [linkSent, setLinkSent] = useState(false);
     const [signInWithGoogle, googleUser, googleLoading, googleError] = useSignInWithGoogle(auth);
     const navigate = useNavigate();
 
-    // Auto-redirect if user is already authenticated (persistent session)
-    React.useEffect(() => {
-        if (user) {
-            console.log("Session restored, redirecting...");
-            navigate('/home', { replace: true });
-        }
-    }, [user, navigate]);
+    // Auto-redirect logic moved to App.tsx
+    // React.useEffect(() => {
+    //     if (user) {
+    //         console.log("Session restored, redirecting...");
+    //         navigate('/home', { replace: true });
+    //     }
+    // }, [user, navigate]);
 
     // Listen for System Browser Auth Success
     React.useEffect(() => {
@@ -124,13 +124,7 @@ const Login = () => {
         }
     };
 
-    if (authLoading) {
-        return (
-            <div className="login-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.1)', borderTop: '4px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-            </div>
-        );
-    }
+
 
     return (
         <div className="login-container">

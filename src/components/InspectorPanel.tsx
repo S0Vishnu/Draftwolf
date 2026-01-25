@@ -169,7 +169,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
     // Versions
     useEffect(() => {
-        if (activeTab === 'versions' && projectRoot && file) {
+        if ((activeTab === 'versions' || activeTab === 'tasks') && projectRoot && file) {
             const loadVersions = async () => {
                 const relPath = getRelativePath();
                 if (!relPath) {
@@ -194,7 +194,11 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             };
 
             loadVersions();
-        } else {
+        }
+        // We generally don't want to clear history immediately if switching to other tabs 
+        // to avoid flicker if we switch back, but strictly following previous logic for now
+        // just expanding the inclusion criteria. 
+        else if (activeTab !== 'versions' && activeTab !== 'tasks') {
             setHistory([]);
         }
     }, [activeTab, projectRoot, file, getRelativePath]);
@@ -547,6 +551,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                         onAdd={handleAddTodo}
                         onToggle={toggleTodo}
                         onDelete={deleteTodo}
+                        availableVersions={history} // Pass available versions
                     />
                 );
             case 'versions':

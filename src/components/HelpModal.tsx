@@ -115,7 +115,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                     <div className="help-section credits">
                         <h4>Credits</h4>
                         <p className="help-modal-footer">
-                            <a className="footer-link" href="https://github.com/S0Vishnu/Draftwolf-app/issues" onClick={(e) => handleOpenLink(e, "https://github.com/S0Vishnu/Draftwolf-app/issues")}>For Issues & Feedback <ExternalLinkIcon size={12} /></a>
+                            <a className="footer-link" href="https://github.com/S0Vishnu/Draftwolf/issues" onClick={(e) => handleOpenLink(e, "https://github.com/S0Vishnu/Draftwolf/issues")}>For Issues & Feedback <ExternalLinkIcon size={12} /></a>
                         </p>
                         <span className="with-love">Made with <Heart size={14} className="heart-icon" /> for builders</span>
                     </div>

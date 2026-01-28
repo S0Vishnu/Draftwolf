@@ -4,6 +4,7 @@ import {
     CheckCircle, Plus
 } from 'lucide-react';
 import '../styles/InspectorPanel.css';
+import { toast } from 'react-toastify';
 
 import ConfirmDialog from './ConfirmDialog';
 import TodoList, { TodoItem, Priority } from './TodoList';
@@ -297,7 +298,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             try {
                 await window.api.draft.extract(projectRoot, ver.id, relativePath, destPath);
             } catch (e: any) {
-                alert(`Failed to save: ${e.message || e} `);
+                toast.error(`Failed to save: ${e.message || e}`);
             }
             setConfirmState(prev => ({ ...prev, isOpen: false }));
         };
@@ -343,7 +344,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
     const handleDeleteAllOtherVersions = async () => {
         if (history.length <= 1) {
-            alert('There is only one version or no versions to delete.');
+            toast.warn('There is only one version or no versions to delete.');
             return;
         }
 
@@ -372,10 +373,10 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                         setHistory([]);
                     }
 
-                    alert(`Successfully deleted ${versionsToDelete.length} version(s).`);
+                    toast.success(`Successfully deleted ${versionsToDelete.length} version(s).`);
                 } catch (e) {
                     console.error('Failed to delete versions:', e);
-                    alert('Failed to delete some versions. Check console for details.');
+                    toast.error('Failed to delete some versions. Check console for details.');
                 }
                 setConfirmState(prev => ({ ...prev, isOpen: false }));
             }
@@ -396,7 +397,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             }
         } catch (e) {
             console.error('Failed to rename version:', e);
-            alert('Failed to rename version. Check console for details.');
+            toast.error('Failed to rename version. Check console for details.');
         }
     };
 
@@ -425,7 +426,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     // Attachment Logic
     const handleAddAttachment = async () => {
         if (!projectRoot) {
-            alert("No project root found.");
+            toast.error("No project root found.");
             return;
         }
 
@@ -449,7 +450,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 };
                 saveAttachments([...attachments, newAttach]);
             } else {
-                alert('Failed to save attachment');
+                toast.error('Failed to save attachment');
             }
         }
     };

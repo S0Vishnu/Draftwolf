@@ -1,5 +1,6 @@
 
 import React, { useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import '../styles/ConfirmDialog.css';
 
 interface ConfirmDialogProps {
@@ -31,7 +32,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onCancel}>
             <div className="modal-dialog" onClick={e => e.stopPropagation()} ref={dialogRef}>
                 <h3 className="modal-title">{title}</h3>
@@ -47,7 +48,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

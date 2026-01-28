@@ -6,6 +6,7 @@ import '../styles/Cleanup.css';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase';
 import { toast } from 'react-toastify';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface FileReport {
     path: string;
@@ -96,35 +97,35 @@ const Cleanup = () => {
         });
     };
 
-    const confirmDeletion = async () => {
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+    const onDeleteClick = () => {
+        if (versionsToDelete.size === 0 || !rootDir) return;
+        setIsConfirmOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        setIsConfirmOpen(false);
         if (versionsToDelete.size === 0 || !rootDir) return;
 
-        const confirmed = await (window as any).api.confirm({
-            message: `Are you sure you want to delete ${versionsToDelete.size} version(s)? This action cannot be undone.`,
-            title: 'Confirm Deletion',
-            type: 'warning'
-        });
+        let successCount = 0;
+        for (const vid of versionsToDelete) {
+            const success = await (window as any).api.draft.delete(rootDir, vid);
+            if (success) successCount++;
+        }
 
-        if (confirmed) {
-            let successCount = 0;
-            for (const vid of versionsToDelete) {
-                const success = await (window as any).api.draft.delete(rootDir, vid);
-                if (success) successCount++;
+        if (successCount > 0) {
+            toast.success(`Deleted ${successCount} version(s)`);
+            // Refresh
+            if (inspectingFile) {
+                const history = await (window as any).api.draft.getHistory(rootDir, inspectingFile.path);
+                setFileVersions(history);
+                setVersionsToDelete(new Set());
+                // Update global report background
+                fetchReport();
             }
-
-            if (successCount > 0) {
-                toast.success(`Deleted ${successCount} version(s)`);
-                // Refresh
-                if (inspectingFile) {
-                    const history = await (window as any).api.draft.getHistory(rootDir, inspectingFile.path);
-                    setFileVersions(history);
-                    setVersionsToDelete(new Set());
-                    // Update global report background
-                    fetchReport();
-                }
-            } else {
-                toast.error("Failed to delete versions.");
-            }
+        } else {
+            toast.error("Failed to delete versions.");
         }
     };
 
@@ -305,7 +306,7 @@ const Cleanup = () => {
                     <h2>{inspectingFile.path}</h2>
                     <div className="inspection-actions">
                         {versionsToDelete.size > 0 && (
-                            <button className="btn-confirm-delete" onClick={confirmDeletion}>
+                            <button className="btn-confirm-delete" onClick={onDeleteClick}>
                                 <Trash2 size={16} /> Delete {versionsToDelete.size} Selected
                             </button>
                         )}
@@ -398,6 +399,14 @@ const Cleanup = () => {
 
                 <div className="module-content">
                     {renderStorageDetail()}
+                    <ConfirmDialog
+                        isOpen={isConfirmOpen}
+                        title="Confirm Deletion"
+                        message={`Are you sure you want to delete ${versionsToDelete.size} version(s)? This action cannot be undone.`}
+                        onConfirm={handleConfirmDelete}
+                        onCancel={() => setIsConfirmOpen(false)}
+                        isDangerous={true}
+                    />
                 </div>
             </div>
         </div>

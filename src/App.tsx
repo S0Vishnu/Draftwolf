@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/AppLayout.css';
 import Login from './pages/Login';
@@ -87,7 +87,7 @@ function App() {
 
       if (window.api.updater.onError) {
         const cleanupError = window.api.updater.onError((error: string) => {
-          alert(`Update Failed: ${error}`);
+          toast.error(`Update Failed: ${error}`);
           setUpdateState((prev: any) => ({ ...prev, isOpen: false, status: 'available' }));
         });
 
@@ -117,7 +117,7 @@ function App() {
       }
     } catch (e: any) {
       console.error("Download failed to start:", e);
-      alert(`Download Error: ${e.message}`);
+      toast.error(`Download Error: ${e.message}`);
       setUpdateState((prev: any) => ({ ...prev, isOpen: false, status: 'available' }));
     }
   };

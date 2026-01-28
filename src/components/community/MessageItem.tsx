@@ -4,6 +4,7 @@ import { deleteDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Trash2, Edit2, X, Check, MoreVertical, CornerUpLeft } from 'lucide-react';
 import { toast } from 'react-toastify';
+import ConfirmDialog from '../ConfirmDialog';
 
 interface Message {
     id: string;
@@ -42,8 +43,14 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    const handleDelete = async () => {
-        if (!window.confirm("Delete this message?")) return;
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    const handleDeleteClick = () => {
+        setShowDeleteConfirm(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        setShowDeleteConfirm(false);
         try {
             await deleteDoc(doc(db, 'community_messages', message.id));
             toast.success("Message deleted");
@@ -159,13 +166,22 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
                                     <Edit2 size={14} />
                                 </button>
                             )}
-                            <button onClick={handleDelete} className="danger" title="Delete">
+                            <button onClick={handleDeleteClick} className="danger" title="Delete">
                                 <Trash2 size={14} />
                             </button>
                         </>
                     )}
                 </div>
             )}
+            <ConfirmDialog
+                isOpen={showDeleteConfirm}
+                title="Delete Message"
+                message="Are you sure you want to delete this message?"
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setShowDeleteConfirm(false)}
+                isDangerous={true}
+                confirmText="Delete"
+            />
         </div>
     );
 };

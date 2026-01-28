@@ -8,6 +8,7 @@ import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase
 import { auth, db, storage } from '../../firebase';
 import MessageItem from './MessageItem';
 import PollItem from './PollItem';
+import ConfirmDialog from '../ConfirmDialog';
 import { toast } from 'react-toastify';
 
 interface ChatAreaProps {
@@ -225,10 +226,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
         }
     };
 
-    const handleDeleteMessage = async (id: string) => {
-        if (window.confirm("Delete this?")) {
-            await deleteDoc(doc(db, 'community_messages', id));
-        }
+    const [pollToDeleteId, setPollToDeleteId] = useState<string | null>(null);
+
+    const handleDeleteMessage = (id: string) => {
+        setPollToDeleteId(id);
+    };
+
+    const handleConfirmDeletePoll = async () => {
+        if (!pollToDeleteId) return;
+        setPollToDeleteId(null);
+        await deleteDoc(doc(db, 'community_messages', pollToDeleteId));
     };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -366,6 +373,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
 
             {/* Input Area */}
             <div className="message-input-area">
+                {/* ... existing input area code ... */}
                 {isReadOnly ? (
                     <div style={{ textAlign: 'center', color: '#666', padding: '10px', fontStyle: 'italic' }}>
                         Only admins can post in this channel.
@@ -558,6 +566,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                     </>
                 )}
             </div>
+            <ConfirmDialog
+                isOpen={!!pollToDeleteId}
+                title="Delete Poll"
+                message="Are you sure you want to delete this poll? This action cannot be undone."
+                onConfirm={handleConfirmDeletePoll}
+                onCancel={() => setPollToDeleteId(null)}
+                isDangerous={true}
+                confirmText="Delete Poll"
+            />
         </div>
     );
 };

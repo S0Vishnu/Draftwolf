@@ -88,7 +88,7 @@ const Settings = () => {
                     localStorage.setItem(`user_settings_${user.uid}`, JSON.stringify(data));
                 } else if (!saved) {
                     // Only set defaults if we didn't populate from cache
-                    const newSettings = { ...defaultSettings, avatarSeed: user.email || 'user' };
+                    const newSettings = { ...defaultSettings, avatarSeed: '' };
                     setSettings(newSettings);
                     setInitialSettings(newSettings);
                 }
@@ -105,9 +105,13 @@ const Settings = () => {
 
         setLoading(true);
         try {
-            // 1. Generate Avatar URL
-            const seed = encodeURIComponent(settings.avatarSeed || 'default');
-            const newPhotoURL = `https://api.dicebear.com/9.x/lorelei/svg?seed=${seed}&radius=50&backgroundColor=b6e3f4,c0aede,d1d4f9,ffdfbf`;
+            // 1. Generate Avatar URL OR Use Existing
+            let newPhotoURL = user.photoURL;
+
+            if (settings.avatarSeed) {
+                const seed = encodeURIComponent(settings.avatarSeed);
+                newPhotoURL = `https://api.dicebear.com/9.x/lorelei/svg?seed=${seed}&radius=50&backgroundColor=b6e3f4,c0aede,d1d4f9,ffdfbf`;
+            }
 
             // 2. Update Firebase Auth Profile
             if (displayName !== user.displayName || newPhotoURL !== user.photoURL) {
@@ -217,13 +221,26 @@ const Settings = () => {
         }
     };
 
-    // Generate Avatar for preview
-    const avatar = createAvatar(lorelei, {
-        seed: settings.avatarSeed || 'default',
-        backgroundColor: ['b6e3f4', 'c0aede', 'd1d4f9', 'ffdfbf'],
-        radius: 50,
-    });
-    const avatarUrl = `data:image/svg+xml;utf8,${encodeURIComponent(avatar.toString())}`;
+    // Determine Avatar URL for display
+    let avatarUrl = user?.photoURL || '';
+
+    // If explicit seed is set (e.g. user regenerated), use that
+    if (settings.avatarSeed) {
+        const avatar = createAvatar(lorelei, {
+            seed: settings.avatarSeed,
+            backgroundColor: ['b6e3f4', 'c0aede', 'd1d4f9', 'ffdfbf'],
+            radius: 50,
+        });
+        avatarUrl = `data:image/svg+xml;utf8,${encodeURIComponent(avatar.toString())}`;
+    } else if (!avatarUrl) {
+        // Fallback if no photoURL and no seed
+        const avatar = createAvatar(lorelei, {
+            seed: user?.email || 'default',
+            backgroundColor: ['b6e3f4', 'c0aede', 'd1d4f9', 'ffdfbf'],
+            radius: 50,
+        });
+        avatarUrl = `data:image/svg+xml;utf8,${encodeURIComponent(avatar.toString())}`;
+    }
 
     return (
         <div className="settings-container">
@@ -250,7 +267,7 @@ const Settings = () => {
                             <div className="profile-section">
                                 <div className="avatar-container">
                                     <div className="avatar-ring"></div>
-                                    <img src={avatarUrl} alt="Avatar" className="avatar-img" />
+                                    <img src={avatarUrl} alt="Avatar" className="avatar-img" referrerPolicy="no-referrer" />
                                     {isEditing && (
                                         <button onClick={regenerateAvatar} className="btn-regenerate" title="Regenerate Avatar">
                                             <RefreshCw size={20} />

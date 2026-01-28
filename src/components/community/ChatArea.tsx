@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Smile, X, Loader2, Plus, Trash2, Search } from 'lucide-react';
+import { Send, Image as ImageIcon, Smile, X, Loader2, Plus, Trash2, Search, CornerUpLeft } from 'lucide-react';
+import EmojiPicker, { EmojiClickData, Theme, EmojiStyle } from 'emoji-picker-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { collection, addDoc, query, where, Timestamp, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { auth, db, storage } from '../../firebase';
 import MessageItem from './MessageItem';
 import PollItem from './PollItem';
@@ -35,32 +36,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
     const [pollQuestion, setPollQuestion] = useState('');
     const [pollOptions, setPollOptions] = useState(['', '']);
 
+    // Reply & Emoji State
+    const [replyingTo, setReplyingTo] = useState<any | null>(null);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const textInputRef = useRef<HTMLInputElement>(null);
 
     // Calculate 7 days ago for query
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    // Query messages: 
-    // We order by desc to get "newest" first with limit, then reverse client side.
-    // This supports "Load More" by increasing limit.
-    // We can't put limit in const variable easily without re-creation.
-    // So we apply it inside the hook call or standard useEffect.
-    // useCollection accepts a query.
-
-    // Construct query dynamically
-    // Actually, to avoid index hell and maintain stability from previous step:
-    // We will stick to the "Fetch All" (it was just filtering 7 days) strategy BUT
-    // we will implement CLIENT SIDE lazy rendering + Search.
-    // Use the simpler query again to prevent "Loading forever/Index needed".
-    // "Lazy Load" in this context (7 days ephemeral) usually allows fetching all as mostly text.
-    // If user insists on "Lazy Load", we can render only last N items and "Show More".
-
-    // Let's try the robust approach:
-    // 1. Fetch all (for last 7 days) - this is reasonably small (e.g. < 1000 messages)
-    // 2. Filter by search
-    // 3. Render only last N, with "Load More" button at top.
 
     const simpleQuery = query(
         collection(db, 'community_messages'),
@@ -128,9 +114,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                     setIsUploading(false);
                     return;
                 }
+
+                // Debug log for bucket config
+                console.log("Storage Bucket Config:", storage.app.options.storageBucket);
+                if (!storage.app.options.storageBucket) {
+                    toast.error("Config Error: Storage Bucket is missing in .env");
+                    setIsUploading(false);
+                    return;
+                }
+
                 const fileRef = ref(storage, `community/${channelId}/${Date.now()}_${imageFile.name}`);
-                const uploadResult = await uploadBytes(fileRef, imageFile);
-                imageUrl = await getDownloadURL(uploadResult.ref);
+
+                // Use Resumable upload for better state management
+                // const uploadResult = await uploadBytes(fileRef, imageFile);
+                const uploadTask = await uploadBytesResumable(fileRef, imageFile);
+                imageUrl = await getDownloadURL(uploadTask.ref);
             }
 
             await addDoc(collection(db, 'community_messages'), {
@@ -143,14 +141,28 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                 expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)), // 7 days TTL
                 type: imageUrl ? 'image' : 'text',
                 imageUrl,
+                replyTo: replyingTo ? {
+                    id: replyingTo.id,
+                    displayName: replyingTo.displayName,
+                    text: replyingTo.text || 'Image'
+                } : null, // Ensure explicit null to avoid undefined issues
                 likes: []
             });
 
             setNewMessage('');
             setImageFile(null);
+            setReplyingTo(null);
+            setShowEmojiPicker(false);
         } catch (error) {
             console.error("Error sending message:", error);
-            toast.error("Failed to send message");
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+            if (errorMessage.includes("unknown") || errorMessage.includes("cors")) {
+                console.warn("CORS ACTION REQUIRED: Run `gsutil cors set cors.json gs://<your-bucket>`");
+                toast.error(`Upload Failed (CORS?): ${errorMessage}. Check Console.`);
+            } else {
+                toast.error(`Failed to send message: ${errorMessage}`);
+            }
         } finally {
             setIsUploading(false);
         }
@@ -201,7 +213,18 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setImageFile(e.target.files[0]);
+            toast.info(`Selected: ${e.target.files[0].name}`);
         }
+    };
+
+    const handleReply = (msg: any) => {
+        setReplyingTo(msg);
+        textInputRef.current?.focus();
+    };
+
+    const onEmojiClick = (emojiData: EmojiClickData) => {
+        setNewMessage(prev => prev + emojiData.emoji);
+        // Don't close picker immediately
     };
 
     const channelNames: Record<string, string> = {
@@ -283,6 +306,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                             key={msg.id}
                             message={msg}
                             currentUser={user}
+                            onReply={handleReply}
                         />
                     );
                 })}
@@ -365,9 +389,37 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                                         borderRadius: '8px',
                                         padding: '8px 12px',
                                         alignItems: 'center',
-                                        border: '1px solid #333'
+                                        border: '1px solid #333',
+                                        position: 'relative' // Needed for absolute positioning of reply bar
                                     }}
                                 >
+                                    {replyingTo && (
+                                        <div className="reply-preview-bar" style={{
+                                            position: 'absolute',
+                                            bottom: '100%',
+                                            left: 0,
+                                            right: 0,
+                                            background: '#252526',
+                                            padding: '8px 12px',
+                                            borderTop: '1px solid #333',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            fontSize: '0.9rem',
+                                            color: '#ccc'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <CornerUpLeft size={16} color="#aaa" />
+                                                <span>Replying to <b>{replyingTo.displayName}</b></span>
+                                            </div>
+                                            <button onClick={() => setReplyingTo(null)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer' }}>
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    )}
+
+
+
                                     <input
                                         type="file"
                                         accept="image/*"
@@ -386,6 +438,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
 
                                     <input
                                         type="text"
+                                        ref={textInputRef}
                                         value={newMessage}
                                         onChange={(e) => setNewMessage(e.target.value)}
                                         placeholder={`Message #${channelNames[channelId] || 'channel'}`}
@@ -401,9 +454,34 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                                         }}
                                     />
 
-                                    <button type="button" style={{ background: 'none', border: 'none', color: '#888', cursor: 'not-allowed', padding: '4px', marginRight: '4px' }}>
-                                        <Smile size={20} />
-                                    </button>
+                                    <div style={{ position: 'relative' }}>
+                                        {showEmojiPicker && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                bottom: '40px', // Push it up a bit more to clear the input
+                                                right: '-10px',
+                                                zIndex: 1000,
+                                                marginBottom: '10px',
+                                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                                            }}>
+                                                <EmojiPicker
+                                                    onEmojiClick={onEmojiClick}
+                                                    theme={Theme.DARK}
+                                                    emojiStyle={EmojiStyle.NATIVE}
+                                                    width={300}
+                                                    height={400}
+                                                    lazyLoadEmojis={true}
+                                                />
+                                            </div>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                            style={{ background: 'none', border: 'none', color: showEmojiPicker ? '#4a9eff' : '#888', cursor: 'pointer', padding: '4px', marginRight: '4px' }}
+                                        >
+                                            <Smile size={20} />
+                                        </button>
+                                    </div>
 
                                     <button
                                         type="submit"

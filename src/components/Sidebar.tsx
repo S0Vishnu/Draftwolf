@@ -125,6 +125,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 src={user.photoURL}
                                 alt="Profile"
                                 className="sidebar-profile-img"
+                                referrerPolicy="no-referrer"
                             />
                         ) : (
                             <SettingsIcon size={22} />

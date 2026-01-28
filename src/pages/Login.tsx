@@ -147,7 +147,7 @@ const Login = () => {
                             toast.info("Opening browser for login...");
                         } else {
                             console.error("Auth API not available");
-                            signInWithGoogle(); // Fallback if API missing (e.g. web mode)
+                            signInWithGoogle([], { prompt: 'select_account' }); // Fallback if API missing (e.g. web mode)
                         }
                     }}
                     disabled={googleLoading}

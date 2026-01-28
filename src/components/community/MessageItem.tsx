@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User } from 'firebase/auth';
 import { deleteDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Trash2, Edit2, X, Check, MoreVertical } from 'lucide-react';
+import { Trash2, Edit2, X, Check, MoreVertical, CornerUpLeft } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 interface Message {
@@ -14,14 +14,20 @@ interface Message {
     createdAt: any;
     imageUrl?: string;
     type: 'text' | 'image';
+    replyTo?: {
+        id: string;
+        displayName: string;
+        text: string;
+    };
 }
 
 interface MessageItemProps {
     message: Message;
     currentUser: User | null | undefined;
+    onReply: (message: Message) => void;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply }) => {
     const isOwner = currentUser?.uid === message.userId;
     // Basic admin check (could be expanded based on claims)
     const isAdmin = false; // Placeholder
@@ -70,7 +76,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser }) => {
         >
             <div className="message-avatar">
                 {message.photoURL ? (
-                    <img src={message.photoURL} alt={message.displayName} />
+                    <img src={message.photoURL} alt={message.displayName} referrerPolicy="no-referrer" />
                 ) : (
                     <div className="avatar-placeholder">{message.displayName?.charAt(0) || '?'}</div>
                 )}
@@ -81,6 +87,19 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser }) => {
                     <span className="message-author">{message.displayName || 'Anonymous'}</span>
                     <span className="message-time">{formatTime(message.createdAt)}</span>
                 </div>
+
+                {message.replyTo && (
+                    <div className="reply-context-message" style={{
+                        fontSize: '0.8rem',
+                        color: '#aaa',
+                        borderLeft: '2px solid #555',
+                        paddingLeft: '8px',
+                        marginBottom: '4px',
+                        marginTop: '2px'
+                    }}>
+                        <span style={{ fontWeight: 'bold' }}>{message.replyTo.displayName}</span>: {message.replyTo.text.substring(0, 50)}{message.replyTo.text.length > 50 ? '...' : ''}
+                    </div>
+                )}
 
                 {isEditing ? (
                     <div className="edit-box">
@@ -108,16 +127,23 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser }) => {
                 )}
             </div>
 
-            {showActions && (isOwner || isAdmin) && !isEditing && (
+            {showActions && !isEditing && (
                 <div className="message-actions">
-                    {isOwner && !message.imageUrl && (
-                        <button onClick={() => setIsEditing(true)} title="Edit">
-                            <Edit2 size={14} />
-                        </button>
-                    )}
-                    <button onClick={handleDelete} className="danger" title="Delete">
-                        <Trash2 size={14} />
+                    <button onClick={() => onReply(message)} title="Reply">
+                        <CornerUpLeft size={14} />
                     </button>
+                    {(isOwner || isAdmin) && (
+                        <>
+                            {isOwner && !message.imageUrl && (
+                                <button onClick={() => setIsEditing(true)} title="Edit">
+                                    <Edit2 size={14} />
+                                </button>
+                            )}
+                            <button onClick={handleDelete} className="danger" title="Delete">
+                                <Trash2 size={14} />
+                            </button>
+                        </>
+                    )}
                 </div>
             )}
         </div>

@@ -108,6 +108,32 @@ function createWindow() {
     }
   })
 
+  // FORCE CORS Allow for Firebase Storage and other external APIs
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    // Force allow origin
+    responseHeaders['Access-Control-Allow-Origin'] = ['*'];
+    responseHeaders['Access-Control-Allow-Headers'] = ['*'];
+    responseHeaders['Access-Control-Allow-Methods'] = ['GET, HEAD, POST, PUT, DELETE, OPTIONS'];
+
+    // Remove conflicting headers if any
+    delete responseHeaders['access-control-allow-origin'];
+    delete responseHeaders['access-control-allow-headers'];
+    delete responseHeaders['access-control-allow-methods'];
+
+    callback({ responseHeaders });
+  });
+
+  // Also ensure we don't send a restricted Origin that confuses the server (optional but good)
+  mainWindow.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
+    const requestHeaders = { ...details.requestHeaders };
+    // Some servers reject file:// origin
+    if (requestHeaders.Origin === 'file://' || !requestHeaders.Origin) {
+      requestHeaders.Origin = 'https://draftflow-app.local'; // Fake origin
+    }
+    callback({ requestHeaders });
+  });
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.maximize()
     mainWindow.show()

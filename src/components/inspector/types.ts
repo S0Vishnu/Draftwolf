@@ -1,6 +1,8 @@
 import { FileEntry } from '../FileItem';
 import { TodoItem } from '../TodoList';
 
+export type InspectorTab = 'info' | 'tasks' | 'versions' | 'attachments';
+
 export interface InspectorPanelProps {
     file: FileEntry | null;
     projectRoot: string;
@@ -8,6 +10,7 @@ export interface InspectorPanelProps {
     onRename?: (e: React.MouseEvent) => void;
     onDelete?: (e: React.MouseEvent) => void;
     onRefresh?: () => void;
+    initialTab?: InspectorTab;
 }
 
 export interface AttachmentItem {

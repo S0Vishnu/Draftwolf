@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase';
 import { FileEntry } from '../components/FileItem';
+import { InspectorTab } from '../components/inspector/types';
 
 // Components
 import Sidebar from '../components/Sidebar';
@@ -29,6 +30,7 @@ const Home = () => {
     // Layout
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [isPreviewOpen, setPreviewOpen] = useState(false);
+    const [inspectorTab, setInspectorTab] = useState<InspectorTab | undefined>(undefined);
     const contentRef = useRef<HTMLDivElement>(null);
 
     // Data
@@ -852,7 +854,10 @@ const Home = () => {
         }
     };
 
-    const handleInspectorClose = () => setPreviewOpen(false);
+    const handleInspectorClose = () => {
+        setPreviewOpen(false);
+        setInspectorTab(undefined);
+    };
 
     // Handle version badge click - select file and open inspector
     const handleVersionClick = (e: React.MouseEvent, file: FileEntry) => {
@@ -861,6 +866,7 @@ const Home = () => {
         setSelectedPaths(new Set([file.path]));
         setLastSelectedPath(file.path);
         // Open the inspector panel
+        setInspectorTab('versions');
         setPreviewOpen(true);
     };
 
@@ -1039,7 +1045,7 @@ const Home = () => {
                             />
 
                             <div
-                                className="file-area"
+                                className="content-area"
                                 ref={contentRef}
                                 onMouseDown={handleMouseDown}
                                 onContextMenu={(e) => handleContextMenu(e)}
@@ -1062,12 +1068,7 @@ const Home = () => {
                                     onRenameSubmit={handleRenameSubmit}
                                     onRenameCancel={cancelRenaming}
                                     onContextMenu={handleContextMenu}
-                                    onVersionClick={(e, f) => {
-                                        // Handle version click (omitted for brevity in this snippet if not used,
-                                        // but assuming existing logic is fine)
-                                        e.stopPropagation();
-                                        console.log("Version click", f);
-                                    }}
+                                    onVersionClick={handleVersionClick}
                                     onCreationChange={setCreationName}
                                     onCreationSubmit={submitCreation}
                                     onCreationCancel={cancelCreation}
@@ -1107,6 +1108,7 @@ const Home = () => {
                         projectRoot={rootDir || currentPath || ''}
                         onClose={handleInspectorClose}
                         onRefresh={() => loadDirectory(currentPath || '')}
+                        initialTab={inspectorTab}
                     />
                 )}
             </div>

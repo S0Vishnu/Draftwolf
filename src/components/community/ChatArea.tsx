@@ -153,13 +153,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
             setImageFile(null);
             setReplyingTo(null);
             setShowEmojiPicker(false);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error sending message:", error);
-            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            if (error.code) console.error("Firebase Error Code:", error.code);
+            if (error.customData) console.error("Error Custom Data:", error.customData);
+
+            const errorMessage = error.message || "Unknown error";
 
             if (errorMessage.includes("unknown") || errorMessage.includes("cors")) {
-                console.warn("CORS ACTION REQUIRED: Run `gsutil cors set cors.json gs://<your-bucket>`");
-                toast.error(`Upload Failed (CORS?): ${errorMessage}. Check Console.`);
+                // Check if it might be a bucket name issue
+                console.warn("Potential Issues: 1. CORS (Fixed in Electron Main?) 2. Invalid Bucket Name in .env");
+                toast.error(`Upload Failed (${error.code || 'Unknown'}): ${errorMessage}`);
             } else {
                 toast.error(`Failed to send message: ${errorMessage}`);
             }
@@ -297,17 +301,46 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                     </div>
                 )}
 
-                {visibleMessages.map(msg => {
-                    if (msg.type === 'poll') {
-                        return <PollItem key={msg.id} message={msg} currentUser={user} isAdmin={isAdmin} onDelete={handleDeleteMessage} />;
-                    }
+                {visibleMessages.map((msg, index) => {
+                    const getDateLabel = (timestamp: any) => {
+                        if (!timestamp) return 'Today'; // Assume fresh message
+                        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                        const today = new Date();
+                        const yesterday = new Date();
+                        yesterday.setDate(yesterday.getDate() - 1);
+
+                        if (date.toDateString() === today.toDateString()) {
+                            return 'Today';
+                        } else if (date.toDateString() === yesterday.toDateString()) {
+                            return 'Yesterday';
+                        } else {
+                            return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+                        }
+                    };
+
+                    const prevMsg = index > 0 ? visibleMessages[index - 1] : null;
+                    const currentDateLabel = getDateLabel(msg.createdAt);
+                    const prevDateLabel = prevMsg ? getDateLabel(prevMsg.createdAt) : null;
+                    const showDateSeparator = currentDateLabel !== prevDateLabel;
+
                     return (
-                        <MessageItem
-                            key={msg.id}
-                            message={msg}
-                            currentUser={user}
-                            onReply={handleReply}
-                        />
+                        <React.Fragment key={msg.id}>
+                            {showDateSeparator && (
+                                <div className="date-separator">
+                                    <span>{currentDateLabel}</span>
+                                </div>
+                            )}
+                            {msg.type === 'poll' ? (
+                                <PollItem key={msg.id} message={msg} currentUser={user} isAdmin={isAdmin} onDelete={handleDeleteMessage} />
+                            ) : (
+                                <MessageItem
+                                    key={msg.id}
+                                    message={msg}
+                                    currentUser={user}
+                                    onReply={handleReply}
+                                />
+                            )}
+                        </React.Fragment>
                     );
                 })}
 
@@ -374,7 +407,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                             )
                         ) : (
                             <>
-                                {imageFile && (
+                                {false && imageFile && (
                                     <div className="attachment-preview">
                                         <span>{imageFile.name}</span>
                                         <button onClick={() => setImageFile(null)}><X size={14} /></button>
@@ -420,21 +453,26 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
 
 
 
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        style={{ display: 'none' }}
-                                        ref={fileInputRef}
-                                        onChange={handleFileSelect}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        style={{ background: 'none', border: 'none', color: imageFile ? '#4a9eff' : '#888', cursor: 'pointer', padding: '4px' }}
-                                        title="Upload Image"
-                                    >
-                                        <ImageIcon size={20} />
-                                    </button>
+                                    {/* Image Upload Disabled */
+                                        false && (
+                                            <>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    style={{ display: 'none' }}
+                                                    ref={fileInputRef}
+                                                    onChange={handleFileSelect}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    style={{ background: 'none', border: 'none', color: imageFile ? '#4a9eff' : '#888', cursor: 'pointer', padding: '4px' }}
+                                                    title="Upload Image"
+                                                >
+                                                    <ImageIcon size={20} />
+                                                </button>
+                                            </>
+                                        )}
 
                                     <input
                                         type="text"

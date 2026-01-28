@@ -183,3 +183,36 @@ code {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+@keyframes highlight-fade {
+  0% {
+    background-color: rgba(74, 158, 255, 0.2);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.highlight-message {
+  animation: highlight-fade 2s ease-out;
+}
+
+.date-separator {
+  display: flex;
+  align-items: center;
+  color: var(--ev-c-text-2, #aaa);
+  font-size: 0.8rem;
+  margin: 20px 0;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+.date-separator::before,
+.date-separator::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0 10px;
+}

@@ -68,8 +68,22 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
         }
     };
 
+    const handleReplyClick = () => {
+        if (!message.replyTo?.id) return;
+
+        const element = document.getElementById(`message-${message.replyTo.id}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.classList.add('highlight-message');
+            setTimeout(() => element.classList.remove('highlight-message'), 2000);
+        } else {
+            toast.info("Original message not mapped in current view");
+        }
+    };
+
     return (
         <div
+            id={`message-${message.id}`}
             className="message-item"
             onMouseEnter={() => setShowActions(true)}
             onMouseLeave={() => setShowActions(false)}
@@ -89,14 +103,20 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
                 </div>
 
                 {message.replyTo && (
-                    <div className="reply-context-message" style={{
-                        fontSize: '0.8rem',
-                        color: '#aaa',
-                        borderLeft: '2px solid #555',
-                        paddingLeft: '8px',
-                        marginBottom: '4px',
-                        marginTop: '2px'
-                    }}>
+                    <div
+                        className="reply-context-message"
+                        onClick={handleReplyClick}
+                        title="Scroll to original message"
+                        style={{
+                            fontSize: '0.8rem',
+                            color: '#aaa',
+                            borderLeft: '2px solid #555',
+                            paddingLeft: '8px',
+                            marginBottom: '4px',
+                            marginTop: '2px',
+                            cursor: 'pointer'
+                        }}
+                    >
                         <span style={{ fontWeight: 'bold' }}>{message.replyTo.displayName}</span>: {message.replyTo.text.substring(0, 50)}{message.replyTo.text.length > 50 ? '...' : ''}
                     </div>
                 )}

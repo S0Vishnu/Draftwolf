@@ -10,15 +10,14 @@ import TodoList, { TodoItem, Priority } from './TodoList';
 import InfoTab from './inspector/InfoTab';
 import VersionsTab from './inspector/VersionsTab';
 import AttachmentsTab from './inspector/AttachmentsTab';
-import { InspectorPanelProps, AttachmentItem } from './inspector/types';
+import { InspectorPanelProps, AttachmentItem, InspectorTab } from './inspector/types';
 
-type Tab = 'info' | 'tasks' | 'versions' | 'attachments';
-
+// type Tab = 'info' | 'tasks' | 'versions' | 'attachments'; // Removed in favor of InspectorTab
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 800;
 
-const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onClose, onRefresh }) => {
-    const [activeTab, setActiveTab] = useState<Tab>('versions');
+const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onClose, onRefresh, initialTab }) => {
+    const [activeTab, setActiveTab] = useState<InspectorTab>(initialTab || 'versions');
     const [width, setWidth] = useState(420);
     const [isResizing, setIsResizing] = useState(false);
     const sidebarRef = useRef<HTMLDivElement>(null);
@@ -44,6 +43,13 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     useEffect(() => {
         setActiveVersionId(null);
     }, [file?.path]);
+
+    // Update activeTab when initialTab prop changes
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
 
     // Confirm Dialog State
     const [confirmState, setConfirmState] = useState({

@@ -43,6 +43,23 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textInputRef = useRef<HTMLInputElement>(null);
+    const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+    // Close emoji picker on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+                setShowEmojiPicker(false);
+            }
+        };
+
+        if (showEmojiPicker) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showEmojiPicker]);
 
     // Calculate 7 days ago for query
     const sevenDaysAgo = new Date();
@@ -492,7 +509,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                                         }}
                                     />
 
-                                    <div style={{ position: 'relative' }}>
+                                    <div style={{ position: 'relative' }} ref={emojiPickerRef}>
                                         {showEmojiPicker && (
                                             <div style={{
                                                 position: 'absolute',
@@ -509,6 +526,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channelId }) => {
                                                     width={300}
                                                     height={400}
                                                     lazyLoadEmojis={true}
+                                                    skinTonesDisabled={true}
                                                 />
                                             </div>
                                         )}

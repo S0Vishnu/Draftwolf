@@ -33,7 +33,8 @@ def send_request(endpoint, data=None):
         req.data = jsondata # IMPLIES POST
         
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
+        # Reduced timeout to 3 seconds for faster detection
+        with urllib.request.urlopen(req, timeout=3) as response:
             return json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         print(f"DraftWolf API Error: {e.code}")
@@ -42,7 +43,8 @@ def send_request(endpoint, data=None):
             return json.loads(err_body)
         except:
             return {'success': False, 'error': f"HTTP {e.code}"}
-    except (urllib.error.URLError, TimeoutError) as e:
+    except (urllib.error.URLError, TimeoutError, ConnectionRefusedError, OSError) as e:
+        # More comprehensive error handling for different systems
         print(f"DraftWolf Connection Error: {e}")
         return {'success': False, 'error': str(e)}
 
@@ -54,18 +56,49 @@ def get_project_root(filepath):
     return res.get('root') if res else None
 
 def check_app_status():
-    """Check if DraftWolf app is installed and running"""
+    """Check if DraftWolf app is installed and running (with caching)"""
+    import time
+    current_time = time.time()
+    
+    # Return cached value if still valid
+    if current_time - StatusCache.last_check_time < StatusCache.cache_duration:
+        return StatusCache.app_running
+    
+    # Update cache
     res = send_request('/health')
-    if res and res.get('success'):
-        return True
-    return False
+    StatusCache.app_running = bool(res and res.get('success'))
+    StatusCache.last_check_time = current_time
+    
+    # If app is not running, reset login status
+    if not StatusCache.app_running:
+        StatusCache.is_logged_in = False
+        StatusCache.username = None
+    
+    return StatusCache.app_running
 
 def check_login_status():
-    """Check if user is logged into DraftWolf"""
+    """Check if user is logged into DraftWolf (with caching)"""
+    import time
+    current_time = time.time()
+    
+    # Return cached value if still valid
+    if current_time - StatusCache.last_check_time < StatusCache.cache_duration:
+        return StatusCache.is_logged_in, StatusCache.username
+    
+    # Only check login if app is running
+    if not StatusCache.app_running:
+        return False, None
+    
+    # Update cache
     res = send_request('/auth/status')
     if res and res.get('loggedIn'):
-        return True, res.get('username', 'User')
-    return False, None
+        StatusCache.is_logged_in = True
+        StatusCache.username = res.get('username', 'User')
+    else:
+        StatusCache.is_logged_in = False
+        StatusCache.username = None
+    
+    return StatusCache.is_logged_in, StatusCache.username
 
 def load_version_history(filepath):
     """Load and filter version history for the current file"""
@@ -115,6 +148,14 @@ class SafeVersionList:
     items = []
     full_history = []
     show_versions = False  # For collapsible UI
+
+class StatusCache:
+    """Cache for app and login status to prevent excessive network calls"""
+    app_running = False
+    is_logged_in = False
+    username = None
+    last_check_time = 0
+    cache_duration = 2.0  # Cache for 2 seconds to reduce lag
 
 # --- Operators ---
 
@@ -657,6 +698,30 @@ class OBJECT_OT_DfRenameVersion(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
 
+class OBJECT_OT_DfRefreshStatus(bpy.types.Operator):
+    """Refresh connection status with DraftWolf app"""
+    bl_idname = "draftwolf.refresh_status"
+    bl_label = "Refresh Status"
+
+    def execute(self, context):
+        # Force cache invalidation
+        StatusCache.last_check_time = 0
+        
+        # Check status
+        app_running = check_app_status()
+        is_logged_in, username = check_login_status()
+        
+        if app_running:
+            if is_logged_in:
+                self.report({'INFO'}, f"✓ Connected! Logged in as {username}")
+            else:
+                self.report({'INFO'}, "✓ App detected but not logged in")
+        else:
+            self.report({'WARNING'}, "App not detected. Make sure DraftWolf is running.")
+        
+        return {'FINISHED'}
+
+
 # --- Panel ---
 
 class DF_PT_MainPanel(bpy.types.Panel):
@@ -778,11 +843,16 @@ class DF_PT_MainPanel(bpy.types.Panel):
         
         # ===== STEP 3: DRAFTWOLF APP =====
         box = layout.box()
-        box.label(text="③ DraftWolf App", icon='WINDOW')
+        
+        # Header with refresh button
+        row = box.row(align=True)
+        row.label(text="③ DraftWolf App", icon='WINDOW')
+        row.operator("draftwolf.refresh_status", text="", icon="FILE_REFRESH")
         
         if not app_running:
             # App not installed/running
             box.label(text="App not detected", icon='ERROR')
+            box.label(text="Make sure DraftWolf is running")
             row = box.row(align=True)
             row.scale_y = 1.2
             row.operator("draftwolf.download_app", text="Download App", icon="INTERNET")
@@ -813,6 +883,7 @@ classes = (
     OBJECT_OT_DfRefreshVersions,
     OBJECT_OT_DfRestoreQuick,
     OBJECT_OT_DfRenameVersion,
+    OBJECT_OT_DfRefreshStatus,
     DF_PT_MainPanel
 )
 

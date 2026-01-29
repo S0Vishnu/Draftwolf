@@ -30,7 +30,7 @@ const Settings = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [appVersion, setAppVersion] = useState("1.1.5"); // Default fallback
+    const [appVersion, setAppVersion] = useState("1.1.7"); // Default fallback
 
     // Initial default settings
     const defaultSettings: UserSettings = {

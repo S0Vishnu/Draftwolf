@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { X, Heart, Coffee, ExternalLinkIcon } from 'lucide-react';
 import logo from '../assets/logo_full.svg';
 import '../styles/HelpModal.css';
@@ -10,6 +10,13 @@ interface HelpModalProps {
 
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     const dialogRef = useRef<HTMLDivElement>(null);
+    const [appVersion, setAppVersion] = useState("1.1.7");
+
+    useEffect(() => {
+        if ((window as any).api && (window as any).api.getAppVersion) {
+            (window as any).api.getAppVersion().then((v: string) => setAppVersion(v));
+        }
+    }, []);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,7 +53,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                         <div className="app-logo">
                             <img src={logo} alt="Draftwolf Logo" className="logo-image" />
                         </div>
-                        <p className="version">Version 1.0.0</p>
+                        <p className="version">Version {appVersion}</p>
                     </div>
 
                     <div className="help-section features">

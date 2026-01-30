@@ -268,11 +268,58 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             confirmText: 'Restore',
             isDangerous: true,
             onConfirm: async () => {
-                await window.api.draft.restore(projectRoot, vId);
-                setActiveVersionId(vId);
-                onRefresh?.();
-                // window.location.reload();
-                setConfirmState(prev => ({ ...prev, isOpen: false }));
+                try {
+                    const result = await window.api.draft.restore(projectRoot, vId);
+
+                    if (result && result.success) {
+                        setActiveVersionId(vId);
+                        onRefresh?.();
+                        setConfirmState(prev => ({ ...prev, isOpen: false }));
+                        toast.success("Version restored successfully");
+                    } else {
+                        // Handle Error
+                        const errorMsg = result?.error || "Unknown error";
+                        const errorCode = result?.code;
+                        console.error("Restore failed:", result);
+
+                        if (errorCode === 'EBUSY' || errorCode === 'EPERM' || errorMsg.toLowerCase().includes("busy") || errorMsg.toLowerCase().includes("locked")) {
+
+                            // 1. Check if it's our own preview holding it
+                            if (previewImage) {
+                                setConfirmState({
+                                    isOpen: true,
+                                    title: 'File Open in Preview',
+                                    message: 'The file is currently open in the preview. Close preview and restore?',
+                                    confirmText: 'Close & Restore',
+                                    isDangerous: false,
+                                    onConfirm: () => {
+                                        setPreviewImage(null);
+                                        // Slight delay to allow state update/unlock
+                                        setTimeout(() => handleRestore(vId), 100);
+                                    }
+                                });
+                                return;
+                            }
+
+                            // 2. External Lock
+                            setConfirmState({
+                                isOpen: true,
+                                title: 'File is Open',
+                                message: `The file is currently open in another program. Please close it and click Retry.`,
+                                confirmText: 'Retry',
+                                isDangerous: false,
+                                onConfirm: () => handleRestore(vId) // Recursively retry
+                            });
+                        } else {
+                            toast.error(`Restore failed: ${errorMsg}`);
+                            setConfirmState(prev => ({ ...prev, isOpen: false }));
+                        }
+                    }
+                } catch (e: any) {
+                    console.error("Restore exception:", e);
+                    toast.error(`Restore failed: ${e.message || e}`);
+                    setConfirmState(prev => ({ ...prev, isOpen: false }));
+                }
             }
         });
     };

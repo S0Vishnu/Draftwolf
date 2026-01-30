@@ -40,7 +40,7 @@ interface Window {
       init: (projectRoot: string) => Promise<boolean>;
       commit: (projectRoot: string, label: string, files: string[]) => Promise<{ success: boolean; versionId?: string; error?: string }>;
       getHistory: (projectRoot: string, relativePath?: string) => Promise<{ id: string; label: string; timestamp: string | number; files: Record<string, string>; totalSize?: number; parent?: string; parents?: string[]; parentId?: string }[]>;
-      restore: (projectRoot: string, versionId: string) => Promise<boolean>;
+      restore: (projectRoot: string, versionId: string) => Promise<{ success: boolean; error?: string; code?: string }>;
       delete: (projectRoot: string, versionId: string) => Promise<boolean>;
       renameVersion: (projectRoot: string, versionId: string, newLabel: string) => Promise<boolean>;
       extract: (projectRoot: string, versionId: string, relativePath: string, destPath: string) => Promise<boolean>;

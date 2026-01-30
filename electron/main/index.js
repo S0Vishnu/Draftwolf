@@ -606,10 +606,10 @@ ipcMain.handle('draft:restore', async (_, { projectRoot, versionId }) => {
   try {
     const dcs = new DraftControlSystem(projectRoot);
     await dcs.restore(versionId);
-    return true;
+    return { success: true };
   } catch (e) {
     console.error('Draft Restore Failed:', e);
-    return false;
+    return { success: false, error: e.message || e.toString(), code: e.code };
   }
 });
 

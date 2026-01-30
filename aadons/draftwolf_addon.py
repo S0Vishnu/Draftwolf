@@ -16,11 +16,41 @@ import os
 import subprocess
 import sys
 import shutil
+import threading
+import time
+import re
+from functools import lru_cache
 
 API_PORT = 45000
 API_URL = f"http://127.0.0.1:{API_PORT}"
 
+# Pre-compile regex patterns for performance
+VERSION_SUFFIX_PATTERN = re.compile(r'-v[\d\.]+$')
+NUMBER_SUFFIX_PATTERN = re.compile(r'-\d+$')
+
 # --- Helper Functions ---
+
+def recover_original_filepath(filepath):
+    """
+    Helper to recover the original filepath from a retrieved version file.
+    This logic was duplicated in multiple operators, now centralized.
+    """
+    filename = os.path.basename(filepath)
+    name, ext = os.path.splitext(filename)
+    
+    # Logic to recover original name if we are inside a retrieved file
+    if name.endswith('-retrieved-version') or '-retrieved-version-' in name:
+        split_key = '-retrieved-version'
+        if split_key in name:
+            original_name_part = name.split(split_key)[0]
+            return os.path.join(os.path.dirname(filepath), original_name_part + ext)
+    elif name.endswith('-retrieved'):
+        temp = name[:-len('-retrieved')]
+        if '-' in temp:
+            original_name_part = temp.rsplit('-', 1)[0]
+            return os.path.join(os.path.dirname(filepath), original_name_part + ext)
+    
+    return filepath
 
 def send_request(endpoint, data=None):
     url = f"{API_URL}{endpoint}"
@@ -33,8 +63,9 @@ def send_request(endpoint, data=None):
         req.data = jsondata # IMPLIES POST
         
     try:
-        # Reduced timeout to 3 seconds for faster detection
-        with urllib.request.urlopen(req, timeout=3) as response:
+        # Ultra fast timeout for local inter-process communication
+        # If localhost doesn't reply in 0.5s, it's down.
+        with urllib.request.urlopen(req, timeout=0.5) as response:
             return json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         print(f"DraftWolf API Error: {e.code}")
@@ -51,54 +82,74 @@ def send_request(endpoint, data=None):
 def get_project_root(filepath):
     if not filepath:
         return None
-    # We send the directory so find-root can traverse up
-    res = send_request('/draft/find-root', {'path': os.path.dirname(filepath)})
-    return res.get('root') if res else None
-
-def check_app_status():
-    """Check if DraftWolf app is installed and running (with caching)"""
-    import time
+        
+    dir_path = os.path.dirname(filepath)
+    
+    # Check cache
     current_time = time.time()
     
-    # Return cached value if still valid
-    if current_time - StatusCache.last_check_time < StatusCache.cache_duration:
-        return StatusCache.app_running
+    if dir_path in RootCache.cache:
+        entry = RootCache.cache[dir_path]
+        if current_time - entry['time'] < RootCache.duration:
+            return entry['root']
+            
+    # We send the directory so find-root can traverse up
+    res = send_request('/draft/find-root', {'path': dir_path})
+    root = res.get('root') if res else None
     
     # Update cache
-    res = send_request('/health')
-    StatusCache.app_running = bool(res and res.get('success'))
-    StatusCache.last_check_time = current_time
+    RootCache.cache[dir_path] = {'root': root, 'time': current_time}
     
-    # If app is not running, reset login status
-    if not StatusCache.app_running:
-        StatusCache.is_logged_in = False
-        StatusCache.username = None
-    
+    return root
+
+def check_app_status():
+    """Return latest known app status from background thread"""
     return StatusCache.app_running
 
 def check_login_status():
-    """Check if user is logged into DraftWolf (with caching)"""
-    import time
-    current_time = time.time()
-    
-    # Return cached value if still valid
-    if current_time - StatusCache.last_check_time < StatusCache.cache_duration:
-        return StatusCache.is_logged_in, StatusCache.username
-    
-    # Only check login if app is running
-    if not StatusCache.app_running:
-        return False, None
-    
-    # Update cache
-    res = send_request('/auth/status')
-    if res and res.get('loggedIn'):
-        StatusCache.is_logged_in = True
-        StatusCache.username = res.get('username', 'User')
-    else:
-        StatusCache.is_logged_in = False
-        StatusCache.username = None
-    
+    """Return latest known login status from background thread"""
     return StatusCache.is_logged_in, StatusCache.username
+
+# Worker function for background thread
+def status_worker():
+    while StatusCache.thread_running:
+        try:
+            # Check Health
+            res = send_request('/health')
+            is_running = bool(res and res.get('success'))
+            StatusCache.app_running = is_running
+
+            if is_running:
+                # Check Login
+                auth_res = send_request('/auth/status')
+                if auth_res and auth_res.get('loggedIn'):
+                    StatusCache.is_logged_in = True
+                    # Truncate username if too long
+                    uname = auth_res.get('username', 'User')
+                    if len(uname) > 15:
+                        uname = uname[:12] + "..."
+                    StatusCache.username = uname
+                else:
+                    StatusCache.is_logged_in = False
+                    StatusCache.username = None
+            else:
+                StatusCache.is_logged_in = False
+                StatusCache.username = None
+                
+        except Exception as e:
+            print(f"Background check failed: {e}")
+            StatusCache.app_running = False
+            
+        # Sleep for 5 seconds before next check (reduced frequency for better performance)
+        # Use small sleeps to allow quick shutdown
+        for _ in range(50): 
+            if not StatusCache.thread_running:
+                break
+            time.sleep(0.1)
+
+# --- Global State for UI ---
+
+
 
 def load_version_history(filepath):
     """Load and filter version history for the current file"""
@@ -115,7 +166,6 @@ def load_version_history(filepath):
         return []
     
     # Filter for current file
-    import re
     target_file = os.path.basename(filepath)
     name, ext = os.path.splitext(target_file)
     
@@ -126,36 +176,51 @@ def load_version_history(filepath):
         clean_name = clean_name[:idx]
     elif '-retrieved' in clean_name:
         clean_name = clean_name.replace('-retrieved', '')
-        clean_name = re.sub(r'-v[\d\.]+$', '', clean_name)
-        clean_name = re.sub(r'-\d+$', '', clean_name)
+        clean_name = VERSION_SUFFIX_PATTERN.sub('', clean_name)
+        clean_name = NUMBER_SUFFIX_PATTERN.sub('', clean_name)
     
     target_file = clean_name + ext
     target_lower = target_file.lower()
     
+    # Use list comprehension for better performance
     filtered_history = []
     for v in history:
         files = v.get('files', {})
-        for f_path in files.keys():
-            f_name = os.path.basename(f_path)
-            if f_name.lower() == target_lower:
-                filtered_history.append(v)
-                break
+        # Early exit if found
+        if any(os.path.basename(f_path).lower() == target_lower for f_path in files.keys()):
+            filtered_history.append(v)
     
     return filtered_history
 
 # --- Global State for UI ---
 class SafeVersionList:
     items = []
-    full_history = []
+    full_history = None  # None means "not loaded yet"
     show_versions = False  # For collapsible UI
+    last_fetch_time = 0
+    fetch_interval = 10.0  # Increased from 5 to 10 seconds
+    current_filepath = None  # To detect file changes
 
 class StatusCache:
-    """Cache for app and login status to prevent excessive network calls"""
+    """Shared state updated by background thread"""
     app_running = False
     is_logged_in = False
     username = None
-    last_check_time = 0
-    cache_duration = 2.0  # Cache for 2 seconds to reduce lag
+    
+    # Thread control
+    thread_running = False
+    thread = None
+    
+    # Cache for draw() method to reduce redundant calls
+    last_draw_time = 0
+    cached_is_saved = False
+    cached_is_initialized = False
+    cached_filepath = None
+
+class RootCache:
+    """Cache for project root discovery"""
+    cache = {}  # {dir_path: {'root': str, 'time': float}}
+    duration = 30.0  # Increased from 10 to 30 seconds (roots rarely change)
 
 # --- Operators ---
 
@@ -264,24 +329,9 @@ class OBJECT_OT_DfRetrieve(bpy.types.Operator):
         if not root:
             return {'CANCELLED'}
         
-        # 1. Identify File Info (Recover original path logic)
-        filename = os.path.basename(filepath)
-        name, ext = os.path.splitext(filename)
-        req_filepath = filepath
-        
-        # Logic to recover original name if we are inside a retrieved file
-        if name.endswith('-retrieved-version') or '-retrieved-version-' in name:
-             split_key = '-retrieved-version'
-             if split_key in name:
-                 original_name_part = name.split(split_key)[0]
-                 req_filepath = os.path.join(os.path.dirname(filepath), original_name_part + ext)
-        elif name.endswith('-retrieved'):
-            temp = name[:-len('-retrieved')]
-            if '-' in temp:
-                original_name_part = temp.rsplit('-', 1)[0]
-                req_filepath = os.path.join(os.path.dirname(filepath), original_name_part + ext)
+        # Use helper to recover original filepath
+        req_filepath = recover_original_filepath(filepath)
 
-        # 2. Perform Restore (Overwrite)
         # Check if we are overwriting the currently open file
         is_open_file = False
         try:
@@ -293,7 +343,6 @@ class OBJECT_OT_DfRetrieve(bpy.types.Operator):
 
         if is_open_file:
             # We must release the lock on Windows
-            # Create new file temporarily
             bpy.ops.wm.read_homefile(app_template="") 
         
         # Call API
@@ -410,9 +459,9 @@ class OBJECT_OT_DfRetrieve(bpy.types.Operator):
         elif '-retrieved' in clean_name:
             clean_name = clean_name.replace('-retrieved', '')
             # Strip version suffixes like -v2, -v2.1
-            clean_name = re.sub(r'-v[\d\.]+$', '', clean_name)
+            clean_name = VERSION_SUFFIX_PATTERN.sub('', clean_name)
             # Strip simple number suffixes from duplicate downloads like -1
-            clean_name = re.sub(r'-\d+$', '', clean_name)
+            clean_name = NUMBER_SUFFIX_PATTERN.sub('', clean_name)
         
         target_file = clean_name + ext
         target_lower = target_file.lower()
@@ -513,7 +562,7 @@ class OBJECT_OT_DfDownloadApp(bpy.types.Operator):
     def execute(self, context):
         try:
             # TODO: Replace with website URL when available
-            url = "https://github.com/S0Vishnu/Draftflow-app"
+            url = "https://github.com/S0Vishnu/Draftflow"
             
             if sys.platform == 'win32':
                 os.startfile(url)
@@ -598,22 +647,8 @@ class OBJECT_OT_DfRestoreQuick(bpy.types.Operator):
         if not root:
             return {'CANCELLED'}
         
-        # Identify File Info (Recover original path logic)
-        filename = os.path.basename(filepath)
-        name, ext = os.path.splitext(filename)
-        req_filepath = filepath
-        
-        # Logic to recover original name if we are inside a retrieved file
-        if name.endswith('-retrieved-version') or '-retrieved-version-' in name:
-             split_key = '-retrieved-version'
-             if split_key in name:
-                 original_name_part = name.split(split_key)[0]
-                 req_filepath = os.path.join(os.path.dirname(filepath), original_name_part + ext)
-        elif name.endswith('-retrieved'):
-            temp = name[:-len('-retrieved')]
-            if '-' in temp:
-                original_name_part = temp.rsplit('-', 1)[0]
-                req_filepath = os.path.join(os.path.dirname(filepath), original_name_part + ext)
+        # Use helper to recover original filepath
+        req_filepath = recover_original_filepath(filepath)
 
         # Check if we are overwriting the currently open file
         is_open_file = False
@@ -691,7 +726,8 @@ class OBJECT_OT_DfRenameVersion(bpy.types.Operator):
     
     def invoke(self, context, event):
         # Find the current label for this version
-        for v in SafeVersionList.full_history:
+        history = SafeVersionList.full_history or []
+        for v in history:
             if v.get('id') == self.version_id:
                 self.new_label = v.get('label', 'Untitled')
                 break
@@ -704,12 +740,12 @@ class OBJECT_OT_DfRefreshStatus(bpy.types.Operator):
     bl_label = "Refresh Status"
 
     def execute(self, context):
-        # Force cache invalidation
-        StatusCache.last_check_time = 0
+        # Implementation: just report current status
         
         # Check status
-        app_running = check_app_status()
-        is_logged_in, username = check_login_status()
+        app_running = StatusCache.app_running
+        is_logged_in = StatusCache.is_logged_in
+        username = StatusCache.username
         
         if app_running:
             if is_logged_in:
@@ -736,16 +772,34 @@ class DF_PT_MainPanel(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Check all statuses
+        # PERFORMANCE: Cache expensive status checks with throttling
+        # Only recalculate every 0.5 seconds instead of on every mouse move
+        current_time = time.time()
         filepath = bpy.data.filepath
-        is_saved = bool(filepath)
-        is_initialized = False
+        
+        # Use cached values if recent and filepath hasn't changed
+        if (current_time - StatusCache.last_draw_time < 0.5 and 
+            StatusCache.cached_filepath == filepath):
+            is_saved = StatusCache.cached_is_saved
+            is_initialized = StatusCache.cached_is_initialized
+        else:
+            # Recalculate
+            is_saved = bool(filepath)
+            is_initialized = False
+            
+            if is_saved:
+                root = get_project_root(filepath)
+                is_initialized = bool(root)
+            
+            # Update cache
+            StatusCache.last_draw_time = current_time
+            StatusCache.cached_is_saved = is_saved
+            StatusCache.cached_is_initialized = is_initialized
+            StatusCache.cached_filepath = filepath
+        
+        # Get status from background thread (already cached)
         app_running = check_app_status()
         is_logged_in, username = check_login_status()
-        
-        if is_saved:
-            root = get_project_root(filepath)
-            is_initialized = bool(root)
         
         # ===== LOGIN STATUS BAR =====
         if app_running and is_logged_in:
@@ -800,15 +854,25 @@ class DF_PT_MainPanel(bpy.types.Panel):
                 row.operator("draftwolf.commit", text="Save Version", icon="EXPORT")
             
             # Version History - Collapsible
-            # Load version history if not already loaded
-            if not SafeVersionList.full_history and is_initialized:
-                SafeVersionList.full_history = load_version_history(filepath)
+            # Verify file change to reset cache
+            if filepath != SafeVersionList.current_filepath:
+                SafeVersionList.current_filepath = filepath
+                SafeVersionList.full_history = None
+
+            # Load version history if not already loaded (throttled)
+            # Only load when versions panel is expanded to save performance
+            if SafeVersionList.full_history is None and is_initialized and SafeVersionList.show_versions:
+                if current_time - SafeVersionList.last_fetch_time > SafeVersionList.fetch_interval:
+                    SafeVersionList.last_fetch_time = current_time
+                    SafeVersionList.full_history = load_version_history(filepath)
             
             # Toggle button with refresh button
             row = box.row(align=True)
+            # Use safe length check
+            count = len(SafeVersionList.full_history) if SafeVersionList.full_history else 0
             icon = 'DOWNARROW_HLT' if SafeVersionList.show_versions else 'RIGHTARROW'
             row.operator("draftwolf.toggle_versions", 
-                        text=f"Version History ({len(SafeVersionList.full_history)} saved)",
+                        text=f"Version History ({count} saved)",
                         icon=icon, emboss=False)
             # Refresh button
             row.operator("draftwolf.refresh_versions", text="", icon="FILE_REFRESH")
@@ -890,8 +954,20 @@ classes = (
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
+        
+    # Start background thread
+    if not StatusCache.thread_running:
+        StatusCache.thread_running = True
+        StatusCache.thread = threading.Thread(target=status_worker, daemon=True)
+        StatusCache.thread.start()
 
 def unregister():
+    # Stop background thread
+    StatusCache.thread_running = False
+    if StatusCache.thread:
+        # We don't join() to avoid hanging UI on exit, daemon will die
+        pass
+        
     for cls in classes:
         bpy.utils.unregister_class(cls)
 

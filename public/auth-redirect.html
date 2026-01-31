@@ -71,10 +71,10 @@
         (async () => {
             // Firebase config - values injected at build time
             const firebaseConfig = {
-                apiKey: "__VITE_FIREBASE_API_KEY__",
-                authDomain: "__VITE_FIREBASE_AUTH_DOMAIN__",
-                projectId: "__VITE_FIREBASE_PROJECT_ID__",
-                appId: "__VITE_FIREBASE_APP_ID__",
+                apiKey: "AIzaSyD3BhG--fI6c8V3TSa5l-2uOBlvBZFt1SQ",
+                authDomain: "draftflow-905d4.firebaseapp.com",
+                projectId: "draftflow-905d4",
+                appId: "1:233410681710:web:33f6a0a6f39ba70c8dbf7f",
             };
 
             const status = msg =>
@@ -109,8 +109,8 @@
 
                     if (googleToken) {
                         status("Sign-in successful");
-                        log(`User: ${result.user.email}`);
-                        log("Google Token acquired, redirecting to app…");
+                        log(`Logged in as ${result.user.displayName}`);
+                        log("You may now close this tab.");
 
                         window.location.href =
                             `myapp://auth?token=${encodeURIComponent(googleToken)}`;

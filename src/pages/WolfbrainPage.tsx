@@ -40,6 +40,10 @@ const WolfbrainPage = () => {
     // --- Canvas Data ---
     const [items, setItems] = useState<CanvasItem[]>([]);
 
+    // --- Unsaved Changes Tracking ---
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const lastSavedItems = useRef<string>(JSON.stringify([]));
+
 
     // Toolbar Responsive State
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -107,6 +111,8 @@ const WolfbrainPage = () => {
                     const parsed = JSON.parse(savedItems);
                     setItems(parsed);
                     setHistory([parsed]); // Init history
+                    lastSavedItems.current = savedItems; // Track as saved
+                    setHasUnsavedChanges(false);
                 } catch (e) { }
             }
         };
@@ -122,6 +128,8 @@ const WolfbrainPage = () => {
                         setItems(parsed);
                         setHistory([parsed]);
                         setCurrentFilePath(path);
+                        lastSavedItems.current = res.content; // Track as saved
+                        setHasUnsavedChanges(false);
                         // Isolate directory from file path for "rootPath" context if needed
                         const separator = path.includes('\\') ? '\\' : '/';
                         const dir = path.substring(0, path.lastIndexOf(separator));
@@ -138,6 +146,8 @@ const WolfbrainPage = () => {
                 setCurrentFilePath(null);
                 setItems([]);
                 setHistory([[]]);
+                lastSavedItems.current = JSON.stringify([]);
+                setHasUnsavedChanges(false);
             }
         });
 
@@ -226,6 +236,76 @@ const WolfbrainPage = () => {
         return () => window.removeEventListener('paste', handlePaste);
     }, [items]);
 
+    // --- Drag and Drop for Images ---
+    useEffect(() => {
+        const handleDragOver = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
+        const handleDrop = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const files = e.dataTransfer?.files;
+            if (files && files.length > 0) {
+                // Handle file drops
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            if (ev.target?.result) {
+                                addImageItem(ev.target.result as string);
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            } else {
+                // Handle URL drops (from websites)
+                const url = e.dataTransfer?.getData('text/uri-list') || e.dataTransfer?.getData('text/html');
+                if (url) {
+                    // Try to extract image URL from HTML or use direct URL
+                    const imgMatch = url.match(/<img[^>]+src="([^">]+)"/);
+                    const imageUrl = imgMatch ? imgMatch[1] : url;
+
+                    // If it looks like an image URL, add it directly
+                    if (imageUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) || imageUrl.startsWith('data:image/')) {
+                        addImageItem(imageUrl);
+                    } else {
+                        // Try to fetch and convert to data URL
+                        fetch(imageUrl)
+                            .then(res => res.blob())
+                            .then(blob => {
+                                if (blob.type.startsWith('image/')) {
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                        if (ev.target?.result) {
+                                            addImageItem(ev.target.result as string);
+                                        }
+                                    };
+                                    reader.readAsDataURL(blob);
+                                }
+                            })
+                            .catch(err => {
+                                console.error('Failed to load dropped image:', err);
+                                toast.error('Failed to load image from URL');
+                            });
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('dragover', handleDragOver);
+        window.addEventListener('drop', handleDrop);
+
+        return () => {
+            window.removeEventListener('dragover', handleDragOver);
+            window.removeEventListener('drop', handleDrop);
+        };
+    }, []);
+
     // --- Tools Logic ---
     const setTool = (tool: typeof activeTool) => {
         setActiveTool(tool);
@@ -239,7 +319,31 @@ const WolfbrainPage = () => {
         window.api?.wolfbrain?.setAlwaysOnTop(newState);
     };
 
-    const handleClose = () => window.api?.wolfbrain?.close();
+    // Custom unsaved changes dialog state
+    const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+
+    const handleClose = async () => {
+        if (hasUnsavedChanges) {
+            setShowUnsavedDialog(true);
+        } else {
+            window.api?.wolfbrain?.close();
+        }
+    };
+
+    const handleSaveAndClose = async () => {
+        await handleSaveWolfbrain();
+        setShowUnsavedDialog(false);
+        window.api?.wolfbrain?.close();
+    };
+
+    const handleDiscardAndClose = () => {
+        setShowUnsavedDialog(false);
+        window.api?.wolfbrain?.close();
+    };
+
+    const handleCancelClose = () => {
+        setShowUnsavedDialog(false);
+    };
     const handleMinimize = () => window.api?.wolfbrain?.minimize();
     const handleToggleMaximize = () => window.api?.wolfbrain?.toggleMaximize();
 
@@ -250,7 +354,11 @@ const WolfbrainPage = () => {
             // Overwrite existing
             try {
                 const res = await window.api.wolfbrain.saveFile(currentFilePath, content);
-                if (res.success) toast.success("Saved successfully");
+                if (res.success) {
+                    toast.success("Saved successfully");
+                    lastSavedItems.current = content;
+                    setHasUnsavedChanges(false);
+                }
                 else toast.error("Failed to save: " + res.error);
             } catch (e: any) { console.error(e); toast.error("Save error: " + e.message); }
         } else {
@@ -260,6 +368,8 @@ const WolfbrainPage = () => {
                 if (res.success && res.filePath) {
                     setCurrentFilePath(res.filePath);
                     toast.success("Saved to " + res.filePath.split(/[/\\]/).pop());
+                    lastSavedItems.current = content;
+                    setHasUnsavedChanges(false);
                 } else if (res.canceled) {
                     // User canceled, do nothing
                 } else {
@@ -320,15 +430,56 @@ const WolfbrainPage = () => {
     };
 
     const addImageItem = (url: string) => {
-        // ...
-        const newItem: CanvasItem = {
-            id: Date.now().toString(), type: 'image', x: 50000, y: 50000, width: 300, height: 300, content: url, zIndex: items.length + 1
+        // Load image to get actual dimensions
+        const img = new Image();
+        img.onload = () => {
+            // Calculate dimensions preserving aspect ratio
+            const maxSize = 400; // Max width or height
+            let width = img.width;
+            let height = img.height;
+
+            // Scale down if too large, preserving aspect ratio
+            if (width > maxSize || height > maxSize) {
+                const ratio = Math.min(maxSize / width, maxSize / height);
+                width = width * ratio;
+                height = height * ratio;
+            }
+
+            const newItem: CanvasItem = {
+                id: Date.now().toString(),
+                type: 'image',
+                x: 50000,
+                y: 50000,
+                width,
+                height,
+                content: url,
+                zIndex: items.length + 1
+            };
+            const newItems = [...items, newItem];
+            setItems(newItems);
+            setSelectedItemIds(new Set([newItem.id]));
+            setTool('move');
+            addToHistory(newItems);
         };
-        const newItems = [...items, newItem];
-        setItems(newItems);
-        setSelectedItemIds(new Set([newItem.id]));
-        setTool('move');
-        addToHistory(newItems);
+        img.onerror = () => {
+            // Fallback to default size if image fails to load
+            const newItem: CanvasItem = {
+                id: Date.now().toString(),
+                type: 'image',
+                x: 50000,
+                y: 50000,
+                width: 300,
+                height: 300,
+                content: url,
+                zIndex: items.length + 1
+            };
+            const newItems = [...items, newItem];
+            setItems(newItems);
+            setSelectedItemIds(new Set([newItem.id]));
+            setTool('move');
+            addToHistory(newItems);
+        };
+        img.src = url;
     };
 
     // --- Mouse Handling ---
@@ -784,6 +935,12 @@ const WolfbrainPage = () => {
         localStorage.setItem('wolfbrain_items', JSON.stringify(items));
     }, [items]);
 
+    // --- Track Unsaved Changes ---
+    useEffect(() => {
+        const currentState = JSON.stringify(items);
+        setHasUnsavedChanges(currentState !== lastSavedItems.current);
+    }, [items]);
+
     // --- Space Pan State ---
     const [isSpacePressed, setIsSpacePressed] = useState(false);
 
@@ -805,6 +962,113 @@ const WolfbrainPage = () => {
 
     return (
         <div className="wolfbrain-window" onContextMenu={handleContextMenu}>
+            {/* Unsaved Changes Dialog */}
+            {showUnsavedDialog && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 100000,
+                    backdropFilter: 'blur(4px)'
+                }} className="no-drag" onClick={handleCancelClose}>
+                    <div style={{
+                        background: '#27272a',
+                        border: '1px solid #3f3f46',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        minWidth: '400px',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: '18px',
+                            fontWeight: '600',
+                            color: '#e4e4e7'
+                        }}>Unsaved Changes</h3>
+                        <p style={{
+                            margin: '0 0 24px 0',
+                            color: '#a1a1aa',
+                            fontSize: '14px',
+                            lineHeight: '1.5'
+                        }}>
+                            You have unsaved changes. Do you want to save before closing?
+                        </p>
+                        <div style={{
+                            display: 'flex',
+                            gap: '8px',
+                            justifyContent: 'flex-end'
+                        }}>
+                            <button
+                                onClick={handleCancelClose}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: 'transparent',
+                                    border: '1px solid #3f3f46',
+                                    borderRadius: '6px',
+                                    color: '#e4e4e7',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#3f3f46'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDiscardAndClose}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: 'transparent',
+                                    border: '1px solid #ef4444',
+                                    borderRadius: '6px',
+                                    color: '#ef4444',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#ef4444';
+                                    e.currentTarget.style.color = '#fff';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = '#ef4444';
+                                }}
+                            >
+                                Don't Save
+                            </button>
+                            <button
+                                onClick={handleSaveAndClose}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: '#8b5cf6',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#7c3aed'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#8b5cf6'}
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Context Menu Render */}
 
             {contextMenu && (
@@ -840,7 +1104,9 @@ const WolfbrainPage = () => {
             <div className="wb-header app-drag-region">
                 <div className="wb-title">
                     <Brain size={18} className="text-accent" style={{ color: '#8b5cf6' }} />
-                    <span style={{ opacity: 0.9, marginLeft: 8 }}>Wolfbrain</span>
+                    <span style={{ opacity: 0.9, marginLeft: 8 }}>
+                        Wolfbrain{hasUnsavedChanges && <span style={{ color: '#fbbf24', marginLeft: 4 }}>●</span>}
+                    </span>
                 </div>
                 <div className="wb-toolbar no-drag">
                     <button onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={historyStep <= 0}><RotateCcw size={18} /></button>

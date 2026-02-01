@@ -146,6 +146,10 @@ function createWindow() {
     });
   })
 
+  mainWindow.on('closed', () => {
+    app.quit();
+  });
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     // Allow Google/Firebase Auth popups if any (though we are moving to system browser)
     // We strictly use system browser for external links now as per requirement
@@ -271,6 +275,17 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('fs:writeFile', async (_, { path, content }) => {
+    try {
+      const fs = await import('fs/promises');
+      await fs.writeFile(path, content, 'utf-8');
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to write file:', error);
+      return { success: false, error: 'Failed to write file' };
+    }
+  })
+
   ipcMain.handle('fs:deleteEntry', async (_, targetPath) => {
     try {
       const fs = await import('fs/promises');
@@ -391,6 +406,17 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('fs:readFile', async (_, filePath) => {
+    try {
+      const fs = await import('fs/promises');
+      const content = await fs.readFile(filePath, 'utf-8');
+      return { success: true, content };
+    } catch (error) {
+      console.error("Failed to read file:", error);
+      return { success: false, error: error.message };
+    }
+  })
+
   ipcMain.handle('fs:getStats', async (_, targetPath) => {
     try {
       const fs = await import('fs/promises');
@@ -404,6 +430,16 @@ app.whenReady().then(() => {
       };
     } catch (error) {
       console.error('Failed to get stats:', error);
+      return null;
+    }
+  })
+
+  ipcMain.handle('fs:getFileIcon', async (_, filePath) => {
+    try {
+      const icon = await app.getFileIcon(filePath);
+      return icon.toDataURL();
+    } catch (error) {
+      console.error('Failed to get file icon:', error);
       return null;
     }
   })
@@ -684,6 +720,118 @@ ipcMain.handle('draft:validate', async (_, projectRoot) => {
   } catch (e) {
     console.error('Draft Validate Failed:', e);
     return { valid: false, errors: [e.message] };
+  }
+});
+
+// --- Wolfbrain Extension ---
+let wolfbrainWindow = null;
+
+function createWolfbrainWindow() {
+  if (wolfbrainWindow) {
+    if (wolfbrainWindow.isMinimized()) wolfbrainWindow.restore();
+    wolfbrainWindow.show();
+    wolfbrainWindow.focus();
+    if (wolfbrainStartPath) {
+      wolfbrainWindow.webContents.send('wolfbrain:init-path', wolfbrainStartPath);
+    }
+    return;
+  }
+
+  wolfbrainWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    show: false,
+    frame: false, // Custom frame in React
+    transparent: false,
+    autoHideMenuBar: true,
+    alwaysOnTop: false, // Default false, toggled by user
+    icon: icon,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  const url = is.dev && process.env['ELECTRON_RENDERER_URL']
+    ? `${process.env['ELECTRON_RENDERER_URL']}#/wolfbrain`
+    : `file://${join(__dirname, '../renderer/index.html')}#/wolfbrain`;
+
+  wolfbrainWindow.loadURL(url);
+
+  wolfbrainWindow.on('ready-to-show', () => {
+    wolfbrainWindow.show();
+    // Send the start path if available
+    if (wolfbrainStartPath) {
+      wolfbrainWindow.webContents.send('wolfbrain:init-path', wolfbrainStartPath);
+    }
+  });
+
+  wolfbrainWindow.on('close', (e) => {
+    e.preventDefault();
+    wolfbrainWindow.hide();
+  });
+
+  // Open external links in browser
+  wolfbrainWindow.webContents.setWindowOpenHandler((details) => {
+    shell.openExternal(details.url);
+    return { action: 'deny' };
+  });
+}
+
+let wolfbrainStartPath = '';
+
+ipcMain.handle('wolfbrain:open', (_, startPath) => {
+  wolfbrainStartPath = startPath || '';
+  createWolfbrainWindow();
+});
+
+ipcMain.handle('wolfbrain:close', () => {
+  if (wolfbrainWindow) wolfbrainWindow.hide();
+});
+
+ipcMain.handle('wolfbrain:setAlwaysOnTop', (_, flag) => {
+  if (wolfbrainWindow) {
+    wolfbrainWindow.setAlwaysOnTop(flag);
+  }
+});
+
+ipcMain.handle('wolfbrain:getAlwaysOnTop', () => {
+  return wolfbrainWindow ? wolfbrainWindow.isAlwaysOnTop() : false;
+});
+
+ipcMain.handle('wolfbrain:minimize', () => {
+  if (wolfbrainWindow) wolfbrainWindow.minimize();
+});
+
+ipcMain.handle('wolfbrain:toggleMaximize', () => {
+  if (wolfbrainWindow) {
+    if (wolfbrainWindow.isMaximized()) {
+      wolfbrainWindow.unmaximize();
+    } else {
+      wolfbrainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.handle('wolfbrain:save-as', async (_, content) => {
+  const { dialog } = await import('electron');
+  const fs = await import('fs/promises');
+
+  const { canceled, filePath } = await dialog.showSaveDialog(wolfbrainWindow, {
+    title: 'Save Wolfbrain Moodboard',
+    defaultPath: 'moodboard.wolfbrain',
+    filters: [{ name: 'Wolfbrain Files', extensions: ['wolfbrain'] }]
+  });
+
+  if (canceled || !filePath) return { success: false, canceled: true };
+
+  try {
+    await fs.writeFile(filePath, content, 'utf-8');
+    return { success: true, filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 });
 

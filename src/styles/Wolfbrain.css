@@ -1,0 +1,254 @@
+.wolfbrain-window {
+    width: 100vw;
+    height: 100vh;
+    background: #1e1e24;
+    /* Dark canvas bg */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.wb-header {
+    height: 52px;
+    background: #27272a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 1000;
+    flex-shrink: 0;
+}
+
+.wb-title {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    font-size: 15px;
+    color: #f4f4f5;
+    letter-spacing: -0.01em;
+}
+
+.wb-toolbar {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px;
+    border-radius: 8px;
+    gap: 2px;
+}
+
+.wb-toolbar button,
+.wb-actions button {
+    min-width: 36px;
+    height: 36px;
+    padding: 0 6px;
+}
+
+.wb-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Tools */
+.wb-toolbar button,
+.wb-actions button {
+    background: transparent;
+    border: none;
+    color: #a1a1aa;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wb-toolbar button:hover,
+.wb-actions button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.wb-toolbar button.active,
+.wb-actions button.active {
+    background: #8b5cf6;
+    color: white;
+    box-shadow: 0 2px 5px rgba(139, 92, 246, 0.4);
+}
+
+.wb-actions button.close-btn:hover {
+    background: #ef4444;
+}
+
+.divider-v {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0 4px;
+}
+
+/* Canvas Items */
+.infinite-grid-surface {
+    /* Use a large fixed size or 100% of the viewport to ensure clicks register */
+    /* Ideally we start at viewport size and expand, but for now fixed large size ensures panning area */
+    width: 100000px;
+    height: 100000px;
+    background-color: #1e1e24;
+    background-image: radial-gradient(#3f3f46 1px, transparent 1px);
+    background-size: 20px 20px;
+    transform-origin: 0 0;
+}
+
+.infinite-grid-surface.crosshair {
+    cursor: crosshair;
+}
+
+.wb-item {
+    position: absolute;
+    /* overflow: hidden; Removed to allow controls to show outside */
+    user-select: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: box-shadow 0.2s;
+}
+
+.wb-item.selected {
+    box-shadow: 0 0 0 2px #8b5cf6, 0 8px 16px rgba(0, 0, 0, 0.3);
+    z-index: 1000 !important;
+}
+
+/* Text Item */
+.text-item {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    background: rgba(30, 30, 36, 0.8);
+}
+
+.text-item textarea {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    resize: none;
+    color: #e4e4e7;
+    padding: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+}
+
+/* Sticker Item */
+.sticker-item {
+    box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.3);
+    border-radius: 2px;
+    /* Sticky notes usually have black text */
+    color: #1f2937;
+}
+
+.sticker-item textarea {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    resize: none;
+    padding: 12px;
+    font-family: 'Kalam', 'Comic Sans MS', sans-serif;
+    /* Handwritten font feel */
+    font-size: 16px;
+    outline: none;
+    color: inherit;
+    line-height: 1.4;
+}
+
+.image-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    border-radius: 4px;
+}
+
+/* Common Controls */
+.wb-item-controls {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    z-index: 2000;
+}
+
+.resize-handle {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border: 1px solid #8b5cf6;
+    border-radius: 50%;
+    z-index: 2100;
+    /* Higher than controls */
+    cursor: nwse-resize;
+    transition: transform 0.1s;
+}
+
+.resize-handle:hover {
+    transform: scale(1.2);
+    background: #f4f4f5;
+}
+
+.resize-handle.br {
+    bottom: -7px;
+    right: -7px;
+}
+
+.del-btn {
+    background: #ef4444;
+    color: white;
+    border: 2px solid #1e1e24;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.zoom-controls {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+}
+
+/* Shapes are managed inline but base styles here */
+.wb-shape {
+    position: absolute;
+    cursor: grab;
+}
+
+.wb-shape.selected {
+    border-color: #a78bfa !important;
+    /* Lighter purple on select */
+    box-shadow: 0 0 0 2px #a78bfa;
+}
+
+/* Window Dragging */
+.app-drag-region {
+    -webkit-app-region: drag;
+}
+
+.no-drag {
+    -webkit-app-region: no-drag;
+}
+
+.resize-handle {
+    bottom: -7px !important;
+    right: -7px !important;
+    top: auto !important;
+    left: auto !important;
+}

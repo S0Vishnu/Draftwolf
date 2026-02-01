@@ -107,7 +107,7 @@ const FileItem: React.FC<FileItemProps> = ({
                 onContextMenu={onContextMenu}
             >
                 <div className="col col-icon">
-                    <FileIcon name={file.name} isDirectory={file.isDirectory} size={18} />
+                    <FileIcon name={file.name} path={file.path} isDirectory={file.isDirectory} size={18} />
                 </div>
 
                 <div className="col col-name">
@@ -162,7 +162,7 @@ const FileItem: React.FC<FileItemProps> = ({
                         v{file.latestVersion}
                     </div>
                 )}
-                <FileIcon name={file.name} isDirectory={file.isDirectory} size={58} />
+                <FileIcon name={file.name} path={file.path} isDirectory={file.isDirectory} size={58} />
             </div>
 
             <div className="card-name">

@@ -28,8 +28,10 @@ interface Window {
     copyEntry: (sourcePath: string, destPath: string) => Promise<boolean>;
     showInFolder: (path: string) => Promise<boolean>;
     openPath: (path: string) => Promise<boolean>;
+    readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>;
     openExternal: (url: string) => Promise<void>;
     getStats: (path: string) => Promise<{ size: number; mtime: Date; birthtime: Date; isFile: boolean; isDirectory: boolean } | null>;
+    getFileIcon: (path: string) => Promise<string | null>;
     watchDir: (path: string) => Promise<boolean>;
     downloadAddon: () => Promise<any>;
     onFileChange: (callback: (data: { event: string; path: string }) => void) => () => void;
@@ -65,7 +67,19 @@ interface Window {
       onAvailable: (callback: (info: any) => void) => () => void;
       onDownloaded: (callback: (info: any) => void) => () => void;
       onProgress: (callback: (info: any) => void) => () => void;
+      onProgress: (callback: (info: any) => void) => () => void;
       onError: (callback: (error: string) => void) => () => void;
+    };
+    wolfbrain: {
+      open: (startPath?: string) => Promise<void>;
+      close: () => Promise<void>;
+      minimize: () => Promise<void>;
+      toggleMaximize: () => Promise<void>;
+      setAlwaysOnTop: (flag: boolean) => Promise<void>;
+      getAlwaysOnTop: () => Promise<boolean>;
+      saveAs: (content: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+      saveFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>;
+      onInitPath: (callback: (path: string) => void) => () => void;
     };
   };
 }

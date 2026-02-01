@@ -215,6 +215,9 @@ const Home = () => {
     useEffect(() => { localStorage.setItem('showHiddenFiles', String(showHiddenFiles)); }, [showHiddenFiles]);
     useEffect(() => { localStorage.setItem('showExtensions', String(showExtensions)); }, [showExtensions]);
 
+    // Extensions State
+    const [isWolfbrainEnabled, setIsWolfbrainEnabled] = useState(() => localStorage.getItem('wolfbrain_enabled') === 'true');
+
     // Computed
     const filteredFiles = files.filter(f => {
         // Hidden Files Filter
@@ -414,6 +417,8 @@ const Home = () => {
 
         if (file.isDirectory) {
             navigateTo(path);
+        } else if (file.name.toLowerCase().endsWith('.wolfbrain')) {
+            window.api.wolfbrain.open(file.path);
         } else {
             window.api.openPath(path);
         }
@@ -1042,6 +1047,24 @@ const Home = () => {
                                 onCreateFile={initCreateFile}
                                 setViewMode={setViewMode}
                                 onNavigate={navigateTo}
+                                isWolfbrainEnabled={isWolfbrainEnabled}
+                                isWolfbrainActive={false} // Currently can't query if window is open easily without more IPC, but clicking again just focuses it.
+                                onWolfbrainClick={() => {
+                                    console.log("Wolfbrain clicked");
+                                    if (!window.api) {
+                                        toast.error("System API not ready");
+                                        return;
+                                    }
+                                    if (!window.api.wolfbrain) {
+                                        toast.error("Wolfbrain Extension not loaded. Restart App?");
+                                        return;
+                                    }
+                                    // Pass current path to open
+                                    window.api.wolfbrain.open(currentPath || rootDir || '').catch(err => {
+                                        console.error(err);
+                                        toast.error("Failed to open Wolfbrain: " + err);
+                                    });
+                                }}
                             />
 
                             <div
@@ -1122,6 +1145,7 @@ const Home = () => {
                     onClose={closeContextMenu}
                 />
             )}
+
             {/* Dialogs */}
             <ConfirmDialog
                 isOpen={deleteDialog.isOpen}

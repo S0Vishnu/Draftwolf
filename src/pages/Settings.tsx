@@ -10,7 +10,7 @@ import { lorelei } from '@dicebear/collection';
 import {
     Bell, Moon, LogOut, RefreshCw, User, Clock, Shield,
     Edit2, X, Check, Download, Coffee, Trash2, Smartphone,
-    Monitor, Globe
+    Monitor, Globe, Blocks
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../styles/Settings.css';
@@ -23,6 +23,7 @@ interface UserSettings {
     notificationsEnabled: boolean;
     avatarSeed: string;
     checkUpdates: boolean;
+    wolfbrainEnabled: boolean;
 }
 
 const Settings = () => {
@@ -40,7 +41,8 @@ const Settings = () => {
         dndEnd: '08:00',
         notificationsEnabled: true,
         avatarSeed: '',
-        checkUpdates: true
+        checkUpdates: true,
+        wolfbrainEnabled: false
     };
 
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
@@ -167,6 +169,10 @@ const Settings = () => {
         const newSettings = { ...settings, [key]: value };
         setSettings(newSettings);
         setInitialSettings(prev => ({ ...prev, [key]: value }));
+
+        if (key === 'wolfbrainEnabled') {
+            localStorage.setItem('wolfbrain_enabled', String(value));
+        }
 
         try {
             await setDoc(doc(db, 'users', user.uid), { [key]: value }, { merge: true });
@@ -330,6 +336,35 @@ const Settings = () => {
 
                         {/* RIGHT COLUMN: Settings Lists */}
                         <div className="settings-list-container">
+
+                            {/* Extensions */}
+                            <div className="glass-panel" style={{ marginBottom: '2rem' }}>
+                                <div className="panel-header">
+                                    <h2 className="panel-title">
+                                        <Blocks size={20} className="text-accent" style={{ color: '#ec4899' }} />
+                                        Extensions
+                                    </h2>
+                                </div>
+
+                                <div className="settings-list">
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <h3>Wolfbrain</h3>
+                                            <p>Enable the Wolfbrain Moodboard overlay for creative work.</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.wolfbrainEnabled ?? false}
+                                                onChange={e => updatePreference('wolfbrainEnabled', e.target.checked)}
+                                                className="toggle-input"
+                                            />
+                                            <span className="toggle-slider"><span className="toggle-knob"></span></span>
+                                        </label>
+                                    </div>
+                                    {/* Future extensions can go here */}
+                                </div>
+                            </div>
 
                             {/* App Preferences */}
                             <div className="glass-panel" style={{ marginBottom: '2rem' }}>

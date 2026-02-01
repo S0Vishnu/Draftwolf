@@ -13,8 +13,10 @@ const api = {
   copyEntry: (sourcePath, destPath) => electronAPI.ipcRenderer.invoke('fs:copyEntry', { sourcePath, destPath }),
   showInFolder: (path) => electronAPI.ipcRenderer.invoke('fs:showInFolder', path),
   openPath: (path) => electronAPI.ipcRenderer.invoke('fs:openPath', path),
+  readFile: (path) => electronAPI.ipcRenderer.invoke('fs:readFile', path),
   openExternal: (url) => electronAPI.ipcRenderer.invoke('shell:openExternal', url),
   getStats: (path) => electronAPI.ipcRenderer.invoke('fs:getStats', path),
+  getFileIcon: (path) => electronAPI.ipcRenderer.invoke('fs:getFileIcon', path),
   watchDir: (path) => electronAPI.ipcRenderer.invoke('fs:watchDir', path),
   downloadAddon: () => electronAPI.ipcRenderer.invoke('addon:download'),
   onFileChange: (callback) => {
@@ -71,6 +73,26 @@ const api = {
     onError: (callback) => {
       const sub = (_event, error) => callback(error);
       return electronAPI.ipcRenderer.on('update:error', sub);
+    }
+  },
+  wolfbrain: {
+    open: (startPath) => electronAPI.ipcRenderer.invoke('wolfbrain:open', startPath),
+    close: () => electronAPI.ipcRenderer.invoke('wolfbrain:close'),
+    setAlwaysOnTop: (flag) => electronAPI.ipcRenderer.invoke('wolfbrain:setAlwaysOnTop', flag),
+    getAlwaysOnTop: () => electronAPI.ipcRenderer.invoke('wolfbrain:getAlwaysOnTop'),
+    minimize: () => electronAPI.ipcRenderer.invoke('wolfbrain:minimize'),
+    toggleMaximize: () => electronAPI.ipcRenderer.invoke('wolfbrain:toggleMaximize'),
+    saveAs: (content) => electronAPI.ipcRenderer.invoke('wolfbrain:save-as', content),
+    saveFile: (path, content) => electronAPI.ipcRenderer.invoke('fs:createFile', path).then(() => {
+      // We need to write content. reuse fs:createFile? No that just creates empty.
+      // We need a write handler. Let's add writeTextFile quickly or reuse existing mechanism? 
+      // existing has 'fs:createFile' which just touches.
+      // We need a proper write. Let's add 'fs:writeFile'.
+      return electronAPI.ipcRenderer.invoke('fs:writeFile', { path, content });
+    }),
+    onInitPath: (callback) => {
+      const sub = (_event, path) => callback(path);
+      return electronAPI.ipcRenderer.on('wolfbrain:init-path', sub);
     }
   }
 }

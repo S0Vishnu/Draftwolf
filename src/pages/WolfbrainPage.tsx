@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
     X, Pin, Plus, Image as ImageIcon, Type, Trash2,
-    Maximize, Minus, Grid, Brain, Save, Download,
+    Maximize, Minus, Grid, Brain, Save, Download, Settings,
     FileText, MousePointer, Square, Circle, Minus as LineIcon,
-    ArrowRight, PenTool, StickyNote, RotateCcw, RotateCw, Eraser, MoreVertical
+    ArrowRight, PenTool, StickyNote, RotateCcw, RotateCw, Eraser, MoreVertical,
+    ZoomIn, ZoomOut, Maximize2, RefreshCw, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { toPng } from 'html-to-image';
@@ -798,9 +799,14 @@ const WolfbrainPage = () => {
         };
     }, []);
 
+
+    // Zoom Controls State
+    const [isZoomCollapsed, setIsZoomCollapsed] = useState(false);
+
     return (
         <div className="wolfbrain-window" onContextMenu={handleContextMenu}>
             {/* Context Menu Render */}
+
             {contextMenu && (
                 <div style={{
                     position: 'absolute',
@@ -935,9 +941,63 @@ const WolfbrainPage = () => {
 
                         return (
                             <>
-                                <div className="zoom-controls">
-                                    <button onClick={() => zoomIn()}>+</button>
-                                    <button onClick={() => zoomOut()}>-</button>
+                                <div className={`zoom-controls no-drag ${isZoomCollapsed ? 'collapsed' : ''}`}>
+                                    <div className="zoom-actions-wrapper">
+                                        <button onClick={() => zoomIn()} title="Zoom In"><Plus size={14} /></button>
+                                        <button onClick={() => zoomOut()} title="Zoom Out"><Minus size={14} /></button>
+                                        <button onClick={() => {
+                                            state.resetTransform();
+                                        }} title="Reset to 100%">
+                                            <span style={{ fontSize: '9px', fontWeight: 'bold' }}>100%</span>
+                                        </button>
+                                        <button onClick={() => {
+                                            if (items.length === 0) {
+                                                state.resetTransform();
+                                                return;
+                                            }
+                                            // Calculate bounds
+                                            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                                            items.forEach(i => {
+                                                minX = Math.min(minX, i.x);
+                                                minY = Math.min(minY, i.y);
+                                                maxX = Math.max(maxX, i.x + Math.abs(i.width || 0));
+                                                maxY = Math.max(maxY, i.y + Math.abs(i.height || 0));
+                                                if (i.points) {
+                                                    i.points.forEach(p => {
+                                                        minX = Math.min(minX, p.x);
+                                                        minY = Math.min(minY, p.y);
+                                                        maxX = Math.max(maxX, p.x);
+                                                        maxY = Math.max(maxY, p.y);
+                                                    });
+                                                }
+                                            });
+
+                                            const padding = 50;
+                                            const width = maxX - minX + (padding * 2);
+                                            const height = maxY - minY + (padding * 2);
+                                            const cx = minX + (maxX - minX) / 2;
+                                            const cy = minY + (maxY - minY) / 2;
+
+                                            if (width <= 0 || height <= 0) { state.resetTransform(); return; }
+
+                                            const containerW = window.innerWidth;
+                                            const containerH = window.innerHeight;
+
+                                            const scaleX = containerW / width;
+                                            const scaleY = containerH / height;
+                                            let scale = Math.min(scaleX, scaleY);
+                                            scale = Math.min(Math.max(scale, 0.1), 5); // Clamp
+
+                                            const x = (containerW / 2) - (cx * scale);
+                                            const y = (containerH / 2) - (cy * scale);
+
+                                            state.setTransform(x, y, scale);
+                                        }} title="Fit Screen"><Maximize2 size={14} /></button>
+                                        <div className="divider-h" />
+                                    </div>
+                                    <button className="collapse-btn" onClick={() => setIsZoomCollapsed(!isZoomCollapsed)} title={isZoomCollapsed ? "Expand" : "Collapse"}>
+                                        {isZoomCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    </button>
                                 </div>
                                 <TransformComponent
                                     wrapperStyle={{ width: '100vw', height: '100vh', overflow: 'hidden' }}

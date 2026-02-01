@@ -221,8 +221,68 @@
     right: 24px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
     z-index: 100;
+    padding: 4px;
+    background: #27272a;
+    /* Zinc 800 */
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+
+    /* Animation Props */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.zoom-actions-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 200px;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.zoom-controls.collapsed .zoom-actions-wrapper {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+}
+
+.zoom-controls button {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    color: #a1a1aa;
+    /* Zinc 400 */
+    border: none;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.zoom-controls button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.zoom-controls button:active {
+    transform: scale(0.96);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.zoom-controls .divider-h {
+    height: 1px;
+    width: 80%;
+    background: #a1a1aa;
+    opacity: 0.2;
+    margin: 2px auto;
 }
 
 /* Shapes are managed inline but base styles here */

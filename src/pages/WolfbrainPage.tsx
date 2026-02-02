@@ -1,16 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
     X, Pin, Plus, Image as ImageIcon, Type, Trash2,
-    Maximize, Minus, Grid, Brain, Save, Download, Settings,
+    Maximize, Minus, Brain, Save, Download,
     FileText, MousePointer, Square, Circle, Minus as LineIcon,
     ArrowRight, PenTool, StickyNote, RotateCcw, RotateCw, Eraser, MoreVertical,
-    ZoomIn, ZoomOut, Maximize2, RefreshCw, ChevronDown, ChevronUp
+    Maximize2, ChevronDown, ChevronUp, Lock, Unlock
 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { toPng } from 'html-to-image';
-import jsPDF from 'jspdf';
 import { toast } from 'react-toastify';
 import '../styles/Wolfbrain.css';
+
+const STICKY_COLORS = [
+    '#fef3c7', // Yellow (Default)
+    '#ffeaee', // Pink
+    '#dcfce7', // Green
+    '#dbeafe', // Blue
+    '#ffedd5', // Orange
+    '#e0e7ff', // Indigo
+];
 
 interface CanvasItem {
     id: string;
@@ -36,6 +44,8 @@ const WolfbrainPage = () => {
     const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
     const [rootPath, setRootPath] = useState('');
     const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
+    // Sticky Note Settings
+    const [isStickyFixedSize, setIsStickyFixedSize] = useState(true);
 
     // --- Canvas Data ---
     const [items, setItems] = useState<CanvasItem[]>([]);
@@ -708,7 +718,22 @@ const WolfbrainPage = () => {
         const handleWinMove = (ev: MouseEvent) => {
             const dx = ev.clientX - startMouseX;
             const dy = ev.clientY - startMouseY;
-            const s = currentScale;
+            // Stickers ignore scale for resize delta visually, but logically we are in canvas space?
+            // Actually, if visual size is fixed, 10px mouse move = 10px visual grow.
+            // But in canvas units, that 10px visual grow is 10px * (1/scale) or 10px * scale?
+            // If scale is 2 (zoomed in), 10px screen = 5px canvas.
+            // Sticker is scaled by 0.5.
+            // So if we add 5px canvas width, it adds 2.5px screen width. Incorrect.
+
+            // To grow sticker by 10px SCREEN pixels:
+            // scale is s_canvas. Sticker scale is 1/s_canvas.
+            // Width_screen = Width_canvas * s_canvas * (1/s_canvas) = Width_canvas.
+            // Wait, effective scale is 1.
+            // So Width_canvas is essentially Width_screen.
+            // So 10px mouse move should equal 10px canvas unit increase?
+            // Let's assume 1:1 for now as effective scale is 1.
+            // Stickers ignore scale for resize delta if fixed size is enabled
+            const s = (item.type === 'sticker' && isStickyFixedSize) ? 1 : currentScale;
 
             setItems(prev => prev.map(i => i.id === id ? {
                 ...i,
@@ -739,6 +764,13 @@ const WolfbrainPage = () => {
         // Disable pointer events if not in move mode
         const pointerEvents = activeTool === 'move' ? 'auto' : 'none';
 
+        // Calculate Transform
+        let transform = item.rotation ? `rotate(${item.rotation}deg)` : '';
+        if (item.type === 'sticker' && isStickyFixedSize) {
+            // Counter-scale using CSS variable updated via refs for performance
+            transform += ` scale(var(--inv-scale, 1))`;
+        }
+
         const style: React.CSSProperties = {
             pointerEvents,
             position: 'absolute',
@@ -747,7 +779,8 @@ const WolfbrainPage = () => {
             zIndex: item.zIndex,
             width: item.width,
             height: item.height,
-            transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
+            transform: transform || undefined,
+            transformOrigin: '0 0',
             cursor: activeTool === 'move' ? 'grab' : 'crosshair'
         };
 
@@ -758,6 +791,25 @@ const WolfbrainPage = () => {
 
         const controls = isSelected && activeTool === 'move' && (
             <>
+                {item.type === 'sticker' && (
+                    <div className="wb-item-controls-colors no-drag" onMouseDown={e => e.stopPropagation()}>
+                        {STICKY_COLORS.map(color => (
+                            <button
+                                key={color}
+                                className={`color-btn ${item.backgroundColor === color ? 'active' : ''}`}
+                                style={{ backgroundColor: color }}
+                                onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    setItems(p => {
+                                        const newItems = p.map(x => x.id === item.id ? { ...x, backgroundColor: color } : x);
+                                        addToHistory(newItems);
+                                        return newItems;
+                                    });
+                                }}
+                            />
+                        ))}
+                    </div>
+                )}
                 <div className="wb-item-controls no-drag" onMouseDown={e => e.stopPropagation()}>
                     <button className="del-btn" onMouseDown={(e) => {
                         e.stopPropagation();
@@ -799,7 +851,7 @@ const WolfbrainPage = () => {
                             value={item.content}
                             onChange={e => setItems(prev => prev.map(i => i.id === item.id ? { ...i, content: e.target.value } : i))}
                             placeholder="Note..."
-                            style={{ background: 'transparent' }}
+                            style={{ backgroundColor: item.backgroundColor, borderRadius: 'inherit' }}
                             onMouseDown={(e) => {
                                 if (activeTool === 'move') setSelectedItemIds(new Set([item.id]));
                                 // e.stopPropagation(); <-- REMOVED THIS
@@ -836,7 +888,7 @@ const WolfbrainPage = () => {
         }
 
         return (
-            <div key={item.id} className={className} style={{ ...style, ...(item.type === 'sticker' ? { background: item.backgroundColor } : {}) }} onMouseDown={onMouseDown}>
+            <div key={item.id} className={className} style={style} onMouseDown={onMouseDown}>
                 {content}
                 {controls}
             </div>
@@ -1172,6 +1224,9 @@ const WolfbrainPage = () => {
                     )}
                 </div>
                 <div className="wb-actions no-drag">
+                    <button onClick={() => setIsStickyFixedSize(!isStickyFixedSize)} className={isStickyFixedSize ? 'active' : ''} title={isStickyFixedSize ? "Fixed Sticky Size: ON" : "Fixed Sticky Size: OFF"}>
+                        {isStickyFixedSize ? <Lock size={18} /> : <Unlock size={18} />}
+                    </button>
                     <button onClick={toggleAlwaysOnTop} className={isAlwaysOnTop ? 'active' : ''} title="Always On Top"><Pin size={18} /></button>
                     <button onClick={handleSaveWolfbrain} title="Save to Project"><Save size={18} /></button>
                     <button onClick={handleExportImage} title="Export Image"><Download size={18} /></button>
@@ -1202,8 +1257,15 @@ const WolfbrainPage = () => {
                     doubleClick={{ disabled: true }} // Prevent double click zoom interfering
                     wheel={{ step: 0.1 }}
                     centerOnInit={true}
+                    onTransformed={(e) => {
+                        // Update CSS variable for high-perf counter-scaling without re-renders
+                        if (canvasRef.current) {
+                            scaleRef.current = e.state.scale;
+                            canvasRef.current.style.setProperty('--inv-scale', (1 / e.state.scale).toString());
+                        }
+                    }}
                 >
-                    {({ zoomIn, zoomOut, state }: any) => {
+                    {({ zoomIn, zoomOut, resetTransform, setTransform, state }: any) => {
                         // Update scale ref
                         if (state && typeof state.scale === 'number') scaleRef.current = state.scale;
 
@@ -1214,13 +1276,13 @@ const WolfbrainPage = () => {
                                         <button onClick={() => zoomIn()} title="Zoom In"><Plus size={14} /></button>
                                         <button onClick={() => zoomOut()} title="Zoom Out"><Minus size={14} /></button>
                                         <button onClick={() => {
-                                            state.resetTransform();
+                                            resetTransform();
                                         }} title="Reset to 100%">
                                             <span style={{ fontSize: '9px', fontWeight: 'bold' }}>100%</span>
                                         </button>
                                         <button onClick={() => {
                                             if (items.length === 0) {
-                                                state.resetTransform();
+                                                resetTransform();
                                                 return;
                                             }
                                             // Calculate bounds
@@ -1246,7 +1308,7 @@ const WolfbrainPage = () => {
                                             const cx = minX + (maxX - minX) / 2;
                                             const cy = minY + (maxY - minY) / 2;
 
-                                            if (width <= 0 || height <= 0) { state.resetTransform(); return; }
+                                            if (width <= 0 || height <= 0) { resetTransform(); return; }
 
                                             const containerW = window.innerWidth;
                                             const containerH = window.innerHeight;
@@ -1259,7 +1321,7 @@ const WolfbrainPage = () => {
                                             const x = (containerW / 2) - (cx * scale);
                                             const y = (containerH / 2) - (cy * scale);
 
-                                            state.setTransform(x, y, scale);
+                                            setTransform(x, y, scale);
                                         }} title="Fit Screen"><Maximize2 size={14} /></button>
                                         <div className="divider-h" />
                                     </div>
@@ -1278,7 +1340,7 @@ const WolfbrainPage = () => {
                                         onMouseMove={handleCanvasMouseMove}
                                         onMouseUp={() => { }}
                                     >
-                                        {items.map(renderItem)}
+                                        {items.map(i => renderItem(i))}
                                         {/* Selection Box Render */}
                                         {selectionBox && (
                                             <div style={{

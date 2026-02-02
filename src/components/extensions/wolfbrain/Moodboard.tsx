@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Pin, GripHorizontal, Plus, Image as ImageIcon, Type, Trash2 } from 'lucide-react';
+import { X, Pin, GripHorizontal, Image as ImageIcon, Type } from 'lucide-react';
 import './wolfbrain.css';
 
 interface MoodboardProps {

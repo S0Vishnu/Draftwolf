@@ -140,11 +140,68 @@
 }
 
 /* Sticker Item */
+/* Sticker Item */
 .sticker-item {
-    box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.3);
+    position: relative;
+    /* Context for pseudo-element */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
     border-radius: 2px;
-    /* Sticky notes usually have black text */
+    border-bottom-right-radius: 60px 10px;
+    /* Slight curl shape */
     color: #1f2937;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+/* Lifted corner shadow effect */
+.sticker-item:after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    bottom: 15px;
+    right: 8px;
+    width: 50%;
+    height: 20%;
+    max-height: 20px;
+    box-shadow: 0 15px 12px rgba(0, 0, 0, 0.3);
+    transform: rotate(4deg) skew(5deg);
+    pointer-events: none;
+}
+
+.wb-item-controls-colors {
+    position: absolute;
+    top: -42px;
+    left: 0;
+    display: flex;
+    gap: 6px;
+    background: #27272a;
+    padding: 8px;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 3000;
+}
+
+.color-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    padding: 0;
+    min-width: 0;
+    outline: none;
+}
+
+.color-btn:hover {
+    transform: scale(1.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    z-index: 1;
+}
+
+.color-btn.active {
+    border: 2px solid #8b5cf6;
+    transform: scale(1.1);
 }
 
 .sticker-item textarea {

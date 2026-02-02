@@ -665,8 +665,8 @@
 
 /* Grid View */
 .file-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 16px;
     padding: 16px;
 }
@@ -678,6 +678,7 @@
     text-align: center;
     padding: 16px;
     border-radius: 8px;
+    max-width: 105px;
     border: 1px solid transparent;
     transition: all 0.2s;
     position: relative;

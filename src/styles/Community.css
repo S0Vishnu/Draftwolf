@@ -167,7 +167,16 @@
     display: flex;
     padding: 2px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
 }
+
+.message-item:hover .message-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 
 .message-actions button {
     background: transparent;
@@ -400,8 +409,8 @@
 }
 
 .btn-primary {
-    background: #4a9eff;
-    color: white;
+    background: #1565c0;
+    color: #ffffff;
     border: none;
     padding: 8px 16px;
     border-radius: 6px;
@@ -428,7 +437,7 @@
 .btn-secondary:hover {
     border-color: #666;
     color: #fff;
-    background: rgba(255, 255, 255, 0.05);
+    background: #23232368;
 }
 
 /* Search Box */

@@ -63,90 +63,85 @@
             GoogleAuthProvider,
             signInWithRedirect,
             getRedirectResult,
-            onAuthStateChanged,
             setPersistence,
             browserLocalPersistence
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        (async () => {
-            // Firebase config - values injected at build time
-            const firebaseConfig = {
-                apiKey: "AIzaSyD3BhG--fI6c8V3TSa5l-2uOBlvBZFt1SQ",
-                authDomain: "draftflow-905d4.firebaseapp.com",
-                projectId: "draftflow-905d4",
-                appId: "1:233410681710:web:33f6a0a6f39ba70c8dbf7f",
-            };
+        // Firebase config - values injected at build time
+        const firebaseConfig = {
+            apiKey: "AIzaSyD3BhG--fI6c8V3TSa5l-2uOBlvBZFt1SQ",
+            authDomain: "draftflow-905d4.firebaseapp.com",
+            projectId: "draftflow-905d4",
+            appId: "1:233410681710:web:33f6a0a6f39ba70c8dbf7f",
+        };
 
-            const status = msg =>
-                document.getElementById("status").innerText = msg;
+        const status = msg =>
+            document.getElementById("status").innerText = msg;
 
-            const log = msg => {
-                console.log(msg);
-                document.getElementById("logs").innerHTML += `<div>${msg}</div>`;
-            };
+        const log = msg => {
+            console.log(msg);
+            document.getElementById("logs").innerHTML += `<div>${msg}</div>`;
+        };
 
-            const app = initializeApp(firebaseConfig);
-            const auth = getAuth(app);
-            const provider = new GoogleAuthProvider();
-            provider.setCustomParameters({
-                prompt: 'select_account'
-            });
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({
+            prompt: 'select_account'
+        });
 
-            try {
-                // 🔒 Required for redirect auth stability
-                await setPersistence(auth, browserLocalPersistence);
+        try {
+            // 🔒 Required for redirect auth stability
+            await setPersistence(auth, browserLocalPersistence);
 
-                status("Checking sign-in result…");
+            status("Checking sign-in result…");
 
-                // 1️⃣ Check for Redirect Result (Google Credential)
-                const result = await getRedirectResult(auth);
+            // 1️⃣ Check for Redirect Result (Google Credential)
+            const result = await getRedirectResult(auth);
 
-                if (result) {
-                    // ✅ FIXED: Get the Google ID Token (from IdP), NOT the Firebase ID Token
-                    // The Electron app needs this Google Token to call signInWithCredential/GoogleAuthProvider
-                    const credential = GoogleAuthProvider.credentialFromResult(result);
-                    const googleToken = credential?.idToken;
+            if (result) {
+                // ✅ FIXED: Get the Google ID Token (from IdP), NOT the Firebase ID Token
+                // The Electron app needs this Google Token to call signInWithCredential/GoogleAuthProvider
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                const googleToken = credential?.idToken;
 
-                    if (googleToken) {
-                        status("Sign-in successful");
-                        log(`Logged in as ${result.user.displayName}`);
-                        log("You may now close this tab.");
+                if (googleToken) {
+                    status("Sign-in successful");
+                    log(`Logged in as ${result.user.displayName}`);
+                    log("You may now close this tab.");
 
-                        window.location.href =
-                            `myapp://auth?token=${encodeURIComponent(googleToken)}`;
-                        return;
-                    } else {
-                        throw new Error("Google Sign-In succeeded, but no ID Token was returned. Check scopes.");
-                    }
+                    globalThis.location.href =
+                        `myapp://auth?token=${encodeURIComponent(googleToken)}`;
+                } else {
+                    throw new Error("Google Sign-In succeeded, but no ID Token was returned. Check scopes.");
                 }
-
+            } else {
                 // 2️⃣ First visit → immediately start Google login
-                const params = new URLSearchParams(window.location.search);
+                const params = new URLSearchParams(globalThis.location.search);
                 if (params.get("mode") === "google") {
                     status("Redirecting to Google…");
                     // Force a new login to ensure we get a fresh Google Credential
                     await signInWithRedirect(auth, provider);
-                    return;
+                } else {
+                    // 3️⃣ Fallback: weird state (logged in but no credential?).
+                    // We cannot proceed because we need the Google Token which is not persisted in session.
+                    status("No credentials found. Please restart login.");
+                    log("Error: Session exists but Google Credential is lost. Redirecting to login...");
+
+                    // Optional: Auto-retry logic
+                    setTimeout(() => {
+                        const cleanUrl = new URL(globalThis.location.href);
+                        cleanUrl.searchParams.set("mode", "google");
+                        globalThis.location.href = cleanUrl.toString();
+                    }, 2000);
                 }
-
-                // 3️⃣ Fallback: weird state (logged in but no credential?).
-                // We cannot proceed because we need the Google Token which is not persisted in session.
-                status("No credentials found. Please restart login.");
-                log("Error: Session exists but Google Credential is lost. Redirecting to login...");
-
-                // Optional: Auto-retry logic
-                setTimeout(() => {
-                    const cleanUrl = new URL(window.location.href);
-                    cleanUrl.searchParams.set("mode", "google");
-                    window.location.href = cleanUrl.toString();
-                }, 2000);
-
-            } catch (err) {
-                status("Authentication error");
-                log(err.message);
-                console.error(err);
             }
-        })();
+
+        } catch (err) {
+            status("Authentication error");
+            log(err.message);
+            console.error(err);
+        }
     </script>
 </body>
 

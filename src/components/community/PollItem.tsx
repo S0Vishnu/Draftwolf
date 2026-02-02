@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
-import { updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Trash2, Lock } from 'lucide-react';
 
@@ -162,11 +162,17 @@ const PollItem: React.FC<PollItemProps> = ({ message, currentUser, isAdmin, onDe
                     const isVoted = currentUser && opt.votes.includes(currentUser.uid);
 
                     return (
-                        <div
+                        <button
                             key={opt.id}
                             className={`poll-option ${isVoted ? 'voted' : ''}`}
                             onClick={() => handleVote(opt.id)}
-                            style={{ cursor: message.isClosed ? 'default' : 'pointer' }}
+                            disabled={message.isClosed}
+                            style={{
+                                cursor: message.isClosed ? 'default' : 'pointer',
+                                textAlign: 'left',
+                                width: '100%'
+                            }}
+                            aria-label={`${opt.text}: ${percent}% (${count} votes)${isVoted ? ', you voted for this' : ''}`}
                         >
                             <div className="poll-bar-bg">
                                 <div className="poll-bar-fill" style={{ width: `${percent}%` }}></div>
@@ -175,7 +181,7 @@ const PollItem: React.FC<PollItemProps> = ({ message, currentUser, isAdmin, onDe
                                 <span className="poll-option-text">{opt.text}</span>
                                 <span className="poll-option-stats">{percent}% ({count})</span>
                             </div>
-                        </div>
+                        </button>
                     );
                 })}
             </div>

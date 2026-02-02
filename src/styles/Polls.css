@@ -51,9 +51,20 @@
     cursor: pointer;
     overflow: hidden;
     transition: border-color 0.2s;
+    /* Button reset styles */
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    display: block;
 }
 
-.poll-option:hover {
+.poll-option:disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.poll-option:hover:not(:disabled) {
     border-color: #666;
 }
 

@@ -80,6 +80,9 @@
     display: flex;
     padding: 2px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
 }
 
 .message-item {
@@ -89,6 +92,11 @@
 
 .message-item:hover {
     background: rgba(255, 255, 255, 0.02);
+}
+
+.message-item:hover .message-actions {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .message-actions button {

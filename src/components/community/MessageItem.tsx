@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
-import { deleteDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Trash2, Edit2, X, Check, MoreVertical, CornerUpLeft } from 'lucide-react';
+import { Trash2, Edit2, X, Check, CornerUpLeft } from 'lucide-react';
 import { toast } from 'react-toastify';
 import ConfirmDialog from '../ConfirmDialog';
 
@@ -35,7 +35,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
 
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(message.text);
-    const [showActions, setShowActions] = useState(false);
 
     const formatTime = (timestamp: any) => {
         if (!timestamp) return 'Sending...';
@@ -92,8 +91,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
         <div
             id={`message-${message.id}`}
             className="message-item"
-            onMouseEnter={() => setShowActions(true)}
-            onMouseLeave={() => setShowActions(false)}
         >
             <div className="message-avatar">
                 {message.photoURL ? (
@@ -110,7 +107,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
                 </div>
 
                 {message.replyTo && (
-                    <div
+                    <button
                         className="reply-context-message"
                         onClick={handleReplyClick}
                         title="Scroll to original message"
@@ -121,11 +118,16 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
                             paddingLeft: '8px',
                             marginBottom: '4px',
                             marginTop: '2px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            background: 'none',
+                            border: 'none',
+                            textAlign: 'left',
+                            width: '100%',
+                            padding: '0'
                         }}
                     >
                         <span style={{ fontWeight: 'bold' }}>{message.replyTo.displayName}</span>: {message.replyTo.text.substring(0, 50)}{message.replyTo.text.length > 50 ? '...' : ''}
-                    </div>
+                    </button>
                 )}
 
                 {isEditing ? (
@@ -154,7 +156,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
                 )}
             </div>
 
-            {showActions && !isEditing && (
+            {!isEditing && (
                 <div className="message-actions">
                     <button onClick={() => onReply(message)} title="Reply">
                         <CornerUpLeft size={14} />

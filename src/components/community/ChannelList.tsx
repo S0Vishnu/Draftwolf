@@ -40,11 +40,12 @@ const ChannelList: React.FC<ChannelListProps> = ({ activeChannel, onSelectChanne
                 Channels
             </h3>
             {channels.map(channel => (
-                <div
+                <button
                     key={channel.id}
                     className={`channel-item ${activeChannel === channel.id ? 'active' : ''}`}
                     onClick={() => onSelectChannel(channel.id)}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}
+                    aria-label={`Select ${channel.name} channel`}
                 >
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                         <channel.icon size={16} style={{ marginRight: '8px', opacity: 0.7 }} />
@@ -64,7 +65,7 @@ const ChannelList: React.FC<ChannelListProps> = ({ activeChannel, onSelectChanne
                             {activePollsCount}
                         </span>
                     )}
-                </div>
+                </button>
             ))}
         </div>
     );

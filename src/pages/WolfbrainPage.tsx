@@ -111,7 +111,7 @@ const WolfbrainPage = () => {
                     const parsed = JSON.parse(savedItems);
                     setItems(parsed);
                     setHistory([parsed]); // Init history
-                    lastSavedItems.current = savedItems; // Track as saved
+                    lastSavedItems.current = JSON.stringify(parsed); // Store unformatted for comparison
                     setHasUnsavedChanges(false);
                 } catch (e) { }
             }
@@ -128,7 +128,7 @@ const WolfbrainPage = () => {
                         setItems(parsed);
                         setHistory([parsed]);
                         setCurrentFilePath(path);
-                        lastSavedItems.current = res.content; // Track as saved
+                        lastSavedItems.current = JSON.stringify(parsed); // Store unformatted for comparison
                         setHasUnsavedChanges(false);
                         // Isolate directory from file path for "rootPath" context if needed
                         const separator = path.includes('\\') ? '\\' : '/';
@@ -349,6 +349,7 @@ const WolfbrainPage = () => {
 
     const handleSaveWolfbrain = async () => {
         const content = JSON.stringify(items, null, 2);
+        const unformattedContent = JSON.stringify(items); // For comparison
 
         if (currentFilePath) {
             // Overwrite existing
@@ -356,7 +357,7 @@ const WolfbrainPage = () => {
                 const res = await window.api.wolfbrain.saveFile(currentFilePath, content);
                 if (res.success) {
                     toast.success("Saved successfully");
-                    lastSavedItems.current = content;
+                    lastSavedItems.current = unformattedContent;
                     setHasUnsavedChanges(false);
                 }
                 else toast.error("Failed to save: " + res.error);
@@ -368,7 +369,7 @@ const WolfbrainPage = () => {
                 if (res.success && res.filePath) {
                     setCurrentFilePath(res.filePath);
                     toast.success("Saved to " + res.filePath.split(/[/\\]/).pop());
-                    lastSavedItems.current = content;
+                    lastSavedItems.current = unformattedContent;
                     setHasUnsavedChanges(false);
                 } else if (res.canceled) {
                     // User canceled, do nothing
@@ -937,6 +938,7 @@ const WolfbrainPage = () => {
 
     // --- Track Unsaved Changes ---
     useEffect(() => {
+        // Use unformatted JSON for comparison to match what we store in lastSavedItems
         const currentState = JSON.stringify(items);
         setHasUnsavedChanges(currentState !== lastSavedItems.current);
     }, [items]);
@@ -1105,7 +1107,7 @@ const WolfbrainPage = () => {
                 <div className="wb-title">
                     <Brain size={18} className="text-accent" style={{ color: '#8b5cf6' }} />
                     <span style={{ opacity: 0.9, marginLeft: 8 }}>
-                        Wolfbrain{hasUnsavedChanges && <span style={{ color: '#fbbf24', marginLeft: 4 }}>●</span>}
+                        {currentFilePath ? currentFilePath.split(/[/\\]/).pop()?.replace(/\.wolfbrain$/i, '') : 'Wolfbrain'}{hasUnsavedChanges && <span style={{ color: '#fbbf24', marginLeft: 4 }}>●</span>}
                     </span>
                 </div>
                 <div className="wb-toolbar no-drag">

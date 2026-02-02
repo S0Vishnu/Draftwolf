@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     X, Pin, Plus, Image as ImageIcon, Type, Trash2,
     Maximize, Minus, Brain, Save, Download,
@@ -42,7 +42,7 @@ interface CanvasItem {
 const WolfbrainPage = () => {
     // --- Window State ---
     const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
-    const [rootPath, setRootPath] = useState('');
+
     const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
     // Sticky Note Settings
     const [isStickyFixedSize, setIsStickyFixedSize] = useState(true);
@@ -56,13 +56,13 @@ const WolfbrainPage = () => {
 
 
     // Toolbar Responsive State
-    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+    const [windowWidth, setWindowWidth] = useState(globalThis.innerWidth);
     const [showToolsMenu, setShowToolsMenu] = useState(false);
 
     useEffect(() => {
-        const handleResize = () => setWindowWidth(window.innerWidth);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        const handleResize = () => setWindowWidth(globalThis.innerWidth);
+        globalThis.addEventListener('resize', handleResize);
+        return () => globalThis.removeEventListener('resize', handleResize);
     }, []);
 
     // Multi-select state
@@ -73,7 +73,7 @@ const WolfbrainPage = () => {
     // --- Interaction State ---
     const [isDrawing, setIsDrawing] = useState(false);
     const [drawStartPos, setDrawStartPos] = useState<{ x: number, y: number } | null>(null);
-    const [currentDrawPoints, setCurrentDrawPoints] = useState<{ x: number, y: number }[]>([]);
+
 
     // --- History State ---
     const [history, setHistory] = useState<CanvasItem[][]>([[]]);
@@ -112,7 +112,7 @@ const WolfbrainPage = () => {
     // --- Initialization ---
     useEffect(() => {
         const load = async () => {
-            const top = await window.api?.wolfbrain?.getAlwaysOnTop();
+            const top = await globalThis.api?.wolfbrain?.getAlwaysOnTop();
             setIsAlwaysOnTop(!!top);
 
             const savedItems = localStorage.getItem('wolfbrain_items');
@@ -123,15 +123,17 @@ const WolfbrainPage = () => {
                     setHistory([parsed]); // Init history
                     lastSavedItems.current = JSON.stringify(parsed); // Store unformatted for comparison
                     setHasUnsavedChanges(false);
-                } catch (e) { }
+                } catch (e) {
+                    console.error('Failed to parse saved items', e);
+                }
             }
         };
         load();
 
-        const cleanListener = window.api?.wolfbrain?.onInitPath(async (path) => {
+        const cleanListener = globalThis.api?.wolfbrain?.onInitPath(async (path) => {
             if (path.toLowerCase().endsWith('.wolfbrain')) {
                 // Open File Mode
-                const res = await window.api.readFile(path);
+                const res = await globalThis.api.readFile(path);
                 if (res.success && res.content) {
                     try {
                         const parsed = JSON.parse(res.content);
@@ -140,10 +142,7 @@ const WolfbrainPage = () => {
                         setCurrentFilePath(path);
                         lastSavedItems.current = JSON.stringify(parsed); // Store unformatted for comparison
                         setHasUnsavedChanges(false);
-                        // Isolate directory from file path for "rootPath" context if needed
-                        const separator = path.includes('\\') ? '\\' : '/';
-                        const dir = path.substring(0, path.lastIndexOf(separator));
-                        setRootPath(dir);
+
                     } catch (e) {
                         toast.error("Failed to parse Wolfbrain file");
                     }
@@ -152,7 +151,7 @@ const WolfbrainPage = () => {
                 }
             } else {
                 // New/Folder Mode
-                setRootPath(path);
+
                 setCurrentFilePath(null);
                 setItems([]);
                 setHistory([[]]);
@@ -190,8 +189,8 @@ const WolfbrainPage = () => {
                 e.preventDefault();
             }
         };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        globalThis.addEventListener('keydown', handleKeyDown);
+        return () => globalThis.removeEventListener('keydown', handleKeyDown);
     }, [items, selectedItemIds, history, historyStep]);
 
     // scaleRef for event handlers
@@ -215,7 +214,7 @@ const WolfbrainPage = () => {
             let handled = false;
             for (let i = 0; i < clipboardItems.length; i++) {
                 const item = clipboardItems[i];
-                if (item.type.indexOf('image') !== -1) {
+                if (item.type.includes('image')) {
                     const blob = item.getAsFile();
                     if (blob) {
                         const reader = new FileReader();
@@ -242,8 +241,8 @@ const WolfbrainPage = () => {
             }
             if (handled) e.preventDefault();
         };
-        window.addEventListener('paste', handlePaste);
-        return () => window.removeEventListener('paste', handlePaste);
+        globalThis.addEventListener('paste', handlePaste);
+        return () => globalThis.removeEventListener('paste', handlePaste);
     }, [items]);
 
     // --- Drag and Drop for Images ---
@@ -299,7 +298,7 @@ const WolfbrainPage = () => {
                                 }
                             })
                             .catch(err => {
-                                console.error('Failed to load dropped image:', err);
+                                // Ignore console error, show toast
                                 toast.error('Failed to load image from URL');
                             });
                     }
@@ -307,12 +306,12 @@ const WolfbrainPage = () => {
             }
         };
 
-        window.addEventListener('dragover', handleDragOver);
-        window.addEventListener('drop', handleDrop);
+        globalThis.addEventListener('dragover', handleDragOver);
+        globalThis.addEventListener('drop', handleDrop);
 
         return () => {
-            window.removeEventListener('dragover', handleDragOver);
-            window.removeEventListener('drop', handleDrop);
+            globalThis.removeEventListener('dragover', handleDragOver);
+            globalThis.removeEventListener('drop', handleDrop);
         };
     }, []);
 
@@ -326,7 +325,7 @@ const WolfbrainPage = () => {
     const toggleAlwaysOnTop = () => {
         const newState = !isAlwaysOnTop;
         setIsAlwaysOnTop(newState);
-        window.api?.wolfbrain?.setAlwaysOnTop(newState);
+        globalThis.api?.wolfbrain?.setAlwaysOnTop(newState);
     };
 
     // Custom unsaved changes dialog state
@@ -336,26 +335,26 @@ const WolfbrainPage = () => {
         if (hasUnsavedChanges) {
             setShowUnsavedDialog(true);
         } else {
-            window.api?.wolfbrain?.close();
+            globalThis.api?.wolfbrain?.close();
         }
     };
 
     const handleSaveAndClose = async () => {
         await handleSaveWolfbrain();
         setShowUnsavedDialog(false);
-        window.api?.wolfbrain?.close();
+        globalThis.api?.wolfbrain?.close();
     };
 
     const handleDiscardAndClose = () => {
         setShowUnsavedDialog(false);
-        window.api?.wolfbrain?.close();
+        globalThis.api?.wolfbrain?.close();
     };
 
     const handleCancelClose = () => {
         setShowUnsavedDialog(false);
     };
-    const handleMinimize = () => window.api?.wolfbrain?.minimize();
-    const handleToggleMaximize = () => window.api?.wolfbrain?.toggleMaximize();
+    const handleMinimize = () => globalThis.api?.wolfbrain?.minimize();
+    const handleToggleMaximize = () => globalThis.api?.wolfbrain?.toggleMaximize();
 
     const handleSaveWolfbrain = async () => {
         const content = JSON.stringify(items, null, 2);
@@ -364,18 +363,18 @@ const WolfbrainPage = () => {
         if (currentFilePath) {
             // Overwrite existing
             try {
-                const res = await window.api.wolfbrain.saveFile(currentFilePath, content);
+                const res = await globalThis.api.wolfbrain.saveFile(currentFilePath, content);
                 if (res.success) {
                     toast.success("Saved successfully");
                     lastSavedItems.current = unformattedContent;
                     setHasUnsavedChanges(false);
                 }
                 else toast.error("Failed to save: " + res.error);
-            } catch (e: any) { console.error(e); toast.error("Save error: " + e.message); }
+            } catch (e: unknown) { toast.error("Save error: " + (e as Error).message); }
         } else {
             // First time save -> Save As
             try {
-                const res = await window.api.wolfbrain.saveAs(content);
+                const res = await globalThis.api.wolfbrain.saveAs(content);
                 if (res.success && res.filePath) {
                     setCurrentFilePath(res.filePath);
                     toast.success("Saved to " + res.filePath.split(/[/\\]/).pop());
@@ -386,20 +385,19 @@ const WolfbrainPage = () => {
                 } else {
                     toast.error("Failed to save: " + res.error);
                 }
-            } catch (e: any) { console.error(e); toast.error("Save error: " + e.message); }
+            } catch (e: unknown) { toast.error("Save error: " + (e as Error).message); }
         }
     };
 
     const handleExportImage = async () => {
         if (!canvasRef.current) return;
         try {
-            const dataUrl = await toPng(canvasRef.current, { backgroundColor: '#1e1e24' });
+            const dataUrl = await toPng(canvasRef.current, { backgroundColor: '#121212' });
             const link = document.createElement('a');
             link.download = 'wolfbrain-export.png';
             link.href = dataUrl;
             link.click();
-        } catch (err) {
-            console.error(err);
+        } catch {
             toast.error("Failed to export image");
         }
     };
@@ -494,10 +492,19 @@ const WolfbrainPage = () => {
     };
 
     // --- Mouse Handling ---
+    const getCanvasPoint = (e: React.MouseEvent | MouseEvent) => {
+        if (!canvasRef.current) return { x: 0, y: 0 };
+        const rect = canvasRef.current.getBoundingClientRect();
+        const scale = scaleRef.current;
+        return {
+            x: (e.clientX - rect.left) / scale,
+            y: (e.clientY - rect.top) / scale
+        };
+    };
+
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0) return; // Only allow Left Drag
-        const x = e.nativeEvent.offsetX;
-        const y = e.nativeEvent.offsetY;
+        const { x, y } = getCanvasPoint(e);
 
         if (activeTool === 'move') {
             if (e.target === e.currentTarget) {
@@ -525,7 +532,7 @@ const WolfbrainPage = () => {
         setIsDrawing(true);
         isInteracting.current = true; // Mark interaction start
         setDrawStartPos({ x, y });
-        setCurrentDrawPoints([{ x, y }]);
+
         // ... create temp item ...
         const newItem: CanvasItem = {
             id: 'drawing-temp', type: activeTool, x, y, width: 0, height: 0,
@@ -536,8 +543,7 @@ const WolfbrainPage = () => {
     };
 
     const handleCanvasMouseMove = (e: React.MouseEvent) => {
-        const currentX = e.nativeEvent.offsetX;
-        const currentY = e.nativeEvent.offsetY;
+        const { x: currentX, y: currentY } = getCanvasPoint(e);
 
         if (selectionBox) {
             setSelectionBox(prev => prev ? { ...prev, currentX, currentY } : null);
@@ -603,9 +609,33 @@ const WolfbrainPage = () => {
 
                 const newSelection = new Set<string>();
                 items.forEach(item => {
-                    const itemR = item.x + Math.abs(item.width || 0);
-                    const itemB = item.y + Math.abs(item.height || 0);
-                    const overlap = !(itemR < left || item.x > right || itemB < top || item.y > bottom);
+                    let overlap = false;
+
+                    if (item.points && item.points.length > 0) {
+                        // Vector items check
+                        const xs = item.points.map(p => p.x);
+                        const ys = item.points.map(p => p.y);
+                        const minX = Math.min(...xs);
+                        const maxX = Math.max(...xs);
+                        const minY = Math.min(...ys);
+                        const maxY = Math.max(...ys);
+
+                        overlap = !(maxX < left || minX > right || maxY < top || minY > bottom);
+                    } else {
+                        // Rect items check
+                        const ix = item.x;
+                        const iy = item.y;
+                        const iw = item.width || 0;
+                        const ih = item.height || 0;
+
+                        const iLeft = Math.min(ix, ix + iw);
+                        const iRight = Math.max(ix, ix + iw);
+                        const iTop = Math.min(iy, iy + ih);
+                        const iBottom = Math.max(iy, iy + ih);
+
+                        overlap = !(iRight < left || iLeft > right || iBottom < top || iTop > bottom);
+                    }
+
                     if (overlap) newSelection.add(item.id);
                 });
 
@@ -636,8 +666,8 @@ const WolfbrainPage = () => {
             // We should hook into handleItemMouseDown to save history.
         };
 
-        window.addEventListener('mouseup', handleGlobalUp);
-        return () => window.removeEventListener('mouseup', handleGlobalUp);
+        globalThis.addEventListener('mouseup', handleGlobalUp);
+        return () => globalThis.removeEventListener('mouseup', handleGlobalUp);
     }, [selectionBox, isDrawing, items, activeTool]);
 
     // Update handleItemMouseDown to save history on drag end
@@ -647,10 +677,10 @@ const WolfbrainPage = () => {
         e.stopPropagation();
 
         const isSelected = selectedItemIds.has(id);
-        if (!e.shiftKey) {
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
             if (!isSelected) setSelectedItemIds(new Set([id]));
         } else {
-            // shift select logic
+            // shift/ctrl select logic
             setSelectedItemIds(prev => {
                 const n = new Set(prev);
                 if (n.has(id)) n.delete(id); else n.add(id);
@@ -663,9 +693,15 @@ const WolfbrainPage = () => {
         const startMouseY = e.clientY;
         const currentScale = scaleRef.current;
         const dragIds = isSelected ? Array.from(selectedItemIds) : [id];
-        const initialPositions = new Map<string, { x: number, y: number }>();
+        const initialPositions = new Map<string, { x: number, y: number, points?: { x: number, y: number }[] }>();
         items.forEach(i => {
-            if (dragIds.includes(i.id)) initialPositions.set(i.id, { x: i.x, y: i.y });
+            if (dragIds.includes(i.id)) {
+                initialPositions.set(i.id, {
+                    x: i.x,
+                    y: i.y,
+                    points: i.points // Snapshot points for vector items
+                });
+            }
         });
 
         let hasMoved = false;
@@ -679,15 +715,25 @@ const WolfbrainPage = () => {
             setItems(prev => prev.map(i => {
                 if (initialPositions.has(i.id)) {
                     const start = initialPositions.get(i.id)!;
-                    return { ...i, x: start.x + (dx / s), y: start.y + (dy / s) };
+                    const nx = start.x + (dx / s);
+                    const ny = start.y + (dy / s);
+
+                    if (start.points) {
+                        const newPoints = start.points.map(p => ({
+                            x: p.x + (dx / s),
+                            y: p.y + (dy / s)
+                        }));
+                        return { ...i, x: nx, y: ny, points: newPoints };
+                    }
+                    return { ...i, x: nx, y: ny };
                 }
                 return i;
             }));
         };
 
         const handleWinUp = () => {
-            window.removeEventListener('mousemove', handleWinMove);
-            window.removeEventListener('mouseup', handleWinUp);
+            globalThis.removeEventListener('mousemove', handleWinMove);
+            globalThis.removeEventListener('mouseup', handleWinUp);
             if (hasMoved) {
                 // Save history after drag completion
                 setItems(current => {
@@ -697,8 +743,8 @@ const WolfbrainPage = () => {
             }
         };
 
-        window.addEventListener('mousemove', handleWinMove);
-        window.addEventListener('mouseup', handleWinUp);
+        globalThis.addEventListener('mousemove', handleWinMove);
+        globalThis.addEventListener('mouseup', handleWinUp);
     };
 
     const handleResizeMouseDown = (e: React.MouseEvent, id: string) => {
@@ -718,21 +764,6 @@ const WolfbrainPage = () => {
         const handleWinMove = (ev: MouseEvent) => {
             const dx = ev.clientX - startMouseX;
             const dy = ev.clientY - startMouseY;
-            // Stickers ignore scale for resize delta visually, but logically we are in canvas space?
-            // Actually, if visual size is fixed, 10px mouse move = 10px visual grow.
-            // But in canvas units, that 10px visual grow is 10px * (1/scale) or 10px * scale?
-            // If scale is 2 (zoomed in), 10px screen = 5px canvas.
-            // Sticker is scaled by 0.5.
-            // So if we add 5px canvas width, it adds 2.5px screen width. Incorrect.
-
-            // To grow sticker by 10px SCREEN pixels:
-            // scale is s_canvas. Sticker scale is 1/s_canvas.
-            // Width_screen = Width_canvas * s_canvas * (1/s_canvas) = Width_canvas.
-            // Wait, effective scale is 1.
-            // So Width_canvas is essentially Width_screen.
-            // So 10px mouse move should equal 10px canvas unit increase?
-            // Let's assume 1:1 for now as effective scale is 1.
-            // Stickers ignore scale for resize delta if fixed size is enabled
             const s = (item.type === 'sticker' && isStickyFixedSize) ? 1 : currentScale;
 
             setItems(prev => prev.map(i => i.id === id ? {
@@ -743,16 +774,16 @@ const WolfbrainPage = () => {
         };
 
         const handleWinUp = () => {
-            window.removeEventListener('mousemove', handleWinMove);
-            window.removeEventListener('mouseup', handleWinUp);
+            globalThis.removeEventListener('mousemove', handleWinMove);
+            globalThis.removeEventListener('mouseup', handleWinUp);
             setItems(current => {
                 addToHistory(current);
                 return current;
             });
         };
 
-        window.addEventListener('mousemove', handleWinMove);
-        window.addEventListener('mouseup', handleWinUp);
+        globalThis.addEventListener('mousemove', handleWinMove);
+        globalThis.addEventListener('mouseup', handleWinUp);
     };
     // --- Render ---
     const renderItem = (item: CanvasItem) => {
@@ -784,6 +815,13 @@ const WolfbrainPage = () => {
             cursor: activeTool === 'move' ? 'grab' : 'crosshair'
         };
 
+        // Apply styles for shapes if present, overriding CSS defaults if set
+        if (['rect', 'circle'].includes(item.type)) {
+            if (item.backgroundColor) style.backgroundColor = item.backgroundColor;
+            if (item.borderColor) style.borderColor = item.borderColor;
+            if (item.borderWidth) style.borderWidth = `${item.borderWidth}px`;
+        }
+
         if (item.width < 0) { style.left = item.x + item.width; style.width = Math.abs(item.width); }
         if (item.height < 0) { style.top = item.y + item.height; style.height = Math.abs(item.height); }
 
@@ -792,7 +830,7 @@ const WolfbrainPage = () => {
         const controls = isSelected && activeTool === 'move' && (
             <>
                 {item.type === 'sticker' && (
-                    <div className="wb-item-controls-colors no-drag" onMouseDown={e => e.stopPropagation()}>
+                    <div className="wb-item-controls-colors no-drag" role="toolbar" aria-label="Color selection" tabIndex={-1} onMouseDown={e => e.stopPropagation()}>
                         {STICKY_COLORS.map(color => (
                             <button
                                 key={color}
@@ -810,7 +848,7 @@ const WolfbrainPage = () => {
                         ))}
                     </div>
                 )}
-                <div className="wb-item-controls no-drag" onMouseDown={e => e.stopPropagation()}>
+                <div className="wb-item-controls no-drag" role="toolbar" aria-label="Item controls" tabIndex={-1} onMouseDown={e => e.stopPropagation()}>
                     <button className="del-btn" onMouseDown={(e) => {
                         e.stopPropagation();
                         setItems(p => {
@@ -822,7 +860,13 @@ const WolfbrainPage = () => {
                         <Trash2 size={12} />
                     </button>
                 </div>
-                <div className="resize-handle br no-drag" onMouseDown={(e) => handleResizeMouseDown(e, item.id)} />
+                <div
+                    className="resize-handle br no-drag"
+                    role="button"
+                    aria-label="Resize"
+                    tabIndex={0}
+                    onMouseDown={(e) => handleResizeMouseDown(e, item.id)}
+                />
             </>
         );
 
@@ -919,13 +963,13 @@ const WolfbrainPage = () => {
             if (e.button === 1) e.preventDefault();
         };
 
-        window.addEventListener('mousedown', handleMouseDown);
-        window.addEventListener('mouseup', handleMouseUp);
-        window.addEventListener('auxclick', handleAuxClick);
+        globalThis.addEventListener('mousedown', handleMouseDown);
+        globalThis.addEventListener('mouseup', handleMouseUp);
+        globalThis.addEventListener('auxclick', handleAuxClick);
         return () => {
-            window.removeEventListener('mousedown', handleMouseDown);
-            window.removeEventListener('mouseup', handleMouseUp);
-            window.removeEventListener('auxclick', handleAuxClick);
+            globalThis.removeEventListener('mousedown', handleMouseDown);
+            globalThis.removeEventListener('mouseup', handleMouseUp);
+            globalThis.removeEventListener('auxclick', handleAuxClick);
         };
     }, []);
 
@@ -935,11 +979,11 @@ const WolfbrainPage = () => {
             setContextMenu(null);
             setShowToolsMenu(false);
         }
-        window.addEventListener('click', closeMenu);
-        window.addEventListener('wheel', closeMenu);
+        globalThis.addEventListener('click', closeMenu);
+        globalThis.addEventListener('wheel', closeMenu);
         return () => {
-            window.removeEventListener('click', closeMenu);
-            window.removeEventListener('wheel', closeMenu);
+            globalThis.removeEventListener('click', closeMenu);
+            globalThis.removeEventListener('wheel', closeMenu);
         };
     }, []);
 
@@ -1002,13 +1046,51 @@ const WolfbrainPage = () => {
         const handleKey = (e: KeyboardEvent) => {
             if (e.code === 'Space') setIsSpacePressed(e.type === 'keydown');
         };
-        window.addEventListener('keydown', handleKey);
-        window.addEventListener('keyup', handleKey);
+        globalThis.addEventListener('keydown', handleKey);
+        globalThis.addEventListener('keyup', handleKey);
         return () => {
-            window.removeEventListener('keydown', handleKey);
-            window.removeEventListener('keyup', handleKey);
+            globalThis.removeEventListener('keydown', handleKey);
+            globalThis.removeEventListener('keyup', handleKey);
         };
     }, []);
+
+    // --- Selection Bounds Calculation ---
+    const selectionBounds = useMemo(() => {
+        if (selectedItemIds.size < 2) return null;
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        items.forEach(i => {
+            if (selectedItemIds.has(i.id)) {
+                if (['line', 'arrow', 'draw'].includes(i.type) && i.points) {
+                    i.points.forEach(p => {
+                        minX = Math.min(minX, p.x);
+                        minY = Math.min(minY, p.y);
+                        maxX = Math.max(maxX, p.x);
+                        maxY = Math.max(maxY, p.y);
+                    });
+                } else {
+                    const ix = i.x;
+                    const iy = i.y;
+                    const iw = i.width || 0;
+                    const ih = i.height || 0;
+                    // Handle negative width/height just in case
+                    const left = Math.min(ix, ix + iw);
+                    const top = Math.min(iy, iy + ih);
+                    const right = Math.max(ix, ix + iw);
+                    const bottom = Math.max(iy, iy + ih);
+
+                    minX = Math.min(minX, left);
+                    minY = Math.min(minY, top);
+                    maxX = Math.max(maxX, right);
+                    maxY = Math.max(maxY, bottom);
+                }
+            }
+        });
+
+        if (minX === Infinity) return null;
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }, [items, selectedItemIds]);
 
 
     // Zoom Controls State
@@ -1030,7 +1112,7 @@ const WolfbrainPage = () => {
                     justifyContent: 'center',
                     zIndex: 100000,
                     backdropFilter: 'blur(4px)'
-                }} className="no-drag" onClick={handleCancelClose}>
+                }} className="no-drag" onClick={handleCancelClose} role="presentation">
                     <div style={{
                         background: '#27272a',
                         border: '1px solid #3f3f46',
@@ -1038,8 +1120,8 @@ const WolfbrainPage = () => {
                         padding: '24px',
                         minWidth: '400px',
                         boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <h3 style={{
+                    }} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="unsaved-changes-title">
+                        <h3 id="unsaved-changes-title" style={{
                             margin: '0 0 12px 0',
                             fontSize: '18px',
                             fontWeight: '600',
@@ -1310,8 +1392,8 @@ const WolfbrainPage = () => {
 
                                             if (width <= 0 || height <= 0) { resetTransform(); return; }
 
-                                            const containerW = window.innerWidth;
-                                            const containerH = window.innerHeight;
+                                            const containerW = globalThis.innerWidth;
+                                            const containerH = globalThis.innerHeight;
 
                                             const scaleX = containerW / width;
                                             const scaleY = containerH / height;
@@ -1336,11 +1418,24 @@ const WolfbrainPage = () => {
                                     <div
                                         ref={canvasRef}
                                         className={`infinite-grid-surface ${activeTool !== 'move' ? 'crosshair' : ''}`}
+                                        role="application"
+                                        aria-label="Canvas"
                                         onMouseDown={handleCanvasMouseDown}
                                         onMouseMove={handleCanvasMouseMove}
-                                        onMouseUp={() => { }}
                                     >
                                         {items.map(i => renderItem(i))}
+                                        {/* Group Selection Box */}
+                                        {selectionBounds && selectedItemIds.size > 1 && (
+                                            <div
+                                                className="selection-group-box"
+                                                style={{
+                                                    left: selectionBounds.x,
+                                                    top: selectionBounds.y,
+                                                    width: selectionBounds.width,
+                                                    height: selectionBounds.height
+                                                }}
+                                            />
+                                        )}
                                         {/* Selection Box Render */}
                                         {selectionBox && (
                                             <div style={{
@@ -1352,7 +1447,9 @@ const WolfbrainPage = () => {
                                                 border: '1px solid #8b5cf6',
                                                 background: 'rgba(139, 92, 246, 0.1)',
                                                 pointerEvents: 'none',
-                                                zIndex: 9999
+                                                zIndex: 9999,
+                                                transform: 'translateZ(0)', // Force GPU layer to prevent artifacts
+                                                backfaceVisibility: 'hidden'
                                             }} />
                                         )}
                                         {/* Markers Defs should be here once */}

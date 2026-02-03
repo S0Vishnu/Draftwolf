@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase';
 import Sidebar from '../components/Sidebar';
+import CustomSelect from '../components/CustomSelect';
 import {
     Download,
     Trash2,
@@ -14,8 +15,7 @@ import {
     ExternalLink,
     Search,
     Filter,
-    Loader,
-    Sparkles
+    Loader
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../styles/Extensions.css';
@@ -335,19 +335,15 @@ const Extensions: React.FC = () => {
                                 />
                             </div>
 
-                            <div className="category-filter">
-                                <Filter size={18} />
-                                <select
-                                    value={selectedCategory}
-                                    onChange={(e) => setSelectedCategory(e.target.value)}
-                                >
-                                    {categories.map(cat => (
-                                        <option key={cat} value={cat}>
-                                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            <CustomSelect
+                                value={selectedCategory}
+                                onChange={setSelectedCategory}
+                                options={categories.map(cat => ({
+                                    value: cat,
+                                    label: cat.charAt(0).toUpperCase() + cat.slice(1)
+                                }))}
+                                icon={<Filter size={18} />}
+                            />
                         </div>
 
                         <div className="plugins-grid">

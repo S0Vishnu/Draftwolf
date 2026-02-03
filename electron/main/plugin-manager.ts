@@ -179,8 +179,38 @@ class PluginManager {
             return await response.json();
         } catch (error) {
             console.error('[PluginManager] Failed to fetch registry:', error);
-            // Return empty registry as fallback
-            return { version: '1.0.0', plugins: [] };
+            // Return fallback registry with sample plugins
+            return {
+                version: '1.0.0',
+                plugins: [
+                    {
+                        id: 'wolfbrain',
+                        name: 'WolfBrain',
+                        description: 'AI-powered creative assistant and knowledge graph.',
+                        version: '1.0.0',
+                        author: 'Draftflow Team',
+                        homepage: 'https://draftwolf.vercel.app',
+                        repository: 'https://github.com/S0Vishnu/draftflow-plugins',
+                        downloadUrl: 'https://github.com/S0Vishnu/draftflow-plugins/releases/download/v1.0.0/wolfbrain.zip',
+                        category: 'productivity',
+                        tags: ['ai', 'assistant', 'graph'],
+                        verified: true
+                    },
+                    {
+                        id: 'theme-dracula',
+                        name: 'Dracula Theme',
+                        description: 'A dark theme for Draftflow.',
+                        version: '1.0.0',
+                        author: 'Draftflow Team',
+                        homepage: 'https://draftwolf.vercel.app',
+                        repository: 'https://github.com/S0Vishnu/draftflow-plugins',
+                        downloadUrl: 'https://github.com/S0Vishnu/draftflow-plugins/releases/download/v1.0.0/theme-dracula.zip',
+                        category: 'design',
+                        tags: ['theme', 'dark'],
+                        verified: true
+                    }
+                ]
+            };
         }
     }
 

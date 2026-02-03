@@ -1,6 +1,6 @@
 {
   "name": "draftwolf",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "A modern client application built with React, TypeScript, and Vite, with optional Electron support.",
   "main": "./out/main/index.js",
   "author": "example.com",

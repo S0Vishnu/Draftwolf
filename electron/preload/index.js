@@ -88,6 +88,17 @@ const api = {
       const sub = (_event, path) => callback(path);
       return electronAPI.ipcRenderer.on('wolfbrain:init-path', sub);
     }
+  },
+  plugins: {
+    getAll: () => electronAPI.ipcRenderer.invoke('plugins:getAll'),
+    get: (pluginId) => electronAPI.ipcRenderer.invoke('plugins:get', pluginId),
+    fetchRegistry: () => electronAPI.ipcRenderer.invoke('plugins:fetchRegistry'),
+    install: (options, downloadUrl) => electronAPI.ipcRenderer.invoke('plugins:install', options, downloadUrl),
+    uninstall: (pluginId) => electronAPI.ipcRenderer.invoke('plugins:uninstall', pluginId),
+    enable: (pluginId) => electronAPI.ipcRenderer.invoke('plugins:enable', pluginId),
+    disable: (pluginId) => electronAPI.ipcRenderer.invoke('plugins:disable', pluginId),
+    checkUpdates: () => electronAPI.ipcRenderer.invoke('plugins:checkUpdates'),
+    update: (pluginId, downloadUrl) => electronAPI.ipcRenderer.invoke('plugins:update', pluginId, downloadUrl)
   }
 }
 

@@ -1,0 +1,25 @@
+{
+    "version": "1.0.0",
+    "plugins": [
+        {
+            "id": "wolfbrain",
+            "name": "Wolfbrain",
+            "description": "Infinite canvas moodboard for visual brainstorming and idea organization",
+            "version": "1.0.0",
+            "author": "S0Vishnu",
+            "homepage": "https://github.com/S0Vishnu/WolfBrain",
+            "repository": "https://github.com/S0Vishnu/WolfBrain",
+            "downloadUrl": "https://github.com/S0Vishnu/WolfBrain/releases/latest/download/wolfbrain-plugin.zip",
+            "category": "design",
+            "tags": [
+                "moodboard",
+                "canvas",
+                "design",
+                "brainstorming"
+            ],
+            "icon": "https://raw.githubusercontent.com/S0Vishnu/WolfBrain/main/icon.png",
+            "screenshots": [],
+            "verified": true
+        }
+    ]
+}

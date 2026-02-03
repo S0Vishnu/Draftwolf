@@ -81,6 +81,17 @@ interface Window {
       saveFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>;
       onInitPath: (callback: (path: string) => void) => () => void;
     };
+    plugins: {
+      getAll: () => Promise<{ success: boolean; plugins?: any[]; error?: string }>;
+      get: (pluginId: string) => Promise<{ success: boolean; plugin?: any; error?: string }>;
+      fetchRegistry: () => Promise<{ success: boolean; registry?: any; error?: string }>;
+      install: (options: any, downloadUrl: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+      uninstall: (pluginId: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+      enable: (pluginId: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+      disable: (pluginId: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+      checkUpdates: () => Promise<{ success: boolean; updates?: any[]; error?: string }>;
+      update: (pluginId: string, downloadUrl: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+    };
   };
 }
 

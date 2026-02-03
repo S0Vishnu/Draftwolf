@@ -10,6 +10,13 @@ import log from 'electron-log'
 import { authManager, setupAuthIPC } from './auth';
 import { startApiServer } from './api-server';
 
+// Wolfbrain Auto-Sync Service (DISABLED - Using Plugin System)
+// const wolfbrainSyncService = require('../../scripts/wolfbrain-sync-service');
+
+// Plugin System
+import { pluginManager } from './plugin-manager';
+import { setupPluginIPC } from './plugin-ipc';
+
 // Start API Server
 let apiServer = startApiServer();
 
@@ -172,6 +179,17 @@ function createWindow() {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.draftwolf.app')
+
+  // Initialize Wolfbrain Auto-Sync Service (DISABLED - Using Plugin System)
+  // wolfbrainSyncService.init().catch(err => {
+  //   console.error('[WolfbrainSync] Failed to initialize:', err);
+  // });
+
+  // Initialize Plugin System
+  setupPluginIPC();
+  pluginManager.init().catch(err => {
+    console.error('[PluginManager] Failed to initialize:', err);
+  });
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -559,6 +577,7 @@ app.on('window-all-closed', () => {
     if (apiServer) {
       apiServer.close();
     }
+    wolfbrainSyncService.cleanup();
     app.quit()
   }
 })
@@ -738,13 +757,15 @@ function createWolfbrainWindow() {
   }
 
   wolfbrainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1000,
+    height: 700,
+    minWidth: 400,
+    minHeight: 300,
     show: false,
-    frame: false, // Custom frame in React
+    frame: false,
     transparent: false,
     autoHideMenuBar: true,
-    alwaysOnTop: false, // Default false, toggled by user
+    alwaysOnTop: false,
     icon: icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -762,7 +783,6 @@ function createWolfbrainWindow() {
 
   wolfbrainWindow.on('ready-to-show', () => {
     wolfbrainWindow.show();
-    // Send the start path if available
     if (wolfbrainStartPath) {
       wolfbrainWindow.webContents.send('wolfbrain:init-path', wolfbrainStartPath);
     }
@@ -773,7 +793,6 @@ function createWolfbrainWindow() {
     wolfbrainWindow.hide();
   });
 
-  // Open external links in browser
   wolfbrainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url);
     return { action: 'deny' };

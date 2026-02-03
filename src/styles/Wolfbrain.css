@@ -2,7 +2,6 @@
     width: 100vw;
     height: 100vh;
     background: #121212;
-    /* Dark canvas bg */
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -29,6 +28,12 @@
     letter-spacing: -0.01em;
 }
 
+.wb-title-logo {
+    flex-shrink: 0;
+    object-fit: contain;
+    display: block;
+}
+
 .wb-toolbar {
     display: flex;
     align-items: center;
@@ -51,7 +56,6 @@
     align-items: center;
 }
 
-/* Tools */
 .wb-toolbar button,
 .wb-actions button {
     background: transparent;
@@ -100,10 +104,7 @@
     margin: 0 4px;
 }
 
-/* Canvas Items */
 .infinite-grid-surface {
-    /* Use a large fixed size or 100% of the viewport to ensure clicks register */
-    /* Ideally we start at viewport size and expand, but for now fixed large size ensures panning area */
     width: 100000px;
     height: 100000px;
     background-color: #121212;
@@ -116,7 +117,6 @@
 
 .wb-item {
     position: absolute;
-    /* overflow: hidden; Removed to allow controls to show outside */
     user-select: none;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     transition: box-shadow 0.2s;
@@ -127,7 +127,6 @@
     z-index: 1000 !important;
 }
 
-/* Text Item */
 .text-item {
     background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -148,20 +147,15 @@
     outline: none;
 }
 
-/* Sticker Item */
-/* Sticker Item */
 .sticker-item {
     position: relative;
-    /* Context for pseudo-element */
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
     border-radius: 2px;
     border-bottom-right-radius: 60px 10px;
-    /* Slight curl shape */
     color: #1f2937;
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
-/* Lifted corner shadow effect */
 .sticker-item:after {
     content: '';
     position: absolute;
@@ -221,7 +215,6 @@
     resize: none;
     padding: 12px;
     font-family: 'Kalam', 'Comic Sans MS', sans-serif;
-    /* Handwritten font feel */
     font-size: 16px;
     outline: none;
     color: inherit;
@@ -236,7 +229,6 @@
     border-radius: 4px;
 }
 
-/* Common Controls */
 .wb-item-controls {
     position: absolute;
     top: -12px;
@@ -252,7 +244,6 @@
     border: 1px solid #8b5cf6;
     border-radius: 50%;
     z-index: 2100;
-    /* Higher than controls */
     cursor: nwse-resize;
     transition: transform 0.1s;
 }
@@ -290,12 +281,9 @@
     z-index: 100;
     padding: 4px;
     background: #27272a;
-    /* Zinc 800 */
     border-radius: 8px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.05);
-
-    /* Animation Props */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
 }
@@ -323,7 +311,6 @@
     height: 28px;
     background: transparent;
     color: #a1a1aa;
-    /* Zinc 400 */
     border: none;
     border-radius: 6px;
     display: flex;
@@ -338,11 +325,6 @@
     color: #ffffff;
 }
 
-.zoom-controls button:active {
-    transform: scale(0.96);
-    background: rgba(255, 255, 255, 0.05);
-}
-
 .zoom-controls .divider-h {
     height: 1px;
     width: 80%;
@@ -351,7 +333,6 @@
     margin: 2px auto;
 }
 
-/* Shapes are managed inline but base styles here */
 .wb-shape {
     position: absolute;
     cursor: grab;
@@ -359,11 +340,9 @@
 
 .wb-shape.selected {
     border-color: #a78bfa !important;
-    /* Lighter purple on select */
     box-shadow: 0 0 0 2px #a78bfa;
 }
 
-/* Window Dragging */
 .app-drag-region {
     -webkit-app-region: drag;
 }
@@ -395,4 +374,20 @@
     border: 2px solid #e4e4e7;
     background: transparent;
     border-radius: 50%;
+}
+
+.wb-popup-menu {
+    position: absolute;
+    top: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #27272a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    z-index: 10000;
 }

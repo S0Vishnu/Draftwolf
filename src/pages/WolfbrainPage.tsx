@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     X, Pin, Plus, Image as ImageIcon, Type, Trash2,
-    Maximize, Minus, Brain, Save, Download,
+    Maximize, Minus, Save, Download, FolderOpen,
     FileText, MousePointer, Square, Circle, Minus as LineIcon,
     ArrowRight, PenTool, StickyNote, RotateCcw, RotateCw, Eraser, MoreVertical,
     Maximize2, ChevronDown, ChevronUp, Lock, Unlock
@@ -10,6 +10,7 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { toPng } from 'html-to-image';
 import { toast } from 'react-toastify';
 import '../styles/Wolfbrain.css';
+import logo from '../assets/icons/logo.png';
 
 const STICKY_COLORS = [
     '#fef3c7', // Yellow (Default)
@@ -1239,7 +1240,7 @@ const WolfbrainPage = () => {
 
             <div className="wb-header app-drag-region">
                 <div className="wb-title">
-                    <Brain size={18} className="text-accent" style={{ color: '#8b5cf6' }} />
+                    <img src={logo} alt="" className="wb-title-logo" width={20} height={20} />
                     <span style={{ opacity: 0.9, marginLeft: 8 }}>
                         {currentFilePath ? currentFilePath.split(/[/\\]/).pop()?.replace(/\.wolfbrain$/i, '') : 'Wolfbrain'}{hasUnsavedChanges && <span style={{ color: '#fbbf24', marginLeft: 4 }}>●</span>}
                     </span>
@@ -1310,6 +1311,7 @@ const WolfbrainPage = () => {
                         {isStickyFixedSize ? <Lock size={18} /> : <Unlock size={18} />}
                     </button>
                     <button onClick={toggleAlwaysOnTop} className={isAlwaysOnTop ? 'active' : ''} title="Always On Top"><Pin size={18} /></button>
+                    <button onClick={() => globalThis.api?.wolfbrain?.openFileDialog()} title="Open..."><FolderOpen size={18} /></button>
                     <button onClick={handleSaveWolfbrain} title="Save to Project"><Save size={18} /></button>
                     <button onClick={handleExportImage} title="Export Image"><Download size={18} /></button>
                     <div className="divider-v"></div>

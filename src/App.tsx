@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import Cleanup from './pages/Cleanup';
 import Community from './pages/Community';
 import WolfbrainPage from './pages/WolfbrainPage';
+import Extensions from './pages/Extensions';
 import UpdateModal from './components/UpdateModal';
 
 
@@ -169,6 +170,7 @@ function App() {
           <Route path="/settings" element={user ? <Settings /> : <Navigate to="/" replace />} />
           <Route path="/cleanup" element={user ? <Cleanup /> : <Navigate to="/" replace />} />
           <Route path="/community" element={user ? <Community /> : <Navigate to="/" replace />} />
+          <Route path="/extensions" element={user ? <Extensions /> : <Navigate to="/" replace />} />
           <Route path="/wolfbrain" element={<WolfbrainPage />} />
         </Routes>
       </Router>

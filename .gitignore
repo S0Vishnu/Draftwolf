@@ -7,3 +7,5 @@ dist-web
 .env.local
 .draft
 *.log
+*.agents
+.agent

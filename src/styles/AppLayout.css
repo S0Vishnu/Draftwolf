@@ -679,6 +679,7 @@
     padding: 16px;
     border-radius: 8px;
     max-width: 105px;
+    min-width: 105px;
     border: 1px solid transparent;
     transition: all 0.2s;
     position: relative;

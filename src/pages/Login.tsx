@@ -51,23 +51,7 @@ const Login = () => {
             }
         });
 
-        // Also check if we already have a token on mount (e.g. valid session from day before)
-        // Wait, init() in Main sends success event if valid token exists.
-        // But we might have missed it if we rendered late.
-        // Check manually:
-        window.api.auth.getToken().then(async (token) => {
-            if (token && !auth.currentUser) {
-                // Attempt silent login
-                try {
-                    const credential = GoogleAuthProvider.credential(token);
-                    await signInWithCredential(auth, credential);
-                    // Don't toast here as it's auto-login
-                    navigate('/home', { replace: true }); // Or let auth state listener handle it
-                } catch (e) {
-                    console.error("Auto-login failed:", e);
-                }
-            }
-        });
+
 
         return cleanup;
     }, [navigate]);

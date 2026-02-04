@@ -22,19 +22,21 @@ class AuthManager extends EventEmitter {
     async init() {
         try {
             const dateStored = await keytar.getPassword(SERVICE_NAME, DATE_KEY);
-            
+
             if (dateStored) {
                 // Check if it's a timestamp (new format) or date string (old format)
                 const lastLogin = parseInt(dateStored);
-                // 30 days in ms = 2592000000
-                const THIRTY_DAYS_MS = 2592000000;
-                
+                // Firebase ID Tokens expire in 1 hour (3600000 ms). 
+                // We use a slightly shorter buffer (e.g. 50 mins) to be safe or just 1 hour allowing auto-refresh if valid.
+                // However, we can't auto-refresh purely from ID token storage.
+                const TOKEN_VALIDITY_MS = 3600000;
+
                 const isTimestamp = !isNaN(lastLogin);
-                const isValid = isTimestamp && (Date.now() - lastLogin < THIRTY_DAYS_MS);
+                const isValid = isTimestamp && (Date.now() - lastLogin < TOKEN_VALIDITY_MS);
 
                 // If old format (Date String) or expired timestamp, we consider it invalid/expired
                 // Note: Old format (string) parsing to int results in NaN, so `isValid` becomes false, forcing re-login which upgrades format.
-                
+
                 if (isValid) {
                     const token = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
                     if (token && isValidToken(token)) {
@@ -102,7 +104,7 @@ class AuthManager extends EventEmitter {
         try {
             // Save token
             await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, token);
-            // Save timestamp to enforce 30-day validity logic
+            // Save timestamp to enforce validity logic
             await keytar.setPassword(SERVICE_NAME, DATE_KEY, Date.now().toString());
         } catch (e) {
             console.error('Keytar Save Error:', e);
@@ -112,15 +114,15 @@ class AuthManager extends EventEmitter {
     async getToken() {
         try {
             const dateStored = await keytar.getPassword(SERVICE_NAME, DATE_KEY);
-            
+
             let isValid = false;
-            
+
             if (dateStored) {
-                 const lastLogin = parseInt(dateStored);
-                 const THIRTY_DAYS_MS = 2592000000;
-                 if (!isNaN(lastLogin) && (Date.now() - lastLogin < THIRTY_DAYS_MS)) {
-                     isValid = true;
-                 }
+                const lastLogin = parseInt(dateStored);
+                const TOKEN_VALIDITY_MS = 3600000;
+                if (!isNaN(lastLogin) && (Date.now() - lastLogin < TOKEN_VALIDITY_MS)) {
+                    isValid = true;
+                }
             }
 
             if (!isValid) {

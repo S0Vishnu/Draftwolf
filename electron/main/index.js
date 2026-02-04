@@ -1,5 +1,5 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join, resolve } from 'path'
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { join, resolve } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { DraftControlSystem } from './services/DraftControlSystem'
 import icon from '../../public/icon.png?asset'
@@ -144,6 +144,16 @@ function createWindow() {
         mainWindow.webContents.send('auth:success', token);
       }
     });
+
+    // Handle Cold Start Deep Link (Windows/Linux)
+    if (process.platform === 'win32' || process.platform === 'linux') {
+      const url = process.argv.find(arg => arg.startsWith('myapp://'));
+      if (url) {
+        // Add a small delay/log to ensure window is ready? valid for ready-to-show.
+        console.log('Processing Cold Start Deep Link:', url);
+        authManager.handleDeepLink(url);
+      }
+    }
   })
 
   mainWindow.on('closed', () => {

@@ -126,12 +126,25 @@ class AuthManager extends EventEmitter {
             }
 
             if (!isValid) {
-                // Token expired
-                await this.logout();
+                // Token expired - return null but do NOT clear keytar, so getTokenForDisplay()
+                // can still report "logged in" for the Blender addon until user explicitly logs out.
                 return null;
             }
 
             return await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * For display only (e.g. Blender addon "logged in?"). Returns token if one exists
+     * without enforcing 1h expiry, so UI stays in sync with the app window.
+     */
+    async getTokenForDisplay() {
+        try {
+            const token = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
+            return token && isValidToken(token) ? token : null;
         } catch (e) {
             return null;
         }

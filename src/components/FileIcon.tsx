@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { File, Folder, Brain } from 'lucide-react';
+import { File, Folder } from 'lucide-react';
 
 interface FileIconProps {
     name: string;
@@ -44,8 +44,7 @@ const getFileColor = (ext: string): string => {
         case 'rar':
         case '7z':
             return '#ffb74d'; // Archive Orange
-        case 'wolfbrain':
-            return '#8b5cf6'; // Wolfbrain Purple
+
         default:
             return '#4facfe'; // Default Cyan-Blue
     }
@@ -60,7 +59,7 @@ const FileIcon: React.FC<FileIconProps> = ({ name, path, isDirectory, size = 32,
         let isMounted = true;
         // Fetch native icon for specific types (Blender, Executables, Shortcuts)
         if (!isDirectory && path && (ext === 'blend' || ext === 'exe' || ext === 'lnk' || ext === 'blend1')) {
-            window.api.getFileIcon(path).then(url => {
+            globalThis.api.getFileIcon(path).then(url => {
                 if (isMounted && url) setIconUrl(url);
             }).catch(err => {
                 console.error("Failed to load icon for", path, err);
@@ -87,25 +86,7 @@ const FileIcon: React.FC<FileIconProps> = ({ name, path, isDirectory, size = 32,
 
     const color = getFileColor(ext);
 
-    // Special render for Wolfbrain
-    if (ext === 'wolfbrain') {
-        return (
-            <div style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className={className}>
-                <File size={size} color={color} strokeWidth={1.5} />
-                <div style={{
-                    position: 'absolute',
-                    top: '55%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}>
-                    <Brain size={size * 0.45} color={color} strokeWidth={2} />
-                </div>
-            </div>
-        );
-    }
+
 
     // Calculate font size relative to icon size
     const fontSize = Math.max(8, Math.round(size * 0.16));

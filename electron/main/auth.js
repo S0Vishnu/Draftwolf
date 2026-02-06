@@ -1,6 +1,6 @@
 import { ipcMain, shell } from 'electron';
 import keytar from 'keytar';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 const SERVICE_NAME = 'DraftWolf-Auth';
 const ACCOUNT_NAME = 'firebase_id_token'; // Single user for now, or use dynamic
@@ -25,13 +25,13 @@ class AuthManager extends EventEmitter {
 
             if (dateStored) {
                 // Check if it's a timestamp (new format) or date string (old format)
-                const lastLogin = parseInt(dateStored);
+                const lastLogin = Number.parseInt(dateStored);
                 // Firebase ID Tokens expire in 1 hour (3600000 ms). 
                 // We use a slightly shorter buffer (e.g. 50 mins) to be safe or just 1 hour allowing auto-refresh if valid.
                 // However, we can't auto-refresh purely from ID token storage.
                 const TOKEN_VALIDITY_MS = 3600000;
 
-                const isTimestamp = !isNaN(lastLogin);
+                const isTimestamp = !Number.isNaN(lastLogin);
                 const isValid = isTimestamp && (Date.now() - lastLogin < TOKEN_VALIDITY_MS);
 
                 // If old format (Date String) or expired timestamp, we consider it invalid/expired
@@ -118,9 +118,9 @@ class AuthManager extends EventEmitter {
             let isValid = false;
 
             if (dateStored) {
-                const lastLogin = parseInt(dateStored);
+                const lastLogin = Number.parseInt(dateStored);
                 const TOKEN_VALIDITY_MS = 3600000;
-                if (!isNaN(lastLogin) && (Date.now() - lastLogin < TOKEN_VALIDITY_MS)) {
+                if (!Number.isNaN(lastLogin) && (Date.now() - lastLogin < TOKEN_VALIDITY_MS)) {
                     isValid = true;
                 }
             }
@@ -133,6 +133,7 @@ class AuthManager extends EventEmitter {
 
             return await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
         } catch (e) {
+            console.error('Get Token Error:', e);
             return null;
         }
     }
@@ -146,6 +147,7 @@ class AuthManager extends EventEmitter {
             const token = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
             return token && isValidToken(token) ? token : null;
         } catch (e) {
+            console.error('Get Token For Display Error:', e);
             return null;
         }
     }

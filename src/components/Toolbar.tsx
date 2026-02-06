@@ -5,7 +5,7 @@ import {
     FolderPlus, FilePlus, List, LayoutGrid, Settings, Check, RotateCw
 } from 'lucide-react';
 import { FileEntry } from './FileItem';
-import { WolfbrainIcon } from './extensions/wolfbrain/WolfbrainIcon';
+
 
 interface ToolbarProps {
     currentPath: string | null;
@@ -32,10 +32,6 @@ interface ToolbarProps {
     setViewMode: (mode: 'list' | 'grid') => void;
     onNavigate: (path: string) => void;
 
-    // Extensions
-    isWolfbrainEnabled: boolean;
-    isWolfbrainActive: boolean;
-    onWolfbrainClick: () => void;
 }
 
 // Update `Toolbar` destructuring first to include new props
@@ -59,9 +55,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     onCreateFile,
     setViewMode,
     onNavigate,
-    isWolfbrainEnabled,
-    isWolfbrainActive,
-    onWolfbrainClick
+
 }) => {
     // Helper to rebuild path up to index
     const getPathAtIndex = (parts: string[], index: number) => {
@@ -210,15 +204,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
                         <div className="divider-v"></div>
 
-                        {isWolfbrainEnabled && (
-                            <>
-                                <WolfbrainIcon
-                                    isActive={isWolfbrainActive}
-                                    onClick={onWolfbrainClick}
-                                />
-                                <div className="divider-v"></div>
-                            </>
-                        )}
+
 
                         <button className={`icon-btn ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')} title="List View"><List size={18} /></button>
                         <button className={`icon-btn ${viewMode === 'grid' ? 'active' : ''}`} onClick={() => setViewMode('grid')} title="Grid View"><LayoutGrid size={18} /></button>

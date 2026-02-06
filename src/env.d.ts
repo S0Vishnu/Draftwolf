@@ -70,17 +70,7 @@ interface Window {
       onProgress: (callback: (info: any) => void) => () => void;
       onError: (callback: (error: string) => void) => () => void;
     };
-    wolfbrain: {
-      open: (startPath?: string) => Promise<void>;
-      close: () => Promise<void>;
-      minimize: () => Promise<void>;
-      toggleMaximize: () => Promise<void>;
-      setAlwaysOnTop: (flag: boolean) => Promise<void>;
-      getAlwaysOnTop: () => Promise<boolean>;
-      saveAs: (content: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
-      saveFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>;
-      onInitPath: (callback: (path: string) => void) => () => void;
-    };
+
   };
 }
 

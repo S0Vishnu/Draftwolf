@@ -8,9 +8,9 @@ import Sidebar from '../components/Sidebar';
 import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import {
-    Bell, Moon, LogOut, RefreshCw, User, Clock, Shield,
-    Edit2, X, Check, Download, Coffee, Trash2, Smartphone,
-    Monitor, Globe, Blocks
+    LogOut, RefreshCw, User, Clock, Shield,
+    Edit2, X, Check, Download, Coffee, Trash2,
+    Monitor, Globe
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../styles/Settings.css';
@@ -23,7 +23,7 @@ interface UserSettings {
     notificationsEnabled: boolean;
     avatarSeed: string;
     checkUpdates: boolean;
-    wolfbrainEnabled: boolean;
+
 }
 
 const Settings = () => {
@@ -42,7 +42,7 @@ const Settings = () => {
         notificationsEnabled: true,
         avatarSeed: '',
         checkUpdates: true,
-        wolfbrainEnabled: false
+
     };
 
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
@@ -61,8 +61,8 @@ const Settings = () => {
         setInitialDisplayName(name);
 
         // Get App Version
-        if ((window as any).api && (window as any).api.getAppVersion) {
-            (window as any).api.getAppVersion().then((v: string) => setAppVersion(v));
+        if ((globalThis as any)?.api?.getAppVersion) {
+            (globalThis as any).api.getAppVersion().then((v: string) => setAppVersion(v));
         }
 
         // 1. Load from LocalStorage immediately for instant UI
@@ -170,9 +170,7 @@ const Settings = () => {
         setSettings(newSettings);
         setInitialSettings(prev => ({ ...prev, [key]: value }));
 
-        if (key === 'wolfbrainEnabled') {
-            localStorage.setItem('wolfbrain_enabled', String(value));
-        }
+
 
         try {
             await setDoc(doc(db, 'users', user.uid), { [key]: value }, { merge: true });
@@ -190,8 +188,8 @@ const Settings = () => {
     const handleSignOut = async () => {
         try {
             // Clear Electron Main Process Auth
-            if ((window as any).api && (window as any).api.auth) {
-                await (window as any).api.auth.logout();
+            if ((globalThis as any)?.api?.auth) {
+                await (globalThis as any).api.auth.logout();
             }
             await auth.signOut();
             navigate('/');
@@ -204,12 +202,12 @@ const Settings = () => {
     const handleClearCache = async () => {
         localStorage.clear();
         toast.info("Local cache cleared. Reloading...");
-        setTimeout(() => window.location.reload(), 1000);
+        setTimeout(() => globalThis.location.reload(), 1000);
     };
 
     const handleDownloadAddon = async () => {
-        const api = (window as any).api;
-        if (!api || !api.downloadAddon) {
+        const api = (globalThis as any)?.api;
+        if (!api?.downloadAddon) {
             toast.error("Feature not available in web mode.");
             return;
         }
@@ -275,26 +273,18 @@ const Settings = () => {
                                     <div className="avatar-ring"></div>
                                     <img src={avatarUrl} alt="Avatar" className="avatar-img" referrerPolicy="no-referrer" />
                                     {isEditing && (
-                                        <button onClick={regenerateAvatar} className="btn-regenerate" title="Regenerate Avatar">
+                                        <button onClick={regenerateAvatar} className="btn-regenerate" aria-label="Regenerate Avatar" title="Regenerate Avatar">
                                             <RefreshCw size={20} />
                                         </button>
                                     )}
                                 </div>
 
-                                {!isEditing ? (
-                                    <div className="user-info-display">
-                                        <h3 className="user-name">{displayName || 'User'}</h3>
-                                        <p className="user-bio">{settings.bio || 'Digital Artist & DraftWolf User'}</p>
-
-                                        <button onClick={() => setIsEditing(true)} className="btn-edit-profile">
-                                            <Edit2 size={16} /> Edit Profile
-                                        </button>
-                                    </div>
-                                ) : (
+                                {isEditing ? (
                                     <div style={{ width: '100%' }}>
                                         <div className="form-group">
-                                            <label className="form-label">Display Name</label>
+                                            <label className="form-label" htmlFor="settings-display-name">Display Name</label>
                                             <input
+                                                id="settings-display-name"
                                                 type="text"
                                                 value={displayName}
                                                 onChange={e => setDisplayName(e.target.value)}
@@ -303,8 +293,9 @@ const Settings = () => {
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label className="form-label">Bio</label>
+                                            <label className="form-label" htmlFor="settings-bio">Bio</label>
                                             <textarea
+                                                id="settings-bio"
                                                 value={settings.bio}
                                                 onChange={e => setSettings({ ...settings, bio: e.target.value })}
                                                 className="input-styled"
@@ -320,6 +311,15 @@ const Settings = () => {
                                                 <Check size={18} /> {loading ? 'Saving...' : 'Save'}
                                             </button>
                                         </div>
+                                    </div>
+                                ) : (
+                                    <div className="user-info-display">
+                                        <h3 className="user-name">{displayName || 'User'}</h3>
+                                        <p className="user-bio">{settings.bio || 'Digital Artist & DraftWolf User'}</p>
+
+                                        <button onClick={() => setIsEditing(true)} className="btn-edit-profile">
+                                            <Edit2 size={16} /> Edit Profile
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -338,33 +338,7 @@ const Settings = () => {
                         <div className="settings-list-container">
 
                             {/* Extensions */}
-                            <div className="glass-panel" style={{ marginBottom: '2rem' }}>
-                                <div className="panel-header">
-                                    <h2 className="panel-title">
-                                        <Blocks size={20} className="text-accent" style={{ color: '#ec4899' }} />
-                                        Extensions
-                                    </h2>
-                                </div>
 
-                                <div className="settings-list">
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <h3>Wolfbrain</h3>
-                                            <p>Enable the Wolfbrain Moodboard overlay for creative work.</p>
-                                        </div>
-                                        <label className="toggle-switch">
-                                            <input
-                                                type="checkbox"
-                                                checked={settings.wolfbrainEnabled ?? false}
-                                                onChange={e => updatePreference('wolfbrainEnabled', e.target.checked)}
-                                                className="toggle-input"
-                                            />
-                                            <span className="toggle-slider"><span className="toggle-knob"></span></span>
-                                        </label>
-                                    </div>
-                                    {/* Future extensions can go here */}
-                                </div>
-                            </div>
 
                             {/* App Preferences */}
                             <div className="glass-panel" style={{ marginBottom: '2rem' }}>
@@ -381,7 +355,7 @@ const Settings = () => {
                                             <h3>Push Notifications</h3>
                                             <p>Receive desktop notifications for important updates.</p>
                                         </div>
-                                        <label className="toggle-switch">
+                                        <label className="toggle-switch" aria-label="Push Notifications">
                                             <input
                                                 type="checkbox"
                                                 checked={settings.notificationsEnabled}
@@ -398,7 +372,7 @@ const Settings = () => {
                                                 <h3>Do Not Disturb</h3>
                                                 <p>Suppress notifications during specific hours.</p>
                                             </div>
-                                            <label className="toggle-switch">
+                                            <label className="toggle-switch" aria-label="Do Not Disturb">
                                                 <input
                                                     type="checkbox"
                                                     checked={settings.dndEnabled}
@@ -415,6 +389,7 @@ const Settings = () => {
                                                     <div className="time-wrapper">
                                                         <Clock size={14} className="text-muted" />
                                                         <input
+                                                            aria-label="Do Not Disturb Start Time"
                                                             type="time"
                                                             value={settings.dndStart}
                                                             onChange={e => updatePreference('dndStart', e.target.value)}
@@ -425,6 +400,7 @@ const Settings = () => {
                                                     <div className="time-wrapper">
                                                         <Clock size={14} className="text-muted" />
                                                         <input
+                                                            aria-label="Do Not Disturb End Time"
                                                             type="time"
                                                             value={settings.dndEnd}
                                                             onChange={e => updatePreference('dndEnd', e.target.value)}
@@ -441,7 +417,7 @@ const Settings = () => {
                                             <h3>Automatic Updates</h3>
                                             <p>Check for the latest version on launch.</p>
                                         </div>
-                                        <label className="toggle-switch">
+                                        <label className="toggle-switch" aria-label="Automatic Updates">
                                             <input
                                                 type="checkbox"
                                                 checked={settings.checkUpdates ?? true}
@@ -493,14 +469,19 @@ const Settings = () => {
                                         <h3>User Identity</h3>
                                         <p>Your unique account ID used for data synchronization.</p>
                                     </div>
-                                    <div className="id-badge" onClick={() => {
-                                        if (user?.uid) {
-                                            navigator.clipboard.writeText(user.uid);
-                                            toast.success("User ID copied!");
-                                        }
-                                    }}>
+                                    <button
+                                        type="button"
+                                        className="id-badge"
+                                        onClick={() => {
+                                            if (user?.uid) {
+                                                navigator.clipboard.writeText(user.uid);
+                                                toast.success("User ID copied!");
+                                            }
+                                        }}
+                                        title="Copy User ID"
+                                    >
                                         {user?.uid || 'Not Connected'}
-                                    </div>
+                                    </button>
                                 </div>
 
                                 <div className="danger-zone">

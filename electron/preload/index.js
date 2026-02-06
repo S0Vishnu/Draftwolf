@@ -75,20 +75,7 @@ const api = {
       return electronAPI.ipcRenderer.on('update:error', sub);
     }
   },
-  wolfbrain: {
-    open: (startPath) => electronAPI.ipcRenderer.invoke('wolfbrain:open', startPath),
-    close: () => electronAPI.ipcRenderer.invoke('wolfbrain:close'),
-    setAlwaysOnTop: (flag) => electronAPI.ipcRenderer.invoke('wolfbrain:setAlwaysOnTop', flag),
-    getAlwaysOnTop: () => electronAPI.ipcRenderer.invoke('wolfbrain:getAlwaysOnTop'),
-    minimize: () => electronAPI.ipcRenderer.invoke('wolfbrain:minimize'),
-    toggleMaximize: () => electronAPI.ipcRenderer.invoke('wolfbrain:toggleMaximize'),
-    saveAs: (content) => electronAPI.ipcRenderer.invoke('wolfbrain:save-as', content),
-    saveFile: (path, content) => electronAPI.ipcRenderer.invoke('fs:writeFile', { path, content }),
-    onInitPath: (callback) => {
-      const sub = (_event, path) => callback(path);
-      return electronAPI.ipcRenderer.on('wolfbrain:init-path', sub);
-    }
-  }
+
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

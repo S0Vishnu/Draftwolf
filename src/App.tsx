@@ -12,7 +12,7 @@ import Home from './pages/Home';
 import Settings from './pages/Settings';
 import Cleanup from './pages/Cleanup';
 import Community from './pages/Community';
-import WolfbrainPage from './pages/WolfbrainPage';
+
 import UpdateModal from './components/UpdateModal';
 
 
@@ -36,7 +36,7 @@ function App() {
       try {
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith('user_settings_')) {
+          if (key?.startsWith('user_settings_')) {
             const data = JSON.parse(localStorage.getItem(key) || '{}');
             if (data.checkUpdates === false) {
               shouldCheck = false;
@@ -48,19 +48,17 @@ function App() {
         console.error("Error reading settings", e);
       }
 
-      if (shouldCheck && window.api?.updater) {
-        window.api.updater.check();
+      if (shouldCheck && globalThis.api?.updater) {
+        globalThis.api.updater.check();
       }
     };
 
     checkForUpdates();
 
     // Event Listeners
-
-    // Event Listeners
-    if (window.api?.updater) {
+    if (globalThis.api?.updater) {
       // ... existing handlers ...
-      const cleanupAvailable = window.api.updater.onAvailable((info: any) => {
+      const cleanupAvailable = globalThis.api.updater.onAvailable((info: any) => {
         setUpdateState({
           isOpen: true,
           version: info.version,
@@ -69,7 +67,7 @@ function App() {
         });
       });
 
-      const cleanupProgress = window.api.updater.onProgress((info: any) => {
+      const cleanupProgress = globalThis.api.updater.onProgress((info: any) => {
         setUpdateState((prev: any) => ({
           ...prev,
           status: 'downloading',
@@ -77,7 +75,7 @@ function App() {
         }));
       });
 
-      const cleanupDownloaded = window.api.updater.onDownloaded((info: any) => {
+      const cleanupDownloaded = globalThis.api.updater.onDownloaded((info: any) => {
         setUpdateState((prev: any) => ({
           ...prev,
           version: info.version,
@@ -86,8 +84,8 @@ function App() {
         }));
       });
 
-      if (window.api.updater.onError) {
-        const cleanupError = window.api.updater.onError((error: string) => {
+      if (globalThis.api.updater.onError) {
+        const cleanupError = globalThis.api.updater.onError((error: string) => {
           toast.error(`Update Failed: ${error}`);
           setUpdateState((prev: any) => ({ ...prev, isOpen: false, status: 'available' }));
         });
@@ -113,8 +111,8 @@ function App() {
   const handleUpdate = async () => {
     try {
       setUpdateState((prev: any) => ({ ...prev, status: 'downloading' }));
-      if (window.api?.updater) {
-        await window.api.updater.download();
+      if (globalThis.api?.updater) {
+        await globalThis.api.updater.download();
       }
     } catch (e: any) {
       console.error("Download failed to start:", e);
@@ -128,8 +126,8 @@ function App() {
   };
 
   const handleRestart = () => {
-    if (window.api?.updater) {
-      window.api.updater.install();
+    if (globalThis.api?.updater) {
+      globalThis.api.updater.install();
     }
   };
 
@@ -169,7 +167,7 @@ function App() {
           <Route path="/settings" element={user ? <Settings /> : <Navigate to="/" replace />} />
           <Route path="/cleanup" element={user ? <Cleanup /> : <Navigate to="/" replace />} />
           <Route path="/community" element={user ? <Community /> : <Navigate to="/" replace />} />
-          <Route path="/wolfbrain" element={<WolfbrainPage />} />
+
         </Routes>
       </Router>
       <UpdateModal

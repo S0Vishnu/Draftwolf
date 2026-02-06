@@ -40,27 +40,27 @@ let db: Firestore;
 let storage: FirebaseStorage;
 let googleProvider: GoogleAuthProvider;
 
-try {
-  // Debug log: Check partially masked key and length to verify correct loading
-  console.log('API Key (partial):', firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 5)}... (len: ${firebaseConfig.apiKey.length})` : 'MISSING');
-  console.log('Project ID:', firebaseConfig.projectId);
-  console.log('Storage Bucket:', firebaseConfig.storageBucket || 'MISSING');
+// Debug log: Check partially masked key and length to verify correct loading
+console.log('API Key (partial):', firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 5)}... (len: ${firebaseConfig.apiKey.length})` : 'MISSING');
+console.log('Project ID:', firebaseConfig.projectId);
+console.log('Storage Bucket:', firebaseConfig.storageBucket || 'MISSING');
 
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-
-  // Explicitly set persistence to local storage to ensure long-term session works
-  setPersistence(auth, browserLocalPersistence).catch((error) => {
-    console.error("Firebase Persistence Error:", error);
-  });
-
-  db = getFirestore(app);
-  storage = getStorage(app);
-  googleProvider = new GoogleAuthProvider();
-  googleProvider.setCustomParameters({ prompt: 'select_account' });
-  console.log('Firebase Initialized successfully.');
-} catch (e) {
-  console.error('Firebase Initialization Failed:', e);
+if (!firebaseConfig.apiKey) {
+  throw new Error("Firebase API Key is missing. Check your .env file.");
 }
+
+app = initializeApp(firebaseConfig);
+auth = getAuth(app);
+
+// Explicitly set persistence to local storage to ensure long-term session works
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error("Firebase Persistence Error:", error);
+});
+
+db = getFirestore(app);
+storage = getStorage(app);
+googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+console.log('Firebase Initialized successfully.');
 
 export { auth, db, googleProvider, storage };

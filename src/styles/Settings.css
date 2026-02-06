@@ -50,7 +50,8 @@
     grid-template-columns: 380px 1fr;
     gap: 2.5rem;
     align-items: start;
-    max-width: 1400px;
+    width: 100%;
+    min-width: 0; /* allow grid to shrink on small screens */
 }
 
 @media (max-width: 1024px) {

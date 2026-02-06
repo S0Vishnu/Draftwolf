@@ -2,8 +2,21 @@ import http from 'http';
 import { DraftControlSystem } from './services/DraftControlSystem';
 import path from 'path';
 import fs from 'fs/promises';
+import { authManager } from './auth';
 
 const PORT = 45000;
+
+/** Decode JWT payload (middle segment) for display name. */
+function getUsernameFromToken(token: string): string {
+    try {
+        const payload = token.split('.')[1];
+        if (!payload) return 'User';
+        const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+        return decoded.name || decoded.email || decoded.sub || 'User';
+    } catch {
+        return 'User';
+    }
+}
 
 export function startApiServer() {
     const server = http.createServer(async (req, res) => {
@@ -32,6 +45,23 @@ export function startApiServer() {
         };
 
         try {
+            // Health check (Blender addon uses this to detect if DraftWolf app is running)
+            if (url.pathname === '/health' && req.method === 'GET') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+                return;
+            }
+
+            // Auth status (Blender addon uses this for login state)
+            if (url.pathname === '/auth/status' && req.method === 'GET') {
+                const token = await authManager.getToken();
+                const loggedIn = !!token;
+                const username = loggedIn ? getUsernameFromToken(token) : undefined;
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ loggedIn, username: username || null }));
+                return;
+            }
+
             // Find Project Root
             if (url.pathname === '/draft/find-root' && req.method === 'POST') {
                 const { path: searchPath } = await getBody();

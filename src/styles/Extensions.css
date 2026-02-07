@@ -157,6 +157,27 @@
   opacity: 1;
 }
 
+.ext-card--coming-soon {
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.ext-card--coming-soon:hover {
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.15),
+    0 2px 4px -1px rgba(0, 0, 0, 0.08);
+}
+
+.ext-coming-soon {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
 .ext-card-icon {
   width: 52px;
   height: 52px;

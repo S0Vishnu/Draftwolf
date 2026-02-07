@@ -69,6 +69,13 @@ const Extensions = () => {
   };
 
   const getActionButton = (ext: Extension) => {
+    if (ext.comingSoon) {
+      return (
+        <span className="ext-coming-soon" aria-hidden="true">
+          Coming soon
+        </span>
+      );
+    }
     if (ext.kind === 'download') {
       const isDownloading = downloadingId === ext.id;
       return (
@@ -129,7 +136,7 @@ const Extensions = () => {
               filteredExtensions.map((ext) => (
                 <article
                   key={ext.id}
-                  className="ext-card"
+                  className={`ext-card${ext.comingSoon ? ' ext-card--coming-soon' : ''}`}
                   style={{ '--ext-accent': ext.accentColor } as React.CSSProperties}
                 >
                   <div className="ext-card-accent" />
@@ -152,15 +159,17 @@ const Extensions = () => {
                     <p className="ext-card-desc">{ext.description}</p>
                     <div className="ext-card-actions">
                       {getActionButton(ext)}
-                      <a
-                        href={ext.repositoryUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ext-btn ext-btn-ghost"
-                        title="View repository"
-                      >
-                        <ExternalLink size={16} /> Visit
-                      </a>
+                      {!ext.comingSoon && (
+                        <a
+                          href={ext.repositoryUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ext-btn ext-btn-ghost"
+                          title="View repository"
+                        >
+                          <ExternalLink size={16} /> Visit
+                        </a>
+                      )}
                     </div>
                   </div>
                 </article>

@@ -20,6 +20,8 @@ export interface Extension {
   version?: string;
   /** Icon accent color (hex) for UI */
   accentColor: string;
+  /** When true, show "Coming soon" and disable actions */
+  comingSoon?: boolean;
 }
 
 export const extensions: Extension[] = [
@@ -40,7 +42,7 @@ export const extensions: Extension[] = [
     description: 'Visual moodboard and reference manager. Collect images, colors, and notes in one place and keep them in sync with your drafts.',
     kind: 'install',
     kindLabel: 'Moodboard',
-    repositoryUrl: 'https://github.com/draftwolf/draftboard',
+    repositoryUrl: 'https://github.com/S0Vishnu/DraftBoard',
     version: 'latest',
     accentColor: '#8b5cf6',
   },
@@ -53,5 +55,6 @@ export const extensions: Extension[] = [
     repositoryUrl: 'https://github.com/draftwolf/dragula-theme',
     version: 'latest',
     accentColor: '#64748b',
+    comingSoon: true,
   },
 ];

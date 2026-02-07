@@ -94,9 +94,10 @@
     left: 14px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--ev-c-text-2);
+    color: rgba(255, 255, 255, 0.5);
     pointer-events: none;
     transition: color 0.3s ease;
+    z-index: 2;
 }
 
 .search-bar-wrapper:focus-within .search-icon {

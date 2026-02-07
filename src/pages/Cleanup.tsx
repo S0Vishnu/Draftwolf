@@ -29,7 +29,6 @@ type SortDirection = 'asc' | 'desc';
 const Cleanup = () => {
     const navigate = useNavigate();
     const [user] = useAuthState(auth);
-    const [selectedModule, setSelectedModule] = useState<string | null>('storage');
     const [storageReport, setStorageReport] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -202,7 +201,16 @@ const Cleanup = () => {
     }, [storageReport, searchTerm, extensionFilter, extensionMode, sortConfig]);
 
     const renderStorageDetail = () => {
-        if (!storageReport) return <div className="loading-spinner">Loading analysis...</div>;
+        if (!rootDir) {
+            return (
+                <div className="empty-state">
+                    <p>Open a folder to analyze storage and clean up old versions.</p>
+                </div>
+            );
+        }
+        if (isLoading || !storageReport) {
+            return <div className="loading-spinner">Loading analysis...</div>;
+        }
 
         if (inspectingFile) {
             return renderFileInspection();
@@ -384,7 +392,7 @@ const Cleanup = () => {
 
                         {!inspectingFile && (
                             <div className="search-bar-wrapper" style={{ marginBottom: 0, width: '300px' }}>
-                                <Search size={18} className="search-icon" />
+                                <Filter size={18} className="search-icon" aria-hidden="true" />
                                 <input
                                     type="text"
                                     placeholder="Filter files..."

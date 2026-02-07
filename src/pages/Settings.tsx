@@ -9,8 +9,8 @@ import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import {
     LogOut, RefreshCw, User, Clock, Shield,
-    Edit2, X, Check, Download, Coffee, Trash2,
-    Monitor, Globe
+    Edit2, X, Check, Coffee, Trash2,
+    Monitor
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../styles/Settings.css';
@@ -203,26 +203,6 @@ const Settings = () => {
         localStorage.clear();
         toast.info("Local cache cleared. Reloading...");
         setTimeout(() => globalThis.location.reload(), 1000);
-    };
-
-    const handleDownloadAddon = async () => {
-        const api = (globalThis as any)?.api;
-        if (!api?.downloadAddon) {
-            toast.error("Feature not available in web mode.");
-            return;
-        }
-        try {
-            toast.info("Starting download...");
-            const result = await api.downloadAddon();
-            if (result.success) {
-                toast.success('Addon downloaded successfully!');
-            } else if (result.error) {
-                toast.error(`Download failed: ${result.error}`);
-            }
-        } catch (error) {
-            console.error(error);
-            toast.error('Failed to initiate download.');
-        }
     };
 
     // Determine Avatar URL for display
@@ -428,30 +408,6 @@ const Settings = () => {
                                         </label>
                                     </div>
 
-                                </div>
-                            </div>
-
-                            {/* Integrations */}
-                            <div className="glass-panel" style={{ marginBottom: '2rem' }}>
-                                <div className="panel-header">
-                                    <h2 className="panel-title">
-                                        <Globe size={20} className="text-accent" style={{ color: '#8b5cf6' }} />
-                                        Integrations & Tools
-                                    </h2>
-                                </div>
-                                <div className="feature-card">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        <div style={{ background: '#e17b34', padding: '10px', borderRadius: '12px' }}>
-                                            <Download size={24} color="white" />
-                                        </div>
-                                        <div className="feature-info">
-                                            <h4>Blender Addon</h4>
-                                            <p>Sync and version your projects directly from Blender.</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={handleDownloadAddon} className="btn-action-primary">
-                                        <Download size={16} /> Download
-                                    </button>
                                 </div>
                             </div>
 

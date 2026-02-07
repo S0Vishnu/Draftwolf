@@ -18,7 +18,6 @@ const api = {
   getStats: (path) => electronAPI.ipcRenderer.invoke('fs:getStats', path),
   getFileIcon: (path) => electronAPI.ipcRenderer.invoke('fs:getFileIcon', path),
   watchDir: (path) => electronAPI.ipcRenderer.invoke('fs:watchDir', path),
-  downloadAddon: () => electronAPI.ipcRenderer.invoke('addon:download'),
   onFileChange: (callback) => {
     const subscription = (_event, value) => callback(value);
     return electronAPI.ipcRenderer.on('fs:fileChanged', subscription);

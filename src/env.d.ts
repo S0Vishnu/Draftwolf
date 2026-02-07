@@ -33,7 +33,6 @@ interface Window {
     getStats: (path: string) => Promise<{ size: number; mtime: Date; birthtime: Date; isFile: boolean; isDirectory: boolean } | null>;
     getFileIcon: (path: string) => Promise<string | null>;
     watchDir: (path: string) => Promise<boolean>;
-    downloadAddon: () => Promise<any>;
     onFileChange: (callback: (data: { event: string; path: string }) => void) => () => void;
     confirm: (options: { message: string, title?: string, type?: string, buttons?: string[] }) => Promise<boolean>;
     quitApp: () => void;

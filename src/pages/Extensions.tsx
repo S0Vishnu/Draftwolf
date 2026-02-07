@@ -113,7 +113,7 @@ const Extensions = () => {
         <main className="extensions-content">
           <header className="extensions-header">
             <div className="extensions-header-text">
-              <h1>Extensions</h1>
+              <h1>Add-ons</h1>
               <p>Plugins, moodboards, and themes from the DraftWolf ecosystem. Each comes from its own repository.</p>
             </div>
             <div className="extensions-search-wrap">

@@ -9,8 +9,7 @@ import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import {
     LogOut, RefreshCw, User, Clock, Shield,
-    Edit2, X, Check, Coffee, Trash2,
-    Monitor
+    Edit2, X, Check, Coffee, Monitor
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../styles/Settings.css';
@@ -197,12 +196,6 @@ const Settings = () => {
             console.error("Error signing out:", error);
             toast.error("Failed to sign out");
         }
-    };
-
-    const handleClearCache = async () => {
-        localStorage.clear();
-        toast.info("Local cache cleared. Reloading...");
-        setTimeout(() => globalThis.location.reload(), 1000);
     };
 
     // Determine Avatar URL for display
@@ -441,10 +434,7 @@ const Settings = () => {
                                 </div>
 
                                 <div className="danger-zone">
-                                    <button onClick={handleClearCache} className="btn-clear-cache">
-                                        <Trash2 size={16} /> Clear Cache
-                                    </button>
-                                    <button onClick={handleSignOut} className="btn-signout">
+                                        <button onClick={handleSignOut} className="btn-signout">
                                         <LogOut size={16} /> Sign Out
                                     </button>
                                 </div>

@@ -251,6 +251,37 @@ ipcMain.handle("dialog:confirm", async (event, options) => {
   return response === 0;
 });
 
+ipcMain.handle("download:file", async (_, { url, suggestedFileName }) => {
+  const { dialog, app } = await import("electron");
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+
+  const defaultPath = suggestedFileName
+    ? path.join(app.getPath("downloads"), suggestedFileName)
+    : app.getPath("downloads");
+
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    defaultPath,
+    title: "Save extension",
+  });
+
+  if (canceled || !filePath) {
+    return { success: false, error: "Canceled" };
+  }
+
+  try {
+    const response = await fetch(url, { redirect: "follow" });
+    if (!response.ok) {
+      return { success: false, error: `Download failed: ${response.status} ${response.statusText}` };
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.writeFile(filePath, buffer);
+    return { success: true, path: filePath };
+  } catch (err) {
+    return { success: false, error: err.message || "Download failed" };
+  }
+});
+
 ipcMain.handle("fs:readDir", async (_, dirPath) => {
   const fs = await import("node:fs/promises");
   const path = await import("node:path");

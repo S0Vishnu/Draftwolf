@@ -23,6 +23,7 @@ const api = {
     return electronAPI.ipcRenderer.on('fs:fileChanged', subscription);
   },
   confirm: (options) => electronAPI.ipcRenderer.invoke('dialog:confirm', options),
+  downloadFile: (url, suggestedFileName) => electronAPI.ipcRenderer.invoke('download:file', { url, suggestedFileName }),
   quitApp: () => electronAPI.ipcRenderer.send('app:quit'),
   getAppVersion: () => electronAPI.ipcRenderer.invoke('app:getVersion'),
   draft: {

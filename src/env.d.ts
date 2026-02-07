@@ -35,6 +35,7 @@ interface Window {
     watchDir: (path: string) => Promise<boolean>;
     onFileChange: (callback: (data: { event: string; path: string }) => void) => () => void;
     confirm: (options: { message: string, title?: string, type?: string, buttons?: string[] }) => Promise<boolean>;
+    downloadFile: (url: string, suggestedFileName?: string) => Promise<{ success: boolean; path?: string; error?: string }>;
     quitApp: () => void;
     getAppVersion: () => Promise<string>;
     draft: {

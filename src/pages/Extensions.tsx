@@ -28,12 +28,33 @@ const Extensions = () => {
     );
   }, [searchQuery]);
 
-  const handleDownloadZip = (ext: Extension) => {
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadZip = async (ext: Extension) => {
     if (ext.kind !== 'download') return;
     const url = ext.downloadUrl || ext.repositoryUrl;
-    if (url) {
+    if (!url) return;
+
+    const downloadInApp = typeof globalThis.api?.downloadFile === 'function';
+    if (!downloadInApp) {
       window.open(url, '_blank');
       toast.success('Download started. Check your downloads folder.');
+      return;
+    }
+
+    const suggestedName = url.split('/').pop() || `${ext.name.replaceAll(/\s+/g, '_')}.zip`;
+    setDownloadingId(ext.id);
+    try {
+      const result = await globalThis.api.downloadFile(url, suggestedName);
+      if (result.success && result.path) {
+        toast.success(`Saved to ${result.path}`);
+      } else if (result.error && result.error !== 'Canceled') {
+        toast.error(result.error);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Download failed');
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -49,12 +70,14 @@ const Extensions = () => {
 
   const getActionButton = (ext: Extension) => {
     if (ext.kind === 'download') {
+      const isDownloading = downloadingId === ext.id;
       return (
         <button
           onClick={() => handleDownloadZip(ext)}
           className="ext-btn ext-btn-primary"
+          disabled={isDownloading}
         >
-          <Download size={16} /> Download .zip
+          <Download size={16} /> {isDownloading ? 'Downloading…' : 'Download .zip'}
         </button>
       );
     }

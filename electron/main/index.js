@@ -1,10 +1,14 @@
-import { app, shell, BrowserWindow, ipcMain } from "electron";
+import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from "electron";
 import { join, resolve } from "node:path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { DraftControlSystem } from "./services/DraftControlSystem";
 import icon from "../../public/icon.png?asset";
 import { autoUpdater } from "electron-updater";
 import log from "electron-log";
+
+// System tray: keep reference for menu updates; pinned folders from renderer
+let tray = null;
+let pinnedFoldersForTray = [];
 
 // Secure Deep Linking & Auth
 import { authManager, setupAuthIPC } from "./auth";
@@ -160,8 +164,78 @@ function createWindow() {
     }
   });
 
+  // Close to system tray instead of quitting
+  mainWindow.on("close", (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
   mainWindow.on("closed", () => {
-    app.quit();
+    if (tray) tray.destroy();
+    tray = null;
+  });
+
+  // System tray with DraftWolf icon
+  const trayIcon = nativeImage.createFromPath(icon).resize({ width: 16, height: 16 });
+  if (trayIcon.isEmpty()) {
+    tray = new Tray(icon);
+  } else {
+    tray = new Tray(trayIcon);
+  }
+  tray.setToolTip("DraftWolf");
+
+  function buildTrayMenu() {
+    const pinnedSubmenu =
+      pinnedFoldersForTray.length > 0
+        ? pinnedFoldersForTray.map((f) => ({
+            label: (f.name || f.path).slice(0, 50),
+            click: () => {
+              const win = BrowserWindow.getAllWindows()[0];
+              if (win) {
+                win.show();
+                win.focus();
+                win.webContents.send("tray:open-folder", f.path);
+              }
+            },
+          }))
+        : [{ label: "No pinned folders", enabled: false }];
+
+    return Menu.buildFromTemplate([
+      { label: "Open DraftWolf", click: () => {
+        const win = BrowserWindow.getAllWindows()[0];
+        if (win) {
+          win.show();
+          win.focus();
+        }
+      }},
+      { type: "separator" },
+      { label: "Pinned folders", submenu: pinnedSubmenu },
+      { type: "separator" },
+      { label: "Settings", click: () => {
+        const win = BrowserWindow.getAllWindows()[0];
+        if (win) {
+          win.show();
+          win.focus();
+          win.webContents.send("tray:navigate", "/settings");
+        }
+      }},
+      { type: "separator" },
+      { label: "Quit", click: () => {
+        app.isQuitting = true;
+        app.quit();
+      }},
+    ]);
+  }
+
+  tray.setContextMenu(buildTrayMenu());
+  tray.on("click", () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      win.show();
+      win.focus();
+    }
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -201,7 +275,55 @@ app.whenReady().then(() => {
 ipcMain.on("ping", () => console.log("pong"));
 
 ipcMain.on("app:quit", () => {
+  app.isQuitting = true;
   app.quit();
+});
+
+ipcMain.on("tray:set-pinned-folders", (_, folders) => {
+  pinnedFoldersForTray = Array.isArray(folders) ? folders : [];
+  if (tray) {
+    const pinnedSubmenu =
+      pinnedFoldersForTray.length > 0
+        ? pinnedFoldersForTray.map((f) => ({
+            label: (f.name || f.path).slice(0, 50),
+            click: () => {
+              const win = BrowserWindow.getAllWindows()[0];
+              if (win) {
+                win.show();
+                win.focus();
+                win.webContents.send("tray:open-folder", f.path);
+              }
+            },
+          }))
+        : [{ label: "No pinned folders", enabled: false }];
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: "Open DraftWolf", click: () => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win) {
+            win.show();
+            win.focus();
+          }
+        }},
+        { type: "separator" },
+        { label: "Pinned folders", submenu: pinnedSubmenu },
+        { type: "separator" },
+        { label: "Settings", click: () => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win) {
+            win.show();
+            win.focus();
+            win.webContents.send("tray:navigate", "/settings");
+          }
+        }},
+        { type: "separator" },
+        { label: "Quit", click: () => {
+          app.isQuitting = true;
+          app.quit();
+        }},
+      ])
+    );
+  }
 });
 
 ipcMain.handle("app:getVersion", () => {

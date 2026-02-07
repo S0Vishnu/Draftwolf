@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import './styles/Toastify.css';
 import './styles/AppLayout.css';
 import Login from './pages/Login';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -16,6 +17,25 @@ import Extensions from './pages/Extensions';
 
 import UpdateModal from './components/UpdateModal';
 
+function TrayListener() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const api = globalThis.api;
+    if (!api?.onTrayOpenFolder || !api?.onTrayNavigate) return;
+    const unsubFolder = api.onTrayOpenFolder((path: string) => {
+      sessionStorage.setItem('trayOpenPath', path);
+      navigate('/home');
+    });
+    const unsubNav = api.onTrayNavigate((route: string) => {
+      navigate(route);
+    });
+    return () => {
+      unsubFolder();
+      unsubNav();
+    };
+  }, [navigate]);
+  return null;
+}
 
 function App() {
   const [user, loading] = useAuthState(auth);
@@ -161,6 +181,7 @@ function App() {
   return (
     <>
       <Router>
+        <TrayListener />
         <Routes>
           <Route path="/" element={user ? <Navigate to="/home" replace /> : <Login />} />
           <Route path="/verify" element={<OTPVerification />} />
@@ -184,11 +205,8 @@ function App() {
       <ToastContainer
         position="bottom-right"
         autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
+        hideProgressBar
         closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
         draggable
         pauseOnHover
         theme="dark"

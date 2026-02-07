@@ -1,0 +1,40 @@
+/* Minimal react-toastify overrides – uses app theme (base.css vars) */
+
+.Toastify__toast-container {
+  --toastify-color-light: var(--color-background-soft, #222);
+  --toastify-color-dark: var(--color-background-soft, #222);
+  --toastify-color-success: var(--ev-c-text-1);
+  --toastify-color-warning: var(--ev-c-text-2);
+  --toastify-color-error: #f87171;
+  --toastify-color-info: var(--ev-c-text-2);
+  --toastify-text-color-light: var(--color-text);
+  --toastify-text-color-dark: var(--color-text);
+}
+
+.Toastify__toast {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--color-background-mute, #282828);
+  padding: 12px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  min-height: auto;
+}
+
+.Toastify__toast-body {
+  color: var(--color-text);
+  padding: 0;
+}
+
+.Toastify__progress-bar {
+  background: var(--ev-c-text-3);
+}
+
+.Toastify__close-button {
+  color: var(--ev-c-text-3);
+  opacity: 0.8;
+}
+
+.Toastify__close-button:hover {
+  color: var(--color-text);
+}

@@ -26,6 +26,17 @@ const api = {
   downloadFile: (url, suggestedFileName) => electronAPI.ipcRenderer.invoke('download:file', { url, suggestedFileName }),
   quitApp: () => electronAPI.ipcRenderer.send('app:quit'),
   getAppVersion: () => electronAPI.ipcRenderer.invoke('app:getVersion'),
+  setPinnedFoldersForTray: (folders) => electronAPI.ipcRenderer.send('tray:set-pinned-folders', folders),
+  onTrayOpenFolder: (callback) => {
+    const sub = (_event, path) => callback(path);
+    electronAPI.ipcRenderer.on('tray:open-folder', sub);
+    return () => electronAPI.ipcRenderer.removeListener('tray:open-folder', sub);
+  },
+  onTrayNavigate: (callback) => {
+    const sub = (_event, path) => callback(path);
+    electronAPI.ipcRenderer.on('tray:navigate', sub);
+    return () => electronAPI.ipcRenderer.removeListener('tray:navigate', sub);
+  },
   draft: {
     init: (projectRoot) => electronAPI.ipcRenderer.invoke('draft:init', projectRoot),
     commit: (projectRoot, label, files) => electronAPI.ipcRenderer.invoke('draft:commit', { projectRoot, label, files }),

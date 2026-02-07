@@ -62,6 +62,31 @@ const Home = () => {
         localStorage.setItem('pinnedFolders', JSON.stringify(pinnedFolders));
     }, [pinnedFolders]);
 
+    useEffect(() => {
+        if (typeof globalThis.api?.setPinnedFoldersForTray === 'function') {
+            globalThis.api.setPinnedFoldersForTray(pinnedFolders);
+        }
+    }, [pinnedFolders]);
+
+    useEffect(() => {
+        const path = sessionStorage.getItem('trayOpenPath');
+        if (path) {
+            sessionStorage.removeItem('trayOpenPath');
+            setRootDir(path);
+            setCurrentPath(path);
+        }
+    }, []);
+
+    useEffect(() => {
+        const api = globalThis.api;
+        if (!api?.onTrayOpenFolder) return;
+        const unsub = api.onTrayOpenFolder((path: string) => {
+            setRootDir(path);
+            setCurrentPath(path);
+        });
+        return unsub;
+    }, []);
+
     const addToPinned = (path: string) => {
         setPinnedFolders(prev => {
             if (prev.some(f => f.path === path)) return prev;

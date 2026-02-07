@@ -38,6 +38,9 @@ interface Window {
     downloadFile: (url: string, suggestedFileName?: string) => Promise<{ success: boolean; path?: string; error?: string }>;
     quitApp: () => void;
     getAppVersion: () => Promise<string>;
+    setPinnedFoldersForTray: (folders: { path: string; name: string }[]) => void;
+    onTrayOpenFolder: (callback: (path: string) => void) => () => void;
+    onTrayNavigate: (callback: (path: string) => void) => () => void;
     draft: {
       init: (projectRoot: string) => Promise<boolean>;
       commit: (projectRoot: string, label: string, files: string[]) => Promise<{ success: boolean; versionId?: string; error?: string }>;

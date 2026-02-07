@@ -269,6 +269,47 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+
+  // Local Theme Development Watcher
+  if (is.dev) {
+    (async () => {
+      try {
+        const fs = require('node:fs/promises');
+        const path = require('node:path');
+        const chokidar = require('chokidar');
+        
+        const localThemeDir = path.join(__dirname, '../../theme');
+        const userDataPath = app.getPath("userData");
+        const installedThemeDir = path.join(userDataPath, 'themes', 'dracula');
+
+        const syncLocalTheme = async () => {
+          try {
+            await fs.access(localThemeDir);
+            await fs.mkdir(installedThemeDir, { recursive: true });
+            await fs.cp(localThemeDir, installedThemeDir, { recursive: true });
+            console.log('[Dev] Synced local theme to installed themes');
+          } catch (e) {
+            // Ignore if local theme doesn't exist
+            if (e.code !== 'ENOENT') {
+              console.error('[Dev] Failed to sync local theme:', e);
+            }
+          }
+        };
+
+        // Initial sync
+        await syncLocalTheme();
+
+        // Watch
+        chokidar.watch(localThemeDir, { ignoreInitial: true }).on('all', async (event, path) => {
+          console.log(`[Dev] Theme file changed: ${event} ${path}`);
+          await syncLocalTheme();
+        });
+        console.log('[Dev] Watching local theme directory:', localThemeDir);
+      } catch (e) {
+        console.error('[Dev] Failed to setup theme watcher:', e);
+      }
+    })();
+  }
 });
 
 // IPC test
@@ -915,3 +956,171 @@ ipcMain.handle("draft:validate", async (_, projectRoot) => {
     return { valid: false, errors: [e.message] };
   }
 });
+
+// --- Theme Management ---
+const getThemesDir = () => {
+  const path = require("node:path");
+  return path.join(app.getPath("userData"), "themes");
+};
+
+ipcMain.handle("theme:list", async () => {
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const themesDir = getThemesDir();
+    
+    // Ensure themes directory exists
+    try {
+      await fs.mkdir(themesDir, { recursive: true });
+    } catch (e) {
+      // Directory may already exist
+    }
+    
+    const entries = await fs.readdir(themesDir, { withFileTypes: true });
+    const themes = [];
+    
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const themeJsonPath = path.join(themesDir, entry.name, "theme.json");
+        try {
+          const content = await fs.readFile(themeJsonPath, "utf-8");
+          const themeInfo = JSON.parse(content);
+          themes.push({
+            ...themeInfo,
+            path: path.join(themesDir, entry.name),
+          });
+        } catch (e) {
+          // Invalid theme, skip
+          console.error(`Invalid theme at ${entry.name}:`, e.message);
+        }
+      }
+    }
+    
+    return themes;
+  } catch (e) {
+    console.error("Theme List Failed:", e);
+    return [];
+  }
+});
+
+ipcMain.handle("theme:install", async (_, { repoUrl, downloadUrl }) => {
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const themesDir = getThemesDir();
+    
+    // Ensure themes directory exists
+    await fs.mkdir(themesDir, { recursive: true });
+    
+    // Determine download URL (use provided downloadUrl or convert repo to zip)
+    const cleanRepoUrl = repoUrl.replace(/\.git\/?$/, "").replace(/\/$/, "");
+    const zipUrl = downloadUrl || `${cleanRepoUrl}/archive/refs/heads/main.zip`;
+    
+    // Download ZIP to temp directory
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "draftwolf-theme-"));
+    const zipPath = path.join(tempDir, "theme.zip");
+    
+    console.log(`Downloading theme from ${zipUrl}...`);
+    const response = await fetch(zipUrl, { redirect: "follow" });
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.writeFile(zipPath, buffer);
+    
+    // Extract ZIP
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip(zipPath);
+    const extractPath = path.join(tempDir, "extracted");
+    zip.extractAllTo(extractPath, true);
+    
+    // Find theme.json in extracted contents (may be in a subfolder)
+    const findThemeJson = async (dir) => {
+      const items = await fs.readdir(dir, { withFileTypes: true });
+      for (const item of items) {
+        const itemPath = path.join(dir, item.name);
+        if (item.isFile() && item.name === "theme.json") {
+          return dir;
+        }
+        if (item.isDirectory()) {
+          const found = await findThemeJson(itemPath);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const themeDir = await findThemeJson(extractPath);
+    if (!themeDir) {
+      throw new Error("Invalid theme: theme.json not found");
+    }
+    
+    // Read theme.json to get theme ID
+    const themeJsonPath = path.join(themeDir, "theme.json");
+    const themeContent = await fs.readFile(themeJsonPath, "utf-8");
+    const themeInfo = JSON.parse(themeContent);
+    
+    if (!themeInfo.id) {
+      throw new Error("Invalid theme: missing 'id' in theme.json");
+    }
+    
+    // Copy to themes directory
+    const destDir = path.join(themesDir, themeInfo.id);
+    
+    // Remove existing if present
+    try {
+      await fs.rm(destDir, { recursive: true, force: true });
+    } catch (e) {
+      // May not exist
+    }
+    
+    await fs.cp(themeDir, destDir, { recursive: true });
+    
+    // Cleanup temp directory
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      console.error("Failed to cleanup temp dir:", e);
+    }
+    
+    console.log(`Theme ${themeInfo.name} installed successfully`);
+    return { success: true, themeId: themeInfo.id, theme: themeInfo };
+  } catch (e) {
+    console.error("Theme Install Failed:", e);
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle("theme:remove", async (_, themeId) => {
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const themesDir = getThemesDir();
+    const themeDir = path.join(themesDir, themeId);
+    
+    await fs.rm(themeDir, { recursive: true, force: true });
+    console.log(`Theme ${themeId} removed`);
+    return { success: true };
+  } catch (e) {
+    console.error("Theme Remove Failed:", e);
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle("theme:readCSS", async (_, themeId) => {
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const themesDir = getThemesDir();
+    const cssPath = path.join(themesDir, themeId, "theme.css");
+    
+    const content = await fs.readFile(cssPath, "utf-8");
+    return { success: true, css: content };
+  } catch (e) {
+    console.error("Theme Read CSS Failed:", e);
+    return { success: false, error: e.message };
+  }
+});
+

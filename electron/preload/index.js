@@ -86,6 +86,12 @@ const api = {
       return electronAPI.ipcRenderer.on('update:error', sub);
     }
   },
+  theme: {
+    list: () => electronAPI.ipcRenderer.invoke('theme:list'),
+    install: (repoUrl, downloadUrl) => electronAPI.ipcRenderer.invoke('theme:install', { repoUrl, downloadUrl }),
+    remove: (themeId) => electronAPI.ipcRenderer.invoke('theme:remove', themeId),
+    readCSS: (themeId) => electronAPI.ipcRenderer.invoke('theme:readCSS', themeId),
+  },
 
 }
 

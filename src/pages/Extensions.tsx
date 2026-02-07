@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebase';
 import Sidebar from '../components/Sidebar';
 import { Download, DownloadCloud, Palette, LayoutGrid, ExternalLink, Search } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { extensions, type Extension } from '../data/extensions';
+import { useTheme } from '../context/ThemeContext';
 import '../styles/Extensions.css';
 
 function KindIcon({ kind }: Readonly<{ kind: Extension['kind'] }>) {
@@ -15,6 +17,8 @@ function KindIcon({ kind }: Readonly<{ kind: Extension['kind'] }>) {
 
 const Extensions = () => {
   const [user] = useAuthState(auth);
+  const navigate = useNavigate();
+  const { refreshThemes } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredExtensions = useMemo(() => {
@@ -29,6 +33,7 @@ const Extensions = () => {
   }, [searchQuery]);
 
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [installingThemeId, setInstallingThemeId] = useState<string | null>(null);
 
   const handleDownloadZip = async (ext: Extension) => {
     if (ext.kind !== 'download') return;
@@ -63,10 +68,55 @@ const Extensions = () => {
     toast.info(`Open the repository to install ${ext.name}.`);
   };
 
-  const handleTheme = (ext: Extension) => {
-    window.open(ext.repositoryUrl, '_blank');
-    toast.info(`Open the theme repository to install ${ext.name}.`);
+  const handleTheme = async (ext: Extension) => {
+    // Check if theme API is available
+    if (!globalThis.api?.theme?.install) {
+      window.open(ext.repositoryUrl, '_blank');
+      toast.info(`Open the theme repository to install ${ext.name}.`);
+      return;
+    }
+
+    setInstallingThemeId(ext.id);
+    const loadingToast = toast.loading(`Installing ${ext.name} theme...`);
+    
+    try {
+      const result = await globalThis.api.theme.install(ext.repositoryUrl, ext.downloadUrl);
+      
+      if (result.success) {
+        toast.update(loadingToast, {
+          render: `${ext.name} theme installed! Go to Settings to apply.`,
+          type: 'success',
+          isLoading: false,
+          autoClose: 3000,
+        });
+        
+        // Refresh themes list
+        await refreshThemes();
+        
+        // Navigate to settings after a short delay
+        setTimeout(() => {
+          navigate('/settings');
+        }, 1500);
+      } else {
+        toast.update(loadingToast, {
+          render: result.error || 'Installation failed',
+          type: 'error',
+          isLoading: false,
+          autoClose: 3000,
+        });
+      }
+    } catch (e) {
+      toast.update(loadingToast, {
+        render: e instanceof Error ? e.message : 'Installation failed',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } finally {
+      setInstallingThemeId(null);
+    }
   };
+
 
   const getActionButton = (ext: Extension) => {
     if (ext.comingSoon) {
@@ -96,9 +146,14 @@ const Extensions = () => {
       );
     }
     if (ext.kind === 'theme') {
+      const isInstalling = installingThemeId === ext.id;
       return (
-        <button onClick={() => handleTheme(ext)} className="ext-btn ext-btn-primary">
-          <Palette size={16} /> Get theme
+        <button 
+          onClick={() => handleTheme(ext)} 
+          className="ext-btn ext-btn-primary"
+          disabled={isInstalling}
+        >
+          <Palette size={16} /> {isInstalling ? 'Installing…' : 'Get theme'}
         </button>
       );
     }

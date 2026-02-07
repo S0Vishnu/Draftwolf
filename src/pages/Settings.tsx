@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -9,9 +9,10 @@ import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import {
     LogOut, RefreshCw, User, Clock, Shield,
-    Edit2, X, Check, Coffee, Monitor
+    Edit2, X, Check, Coffee, Monitor, Palette, Trash2
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useTheme } from '../context/ThemeContext';
 import '../styles/Settings.css';
 
 interface UserSettings {
@@ -28,9 +29,11 @@ interface UserSettings {
 const Settings = () => {
     const [user] = useAuthState(auth);
     const navigate = useNavigate();
+    const { currentTheme, installedThemes, setTheme, refreshThemes } = useTheme();
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [appVersion, setAppVersion] = useState("1.1.7"); // Default fallback
+    const [removingTheme, setRemovingTheme] = useState<string | null>(null);
 
     // Initial default settings
     const defaultSettings: UserSettings = {
@@ -401,6 +404,124 @@ const Settings = () => {
                                         </label>
                                     </div>
 
+                                </div>
+                            </div>
+
+                            {/* Appearance & Themes */}
+                            <div className="glass-panel" style={{ marginBottom: '2rem' }}>
+                                <div className="panel-header">
+                                    <h2 className="panel-title">
+                                        <Palette size={20} className="text-accent" style={{ color: '#bd93f9' }} />
+                                        Appearance
+                                    </h2>
+                                </div>
+
+                                <div className="settings-list">
+                                    <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
+                                        <div className="setting-info" style={{ width: '100%' }}>
+                                            <h3>Theme</h3>
+                                            <p>Choose a color theme for the application.</p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', width: '100%' }}>
+                                            <button
+                                                onClick={() => setTheme('default')}
+                                                className={`theme-option ${currentTheme === 'default' ? 'active' : ''}`}
+                                                style={{
+                                                    padding: '0.75rem 1.25rem',
+                                                    borderRadius: '8px',
+                                                    border: currentTheme === 'default' ? '2px solid #3b82f6' : '2px solid rgba(255,255,255,0.1)',
+                                                    background: currentTheme === 'default' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.05)',
+                                                    color: 'inherit',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 500,
+                                                    transition: 'all 0.2s',
+                                                }}
+                                            >
+                                                Default
+                                            </button>
+                                            {installedThemes.map((theme) => (
+                                                <div key={theme.id} style={{ position: 'relative', display: 'inline-flex' }}>
+                                                    <button
+                                                        onClick={() => setTheme(theme.id)}
+                                                        className={`theme-option ${currentTheme === theme.id ? 'active' : ''}`}
+                                                        style={{
+                                                            padding: '0.75rem 1.25rem',
+                                                            paddingRight: '2.5rem',
+                                                            borderRadius: '8px',
+                                                            border: currentTheme === theme.id ? `2px solid ${theme.accentColor || '#3b82f6'}` : '2px solid rgba(255,255,255,0.1)',
+                                                            background: currentTheme === theme.id ? `${theme.accentColor}22` : 'rgba(255,255,255,0.05)',
+                                                            color: 'inherit',
+                                                            cursor: 'pointer',
+                                                            fontSize: '0.9rem',
+                                                            fontWeight: 500,
+                                                            transition: 'all 0.2s',
+                                                        }}
+                                                    >
+                                                        {theme.name}
+                                                    </button>
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (removingTheme) return;
+                                                            
+                                                            const confirmed = await globalThis.api?.confirm({
+                                                                message: `Are you sure you want to remove the ${theme.name} theme?`,
+                                                                title: 'Remove Theme',
+                                                                buttons: ['Remove', 'Cancel']
+                                                            });
+                                                            
+                                                            if (!confirmed) return;
+
+                                                            setRemovingTheme(theme.id);
+                                                            try {
+                                                                if (currentTheme === theme.id) {
+                                                                    await setTheme('default');
+                                                                }
+                                                                await globalThis.api?.theme?.remove(theme.id);
+                                                                await refreshThemes();
+                                                                toast.success(`${theme.name} theme removed`);
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                toast.error('Failed to remove theme');
+                                                            } finally {
+                                                                setRemovingTheme(null);
+                                                            }
+                                                        }}
+                                                        disabled={removingTheme === theme.id}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            right: '6px',
+                                                            top: '50%',
+                                                            transform: 'translateY(-50%)',
+                                                            padding: '4px',
+                                                            background: 'transparent',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            opacity: 0.5,
+                                                            color: 'inherit',
+                                                            borderRadius: '4px',
+                                                        }}
+                                                        title={`Remove ${theme.name}`}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <Link 
+                                            to="/extensions" 
+                                            style={{ 
+                                                fontSize: '0.85rem', 
+                                                color: '#3b82f6', 
+                                                textDecoration: 'none',
+                                                opacity: 0.8,
+                                                marginTop: '0.5rem'
+                                            }}
+                                        >
+                                            Get more themes from Add-ons →
+                                        </Link>
+                                    </div>
                                 </div>
                             </div>
 

@@ -73,6 +73,12 @@ interface Window {
       onProgress: (callback: (info: any) => void) => () => void;
       onError: (callback: (error: string) => void) => () => void;
     };
+    theme: {
+      list: () => Promise<{ id: string; name: string; description?: string; version?: string; author?: string; accentColor?: string; path?: string }[]>;
+      install: (repoUrl: string, downloadUrl?: string) => Promise<{ success: boolean; themeId?: string; theme?: any; error?: string }>;
+      remove: (themeId: string) => Promise<{ success: boolean; error?: string }>;
+      readCSS: (themeId: string) => Promise<{ success: boolean; css?: string; error?: string }>;
+    };
 
   };
 }

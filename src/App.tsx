@@ -16,6 +16,7 @@ import Community from './pages/Community';
 import Extensions from './pages/Extensions';
 
 import UpdateModal from './components/UpdateModal';
+import { ThemeProvider } from './context/ThemeContext';
 
 function TrayListener() {
   const navigate = useNavigate();
@@ -166,7 +167,7 @@ function App() {
   }
 
   return (
-    <>
+    <ThemeProvider>
       <Router>
         <TrayListener />
         <Routes>
@@ -195,7 +196,7 @@ function App() {
         pauseOnHover
         theme="dark"
       />
-    </>
+    </ThemeProvider>
   )
 }
 

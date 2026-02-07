@@ -12,9 +12,9 @@ We've all been there. You have a folder that looks like a graveyard of good inte
 - `script_final_ACTUALLY_FINAL.txt`
 - `script_final_ACTUALLY_FINAL_UseThisOne.txt`
 
-**DraftFlow** gently takes that chaos, pats it on the head, and organizes it into a sleek, version-controlled system that doesn't require a degree in Rocket Surgery (or `git`). It’s local version control for the rest of us.
+**DraftWolf** gently takes that chaos, pats it on the head, and organizes it into a sleek, version-controlled system that doesn't require a degree in Rocket Surgery (or `git`). It’s local version control for the rest of us.
 
-## � Features (The Good Stuff)
+## ✨ Features (The Good Stuff)
 
 ### 🕰️ Time Travel (Version Control)
 Go back in time to when your ideas were fresh and you hadn't accidentally deleted that crucial paragraph. Our **Semantic Branching** logic handles the messy stuff—if you restore an old version and edit it, we don't just overwrite history; we branch it off like a multiverse timeline. You're welcome, Doctor Strange.

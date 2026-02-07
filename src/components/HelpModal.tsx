@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { X, Heart, Coffee, ExternalLinkIcon } from 'lucide-react';
+import { X, Heart, Coffee, ExternalLinkIcon, Search, ListTodo, Brush, Puzzle, BookOpen, RotateCcw } from 'lucide-react';
 import logo from '../assets/logo_full.svg';
 import '../styles/HelpModal.css';
 
@@ -10,7 +10,7 @@ interface HelpModalProps {
 
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     const dialogRef = useRef<HTMLDivElement>(null);
-    const [appVersion, setAppVersion] = useState("1.1.7");
+    const [appVersion, setAppVersion] = useState("1.1.8");
 
     useEffect(() => {
         if ((window as any).api && (window as any).api.getAppVersion) {
@@ -54,22 +54,45 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                             <img src={logo} alt="Draftwolf Logo" className="logo-image" />
                         </div>
                         <p className="version">Version {appVersion}</p>
+                        <p className="about-tagline">Local version control for your files—no git required. Organize drafts, versions, and metadata in one place.</p>
                     </div>
 
                     <div className="help-section features">
                         <div className="feature-list">
-                            <div className="feature-item">
-                                <div className="feature-icon">🔍</div>
+                            <div className="feature-card">
+                                <div className="feature-icon">
+                                    <Search size={18} strokeWidth={2} />
+                                </div>
                                 <div className="feature-info">
                                     <h5>Inspector Panel</h5>
                                     <p>View properties, manage tasks, and handle version history for any selected file.</p>
                                 </div>
                             </div>
-                            <div className="feature-item">
-                                <div className="feature-icon">✅</div>
+                            <div className="feature-card">
+                                <div className="feature-icon">
+                                    <ListTodo size={18} strokeWidth={2} />
+                                </div>
                                 <div className="feature-info">
                                     <h5>Tasks & Metadata</h5>
                                     <p>Attach to-dos and reference images directly to specific files so you never lose context.</p>
+                                </div>
+                            </div>
+                            <div className="feature-card">
+                                <div className="feature-icon">
+                                    <Brush size={18} strokeWidth={2} />
+                                </div>
+                                <div className="feature-info">
+                                    <h5>Cleanup</h5>
+                                    <p>Merge or archive old versions and keep your workspace tidy without losing history.</p>
+                                </div>
+                            </div>
+                            <div className="feature-card">
+                                <div className="feature-icon">
+                                    <Puzzle size={18} strokeWidth={2} />
+                                </div>
+                                <div className="feature-info">
+                                    <h5>Extensions</h5>
+                                    <p>Connect Blender and other tools via plugins to integrate Draftwolf into your pipeline.</p>
                                 </div>
                             </div>
                         </div>
@@ -84,7 +107,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                             </div>
                             <div className="step">
                                 <span className="step-num">2</span>
-                                <p>Click the <strong>Versions</strong> tab <span className="icon-inline">📚</span>.</p>
+                                <p>Click the <strong>Versions</strong> tab <span className="icon-inline"><BookOpen size={12} /></span>.</p>
                             </div>
                             <div className="step">
                                 <span className="step-num">3</span>
@@ -92,7 +115,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                             </div>
                             <div className="step">
                                 <span className="step-num">4</span>
-                                <p>Use the <strong>Restore</strong> <span className="icon-inline">↺</span> button to revert changes anytime.</p>
+                                <p>Use the <strong>Restore</strong> <span className="icon-inline"><RotateCcw size={12} /></span> button to revert changes anytime.</p>
                             </div>
                         </div>
                     </div>

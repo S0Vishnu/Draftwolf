@@ -1,136 +1,100 @@
-/* UpdateModal.css */
-/* Minimal Slide-In Popup */
+/* UpdateModal.css – minimal restart-only popup */
 
 .update-modal-overlay {
-    /* No longer a full screen overlay, just a wrapper for positioning if needed, 
-       but we can also just target .update-modal if we remove the wrapper in TSX.
-       For now, let's make this a pass-through container so we don't break TSX structure yet. */
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: auto;
-    height: auto;
-    z-index: 9999;
-    pointer-events: none;
-    /* Let clicks pass through outside the modal */
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9999;
+  pointer-events: none;
 }
 
 .update-modal {
-    pointer-events: auto;
-    background: rgba(20, 20, 30, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 16px;
-    width: 320px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    /* Left align for minimal look */
-    text-align: left;
-
-    animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+  background: rgba(20, 20, 30, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  width: 220px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(20px) translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0) translateY(0);
-    }
+.update-modal-icon {
+  color: #8b5cf6;
+  flex-shrink: 0;
 }
 
-.update-modal h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-    color: #fff;
-    /* Removed gradients for minimal look, or keep it subtle */
+.update-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
-.update-modal p {
-    color: #94a3b8;
-    margin-bottom: 1rem;
-    font-size: 0.85rem;
-    line-height: 1.4;
+.update-modal-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
 }
 
-/* Adjust the icon container if present in TSX */
-.update-modal>div:first-child {
-    display: none;
-    /* Hide the large icon for minimal look */
+.update-modal-text {
+  font-size: 0.75rem;
+  color: #94a3b8;
 }
 
 .update-modal-actions {
-    display: flex;
-    gap: 8px;
-    width: 100%;
-    margin-top: 4px;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .btn-update-primary {
-    flex: 1;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: none;
-    background: #3b82f6;
-    color: white;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  background: #8b5cf6;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
 .btn-update-primary:hover {
-    background: #2563eb;
+  background: #7c3aed;
 }
 
 .btn-update-ignore {
-    flex: 1;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    background: transparent;
-    color: #94a3b8;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .btn-update-ignore:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
 }
 
-.progress-container {
-    width: 100%;
-    margin-top: 0.5rem;
-}
-
-.progress-bar {
-    height: 4px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background: #3b82f6;
-    transition: width 0.3s ease;
-}
-
-.progress-text {
-    margin-top: 4px;
-    font-size: 0.75rem;
-    color: #64748b;
-    text-align: right;
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }

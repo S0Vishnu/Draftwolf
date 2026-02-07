@@ -679,11 +679,10 @@ if (is.dev) {
     return false;
   });
 } else {
-  autoUpdater.autoDownload = false;
+  autoUpdater.autoDownload = true;
   autoUpdater.logger = log;
   log.transports.file.level = "info";
   log.info("App starting...");
-  autoUpdater.autoDownload = false;
   autoUpdater.allowPrerelease = true;
   autoUpdater.disableDifferentialDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;

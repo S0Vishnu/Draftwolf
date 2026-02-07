@@ -81,9 +81,9 @@ function App() {
       // ... existing handlers ...
       const cleanupAvailable = globalThis.api.updater.onAvailable((info: any) => {
         setUpdateState({
-          isOpen: true,
+          isOpen: false,
           version: info.version,
-          status: 'available',
+          status: 'downloading',
           progress: 0
         });
       });
@@ -97,12 +97,12 @@ function App() {
       });
 
       const cleanupDownloaded = globalThis.api.updater.onDownloaded((info: any) => {
-        setUpdateState((prev: any) => ({
-          ...prev,
+        setUpdateState({
+          isOpen: true,
           version: info.version,
           status: 'ready',
           progress: 100
-        }));
+        });
       });
 
       if (globalThis.api.updater.onError) {
@@ -128,19 +128,6 @@ function App() {
       };
     }
   }, []);
-
-  const handleUpdate = async () => {
-    try {
-      setUpdateState((prev: any) => ({ ...prev, status: 'downloading' }));
-      if (globalThis.api?.updater) {
-        await globalThis.api.updater.download();
-      }
-    } catch (e: any) {
-      console.error("Download failed to start:", e);
-      toast.error(`Download Error: ${e.message}`);
-      setUpdateState((prev: any) => ({ ...prev, isOpen: false, status: 'available' }));
-    }
-  };
 
   const handleIgnore = () => {
     setUpdateState((prev: any) => ({ ...prev, isOpen: false }));
@@ -196,9 +183,6 @@ function App() {
       <UpdateModal
         isOpen={updateState.isOpen}
         version={updateState.version}
-        status={updateState.status}
-        progress={updateState.progress}
-        onUpdate={handleUpdate}
         onIgnore={handleIgnore}
         onRestart={handleRestart}
       />

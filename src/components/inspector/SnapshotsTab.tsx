@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Trash2, RotateCcw, Download, GitCommit, Edit2, Archive, HardDrive } from 'lucide-react';
+import { Trash2, RotateCcw, Edit2, Archive, HardDrive } from 'lucide-react';
 import { FileEntry } from '../FileItem';
 import { Version } from './types';
 
@@ -36,7 +36,7 @@ const formatSize = (bytes?: number) => {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
 const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
@@ -63,7 +63,7 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
         const fetchStats = async () => {
             try {
                 // @ts-ignore
-                const s = await window.api.draft.getStorageStats(projectRoot);
+                const s = await globalThis.api.draft.getStorageReport(projectRoot);
                 setStats(s);
             } catch (e) {
                 console.error("Failed to fetch storage stats", e);
@@ -87,12 +87,12 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
                 parentId = history[index + 1].id;
             }
 
-            let laneIndex = lanes.findIndex(expectedId => expectedId === ver.id);
+            let laneIndex = lanes.indexOf(ver.id);
             if (laneIndex === -1) {
                 if (index === history.length - 1) {
                     laneIndex = 0;
                 } else {
-                    laneIndex = lanes.findIndex(l => l === null);
+                    laneIndex = lanes.indexOf(null);
                     if (laneIndex === -1) {
                         laneIndex = lanes.length;
                         lanes.push(null);
@@ -114,9 +114,7 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
                 y: index * ROW_HEIGHT + (ROW_HEIGHT / 2)
             });
 
-            if (parentId) {
-                const parentIndex = idToIndex.get(parentId);
-            }
+
         });
 
         // Second pass for links
@@ -144,30 +142,20 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
         <div className="versions-list">
             {/* Stats Header */}
             {stats && (
-                <div style={{
-                    padding: '12px',
-                    marginBottom: '8px',
-                    backgroundColor: '#1e1e24',
-                    borderRadius: '6px',
-                    border: '1px solid #2d2d38',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    fontSize: '13px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                <div className="snapshot-stats-container">
+                    <div className="stats-info-group">
                         <HardDrive size={16} className="text-muted" />
                         <div>
-                            <div style={{ color: '#8b8b95', fontSize: '11px' }}>Storage Used</div>
-                            <div style={{ fontWeight: 500, color: '#e0e0e0' }}>
+                            <div className="stats-label">Storage Used</div>
+                            <div className="stats-value">
                                 {formatSize(stats.totalCompressedSize)}
-                                <span style={{ opacity: 0.5, fontWeight: 400 }}> / {formatSize(stats.totalSize)}</span>
+                                <span className="stats-sub-text"> / {formatSize(stats.totalSize)}</span>
                             </div>
                         </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                        <div style={{ color: '#8b8b95', fontSize: '11px' }}>Efficiency</div>
-                        <div style={{ color: '#50fa7b', fontWeight: 600 }}>
+                    <div className="stats-efficiency-group">
+                        <div className="stats-label">Efficiency</div>
+                        <div className="stats-efficiency-value">
                             {stats.totalSize > 0
                                 ? Math.round((1 - (stats.totalCompressedSize / stats.totalSize)) * 100)
                                 : 0}% Saved
@@ -203,7 +191,7 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
             <div className="graph-container">
                 <svg className="version-graph-svg" style={{ height: Math.max(200, history.length * ROW_HEIGHT) }}>
                     {links.map((link, i) => {
-                        const dx = link.target.x - link.source.x;
+
                         const dy = link.target.y - link.source.y;
                         let d = '';
                         if (link.source.x === link.target.x) {

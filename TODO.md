@@ -8,19 +8,19 @@
 ## 🚀 Immediate Focus: Advanced Version Control (The "Snapshots" Engine)
 *Focus: Supporting the complex workflow of 3D/VFX artists.*
 
-- [ ] **Folder Versioning (Snapshots)**  
+- [x] **Folder Versioning (Snapshots)**  
   - Treat entire folders as atomic units to preserve dependencies (e.g., `.blend` files + textures).
   - Create recursive manifests for folder states.
 
-- [ ] **Content-Addressable Storage (CAS)**  
-  - [ ] **Deduplication**: Store files by SHA-256 hash. Never store duplicate data.
-  - [ ] **Compression**: Compress blobs (Zstd/Brotli) before writing to disk.
-  - [ ] **Garbage Collection**: Mechanism to prune orphaned blobs.
+- [x] **Content-Addressable Storage (CAS)**  
+  - [x] **Deduplication**: Store files by SHA-256 hash. Never store duplicate data.
+  - [x] **Compression**: Compress blobs (Zstd/Brotli) before writing to disk.
+  - [x] **Garbage Collection**: Mechanism to prune orphaned blobs.
 
-- [ ] **UI Updates**  
-  - [ ] Add "Snapshots" tab to Inspector Panel.
-  - [ ] Visualization for Folder History/Timeline.
-  - [ ] Storage usage stats (e.g., "Saved 2GB via compression").
+- [x] **UI Updates**  
+  - [x] Add "Snapshots" tab to Inspector Panel.
+  - [x] Visualization for Folder History/Timeline.
+  - [x] Storage usage stats (e.g., "Saved 2GB via compression").
 
 ---
 

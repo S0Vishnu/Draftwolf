@@ -32,6 +32,7 @@ interface VersionDetail {
     label: string;
     timestamp: string;
     totalSize: number;
+    files?: Record<string, string>;
 }
 
 type SortKey = 'path' | 'versionCount' | 'latestDate' | 'totalHistorySize' | 'label' | 'scope' | 'fileCount' | 'totalSize';
@@ -68,6 +69,7 @@ const Cleanup = () => {
     // Detail View State
     const [inspectingFile, setInspectingFile] = useState<FileReport | null>(null);
     const [fileVersions, setFileVersions] = useState<VersionDetail[]>([]);
+    const [selectedVersion, setSelectedVersion] = useState<VersionDetail | null>(null);
     const [versionsToDelete, setVersionsToDelete] = useState<Set<string>>(new Set());
 
     const rootDir = localStorage.getItem('rootDir');
@@ -103,9 +105,13 @@ const Cleanup = () => {
     const handleFileClick = async (file: FileReport) => {
         setInspectingFile(file);
         setVersionsToDelete(new Set());
+        setSelectedVersion(null);
         if (rootDir) {
             const history = await (window as any).api.draft.getHistory(rootDir, file.path);
             setFileVersions(history);
+            if (history.length > 0) {
+                setSelectedVersion(history[0]);
+            }
         }
     };
 
@@ -418,44 +424,76 @@ const Cleanup = () => {
                     </div>
                 </div>
 
-                <div className="version-list-wrapper">
-                    <table className="version-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: '50px' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={fileVersions.length > 0 && versionsToDelete.size === fileVersions.length}
-                                        onChange={toggleSelectAllVersions}
-                                        style={{ cursor: 'pointer' }}
-                                    />
-                                </th>
-                                <th>Version</th>
-                                <th>Label</th>
-                                <th>Date</th>
-                                <th>Size</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {fileVersions.map(v => (
-                                <tr key={v.id} className={versionsToDelete.has(v.id) ? 'selected-row' : ''}>
-                                    <td>
+                <div className="inspection-content" style={{ display: 'flex', gap: '2rem', height: 'calc(100vh - 200px)' }}>
+                    <div className="version-list-wrapper" style={{ flex: 1, overflowY: 'auto' }}>
+                        <h3>Version History</h3>
+                        <table className="version-table">
+                            <thead>
+                                <tr>
+                                    <th style={{ width: '40px' }}>
                                         <input
                                             type="checkbox"
-                                            checked={versionsToDelete.has(v.id)}
-                                            onChange={() => toggleVersionDeletion(v.id)}
+                                            checked={fileVersions.length > 0 && versionsToDelete.size === fileVersions.length}
+                                            onChange={toggleSelectAllVersions}
+                                            style={{ cursor: 'pointer' }}
                                         />
-                                    </td>
-                                    <td>
-                                        <span className="version-tag">{v.versionNumber}</span>
-                                    </td>
-                                    <td>{v.label || '-'}</td>
-                                    <td>{new Date(v.timestamp).toLocaleString()}</td>
-                                    <td>{formatBytes(v.totalSize || 0)}</td>
+                                    </th>
+                                    <th>Version</th>
+                                    <th>Label</th>
+                                    <th>Date</th>
+                                    <th>Size</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {fileVersions.map(v => (
+                                    <tr
+                                        key={v.id}
+                                        className={`${versionsToDelete.has(v.id) ? 'selected-row' : ''} ${selectedVersion?.id === v.id ? 'active-version-row' : ''}`}
+                                        onClick={() => setSelectedVersion(v)}
+                                        style={{ cursor: 'pointer', background: selectedVersion?.id === v.id ? 'var(--ev-c-bg-soft)' : undefined }}
+                                    >
+                                        <td onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={versionsToDelete.has(v.id)}
+                                                onChange={() => toggleVersionDeletion(v.id)}
+                                            />
+                                        </td>
+                                        <td>
+                                            <span className="version-tag">{v.versionNumber}</span>
+                                        </td>
+                                        <td>{v.label || '-'}</td>
+                                        <td>{new Date(v.timestamp).toLocaleString()}</td>
+                                        <td>{formatBytes(v.totalSize || 0)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="snapshot-contents-wrapper" style={{ flex: 1, overflowY: 'auto', background: 'var(--ev-c-bg-soft)', padding: '1rem', borderRadius: '8px' }}>
+                        <h3>Snapshot Contents {selectedVersion && <span style={{ fontSize: '0.8em', opacity: 0.7 }}>({selectedVersion.versionNumber})</span>}</h3>
+                        {!selectedVersion ? (
+                            <div className="empty-state" style={{ height: '200px' }}>
+                                <p>Select a version to view files</p>
+                            </div>
+                        ) : (
+                            <div className="snapshot-file-list">
+                                {selectedVersion.files && Object.keys(selectedVersion.files).length > 0 ? (
+                                    Object.keys(selectedVersion.files).sort().map((filePath, i) => (
+                                        <div key={i} className="snapshot-file-item" style={{ padding: '0.5rem', borderBottom: '1px solid var(--ev-c-border)', display: 'flex', alignItems: 'center' }}>
+                                            <span style={{ marginRight: '0.5rem', opacity: 0.7 }}>📄</span>
+                                            <span style={{ wordBreak: 'break-all' }}>{filePath}</span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="empty-state">
+                                        <p>No files in this version.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         );

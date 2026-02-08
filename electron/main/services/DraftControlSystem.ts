@@ -1177,15 +1177,63 @@ export class DraftControlSystem {
     const files: Record<string, {
       path: string;
       versionCount: number;
+      explicitCount: number;
+      snapshotCount: number;
       latestDate: string;
       latestVersionId: string;
       uniqueBlobs: Set<string>;
     }> = {};
 
+    const folderMap: Record<string, {
+      scope: string;
+      versionCount: number;
+      latestDate: string;
+      totalSize: number;
+      totalCompressedSize: number;
+      fileCount: number;
+    }> = {};
+
     for (const v of history) {
       if (!v.files) continue; // Safety check
       this.processManifestFiles(v, files);
+
+      // Process Snapshot (Folder Version)
+      if (v.scope) {
+        let snapSize = 0;
+        let snapCompressedSize = 0;
+
+        for (const hash of Object.values(v.files)) {
+          if (index.objects[hash]) {
+            snapSize += index.objects[hash].size;
+            snapCompressedSize += (index.objects[hash].compressedSize || index.objects[hash].size);
+          }
+        }
+
+        if (!folderMap[v.scope]) {
+          folderMap[v.scope] = {
+            scope: v.scope,
+            versionCount: 0,
+            latestDate: v.timestamp,
+            totalSize: 0,
+            totalCompressedSize: 0,
+            fileCount: 0
+          };
+        }
+
+        const f = folderMap[v.scope];
+        f.versionCount++;
+        f.totalSize += snapSize;
+        f.totalCompressedSize += snapCompressedSize;
+
+        // Update latest info
+        if (new Date(v.timestamp) >= new Date(f.latestDate) || f.versionCount === 1) {
+          f.latestDate = v.timestamp;
+          f.fileCount = Object.keys(v.files).length;
+        }
+      }
     }
+
+    const snapshots = Object.values(folderMap);
 
     const fileReports = Object.values(files).map(f => {
       let size = 0;
@@ -1199,6 +1247,8 @@ export class DraftControlSystem {
       return {
         path: f.path,
         versionCount: f.versionCount,
+        explicitCount: f.explicitCount,
+        snapshotCount: f.snapshotCount,
         latestDate: f.latestDate,
         totalHistorySize: size,
         totalCompressedSize: compressedSize
@@ -1220,7 +1270,8 @@ export class DraftControlSystem {
       totalCompressedSize,
       compressionRatio: totalSize > 0 ? (totalCompressedSize / totalSize).toFixed(2) : 1,
       fileCount: fileReports.length,
-      files: fileReports.sort((a, b) => b.totalHistorySize - a.totalHistorySize)
+      files: fileReports.sort((a, b) => b.totalHistorySize - a.totalHistorySize),
+      snapshots: snapshots.sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime())
     };
   }
 
@@ -1233,6 +1284,8 @@ export class DraftControlSystem {
         files[normPath] = {
           path: normPath,
           versionCount: 0,
+          explicitCount: 0,
+          snapshotCount: 0,
           latestDate: v.timestamp,
           latestVersionId: v.id,
           uniqueBlobs: new Set()
@@ -1240,6 +1293,11 @@ export class DraftControlSystem {
       }
 
       files[normPath].versionCount++;
+      if (v.scope) {
+        files[normPath].snapshotCount++;
+      } else {
+        files[normPath].explicitCount++;
+      }
       files[normPath].uniqueBlobs.add(hash);
 
       if (new Date(v.timestamp) > new Date(files[normPath].latestDate)) {

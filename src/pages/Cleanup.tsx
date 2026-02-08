@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
-import { Trash2, Search, ArrowLeft, ArrowUp, ArrowDown, Filter, CheckSquare, Square, ChevronDown } from 'lucide-react';
+import { Trash2, Search, ArrowLeft, ArrowUp, ArrowDown, Filter, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Cleanup.css';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -11,8 +11,19 @@ import ConfirmDialog from '../components/ConfirmDialog';
 interface FileReport {
     path: string;
     versionCount: number;
+    explicitCount?: number;
+    snapshotCount?: number;
     latestDate: string;
     totalHistorySize: number;
+}
+
+interface SnapshotReport {
+    scope: string;
+    versionCount: number;
+    latestDate: string;
+    fileCount: number;
+    totalSize: number;
+    totalCompressedSize: number;
 }
 
 interface VersionDetail {
@@ -23,14 +34,25 @@ interface VersionDetail {
     totalSize: number;
 }
 
-type SortKey = 'path' | 'versionCount' | 'latestDate' | 'totalHistorySize';
+type SortKey = 'path' | 'versionCount' | 'latestDate' | 'totalHistorySize' | 'label' | 'scope' | 'fileCount' | 'totalSize';
 type SortDirection = 'asc' | 'desc';
+
+function formatBytes(bytes: number, decimals = 2) {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
 
 const Cleanup = () => {
     const navigate = useNavigate();
     const [user] = useAuthState(auth);
     const [storageReport, setStorageReport] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
+
+    const [activeTab, setActiveTab] = useState<'versioned' | 'snapshots'>('versioned');
 
     // Filter & Sort State
     const [searchTerm, setSearchTerm] = useState('');
@@ -137,14 +159,8 @@ const Cleanup = () => {
         }
     };
 
-    function formatBytes(bytes: number, decimals = 2) {
-        if (!+bytes) return '0 Bytes';
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-    }
+
+
 
     const handleSort = (key: SortKey) => {
         setSortConfig(current => ({
@@ -161,10 +177,24 @@ const Cleanup = () => {
         }
     };
 
-    const filteredAndSortedFiles = useMemo(() => {
-        if (!storageReport?.files) return [];
 
-        let result = storageReport.files;
+
+    const filteredReport = useMemo(() => {
+        if (!storageReport) return { versioned: [], snapshots: [] };
+
+        // Versioned Files: Files with explicit versions
+        const versioned = storageReport.files ? storageReport.files.filter((f: FileReport) => (f.explicitCount !== undefined ? f.explicitCount > 0 : true)) : [];
+
+        // Snapshots: Folder Snapshots from backend
+        const snapshots = storageReport.snapshots || [];
+
+        return { versioned, snapshots };
+    }, [storageReport]);
+
+    const activeList = activeTab === 'versioned' ? filteredReport.versioned : filteredReport.snapshots;
+
+    const filteredAndSortedFiles = useMemo(() => {
+        let result = activeList;
 
         // 1. Search
         if (searchTerm) {
@@ -186,19 +216,37 @@ const Cleanup = () => {
         }
 
         // 3. Sort
+        // 3. Sort
         return [...result].sort((a: any, b: any) => {
             let aValue = a[sortConfig.key];
             let bValue = b[sortConfig.key];
 
-            if (sortConfig.key === 'totalHistorySize' || sortConfig.key === 'versionCount') {
+            // Map inconsistent keys if needed or ensure data structure matches
+            // For snapshots, we use 'label', 'scope', 'fileCount', 'totalSize', 'timestamp'
+
+            if (activeTab === 'snapshots') {
+                if (sortConfig.key === 'path') aValue = a.scope;
+                if (sortConfig.key === 'path') bValue = b.scope;
+
+                if (sortConfig.key === 'latestDate') aValue = a.latestDate;
+                if (sortConfig.key === 'latestDate') bValue = b.latestDate;
+
+                if (sortConfig.key === 'totalHistorySize') aValue = a.totalSize;
+                if (sortConfig.key === 'totalHistorySize') bValue = b.totalSize;
+
+                if (sortConfig.key === 'versionCount') aValue = a.versionCount;
+                if (sortConfig.key === 'versionCount') bValue = b.versionCount;
+            }
+
+            if (typeof aValue === 'number' && typeof bValue === 'number') {
                 return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
             }
             return sortConfig.direction === 'asc' ?
-                String(aValue).localeCompare(String(bValue)) :
-                String(bValue).localeCompare(String(aValue));
+                String(aValue || '').localeCompare(String(bValue || '')) :
+                String(bValue || '').localeCompare(String(aValue || ''));
         });
 
-    }, [storageReport, searchTerm, extensionFilter, extensionMode, sortConfig]);
+    }, [activeList, searchTerm, extensionFilter, extensionMode, sortConfig]);
 
     const renderStorageDetail = () => {
         if (!rootDir) {
@@ -225,9 +273,26 @@ const Cleanup = () => {
                     </div>
                     <div className="stat-card">
                         <h3>Versioned Files</h3>
-                        <div className="big-value">{storageReport.fileCount}</div>
+                        <div className="big-value">{filteredReport.versioned.length}</div>
                     </div>
                 </div>
+
+                <div className="cleanup-tabs">
+                    <button
+                        className={`cleanup-tab ${activeTab === 'versioned' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('versioned')}
+                    >
+                        Versioned Files ({filteredReport.versioned.length})
+                    </button>
+                    <button
+                        className={`cleanup-tab ${activeTab === 'snapshots' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('snapshots')}
+                        title="Folder Snapshots"
+                    >
+                        Folder Snapshots ({filteredReport.snapshots.length})
+                    </button>
+                </div>
+
 
                 <div className="filter-toolbar">
                     <div className="filter-group">
@@ -269,30 +334,62 @@ const Cleanup = () => {
 
                 <div className="file-list-container">
                     <div className="file-list-header">
-                        <div className="header-cell sortable" onClick={() => handleSort('path')}>
-                            File Path {sortConfig.key === 'path' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
-                        </div>
-                        <div className="header-cell sortable" onClick={() => handleSort('versionCount')}>
-                            Versions {sortConfig.key === 'versionCount' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
-                        </div>
-                        <div className="header-cell sortable" onClick={() => handleSort('latestDate')}>
-                            Last Modified {sortConfig.key === 'latestDate' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
-                        </div>
-                        <div className="header-cell sortable" onClick={() => handleSort('totalHistorySize')}>
-                            History Size {sortConfig.key === 'totalHistorySize' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
-                        </div>
+                        {activeTab === 'versioned' ? (
+                            <>
+                                <div className="header-cell sortable" onClick={() => handleSort('path')}>
+                                    File Path {sortConfig.key === 'path' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                </div>
+                                <div className="header-cell sortable" onClick={() => handleSort('versionCount')}>
+                                    Versions {sortConfig.key === 'versionCount' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                </div>
+                                <div className="header-cell sortable" onClick={() => handleSort('latestDate')}>
+                                    Last Modified {sortConfig.key === 'latestDate' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                </div>
+                                <div className="header-cell sortable" onClick={() => handleSort('totalHistorySize')}>
+                                    History Size {sortConfig.key === 'totalHistorySize' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="header-cell sortable" onClick={() => handleSort('path')} style={{ flex: 3 }}>
+                                    Folder Name {sortConfig.key === 'path' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                </div>
+                                <div className="header-cell sortable" onClick={() => handleSort('versionCount')}>
+                                    Versions {sortConfig.key === 'versionCount' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                </div>
+                                <div className="header-cell sortable" onClick={() => handleSort('latestDate')}>
+                                    Date {sortConfig.key === 'latestDate' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                </div>
+                                <div className="header-cell sortable" onClick={() => handleSort('totalHistorySize')}>
+                                    Size {sortConfig.key === 'totalHistorySize' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                </div>
+                            </>
+                        )}
                     </div>
                     <div className="file-list">
-                        {filteredAndSortedFiles.map((file: FileReport, index: number) => (
-                            <div key={index} className="file-row clickable" onClick={() => handleFileClick(file)}>
-                                <span className="file-path" title={file.path}>{file.path}</span>
-                                <span className="file-versions">
-                                    <span className="badge">{file.versionCount}</span>
-                                </span>
-                                <span className="file-date">{new Date(file.latestDate).toLocaleDateString()}</span>
-                                <span className="file-size">{formatBytes(file.totalHistorySize)}</span>
-                            </div>
-                        ))}
+                        {activeTab === 'versioned' ? (
+                            filteredAndSortedFiles.map((file: FileReport, index: number) => (
+                                <div key={index} className="file-row clickable" onClick={() => handleFileClick(file)}>
+                                    <span className="file-path" title={file.path}>{file.path}</span>
+                                    <span className="file-versions">
+                                        <span className="badge">{file.versionCount}</span>
+                                    </span>
+                                    <span className="file-date">{new Date(file.latestDate).toLocaleDateString()}</span>
+                                    <span className="file-size">{formatBytes(file.totalHistorySize)}</span>
+                                </div>
+                            ))
+                        ) : (
+                            filteredAndSortedFiles.map((snap: any, index: number) => (
+                                <div key={snap.scope} className="file-row clickable" onClick={() => handleFileClick({ ...snap, path: snap.scope, totalHistorySize: snap.totalSize })} style={{ gridTemplateColumns: '3fr 1fr 1.5fr 1fr' }}>
+                                    <span className="file-path" title={snap.scope} style={{ fontWeight: 700 }}>{snap.scope}</span>
+                                    <span className="file-versions">
+                                        <span className="badge">{snap.versionCount}</span>
+                                    </span>
+                                    <span className="file-date">{new Date(snap.latestDate).toLocaleDateString()}</span>
+                                    <span className="file-size">{formatBytes(snap.totalSize)}</span>
+                                </div>
+                            ))
+                        )}
                         {filteredAndSortedFiles.length === 0 && (
                             <div className="empty-state">
                                 <Search size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
@@ -301,7 +398,7 @@ const Cleanup = () => {
                         )}
                     </div>
                 </div>
-            </div>
+            </div >
         );
     };
 

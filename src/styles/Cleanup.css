@@ -706,3 +706,41 @@ input[type="checkbox"]:checked:hover {
         transform: rotate(360deg);
     }
 }
+
+.cleanup-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cleanup-tab {
+    background: transparent;
+    border: none;
+    color: var(--ev-c-text-2);
+    padding: 0.75rem 0.25rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.cleanup-tab:hover {
+    color: var(--ev-c-text-1);
+}
+
+.cleanup-tab.active {
+    color: #a5b4fc;
+    font-weight: 500;
+}
+
+.cleanup-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #a5b4fc;
+    border-radius: 2px 2px 0 0;
+}

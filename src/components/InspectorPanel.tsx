@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     X, Info, Layers, Paperclip,
-    CheckCircle, Plus
+    CheckCircle, Plus, HardDrive
 } from 'lucide-react';
 import '../styles/InspectorPanel.css';
 import { toast } from 'react-toastify';
@@ -10,6 +10,7 @@ import ConfirmDialog from './ConfirmDialog';
 import TodoList, { TodoItem, Priority } from './TodoList';
 import InfoTab from './inspector/InfoTab';
 import VersionsTab from './inspector/VersionsTab';
+import SnapshotsTab from './inspector/SnapshotsTab';
 import AttachmentsTab from './inspector/AttachmentsTab';
 import { InspectorPanelProps, AttachmentItem, InspectorTab } from './inspector/types';
 
@@ -51,6 +52,15 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             setActiveTab(initialTab);
         }
     }, [initialTab]);
+
+    // Auto-switch between Versions and Snapshots depending on file type
+    useEffect(() => {
+        if (file?.isDirectory && activeTab === 'versions') {
+            setActiveTab('snapshots');
+        } else if (!file?.isDirectory && activeTab === 'snapshots') {
+            setActiveTab('versions');
+        }
+    }, [file?.isDirectory, activeTab]);
 
     // Confirm Dialog State
     const [confirmState, setConfirmState] = useState({
@@ -174,15 +184,16 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     }, [isResizing]);
 
 
-    // Versions
+    // Versions & Snapshots
     useEffect(() => {
-        if ((activeTab === 'versions' || activeTab === 'tasks') && projectRoot && file) {
+        if ((activeTab === 'versions' || activeTab === 'tasks' || activeTab === 'snapshots') && projectRoot && file) {
             const loadVersions = async () => {
-                const relPath = getRelativePath();
-                if (!relPath) {
+                let relPath = getRelativePath();
+                if (relPath === null) {
                     setHistory([]);
                     return;
                 }
+                if (relPath === '') relPath = '.'; // Handle root directory
 
                 try {
                     const filtered = await window.api.draft.getHistory(projectRoot, relPath);
@@ -205,7 +216,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         // We generally don't want to clear history immediately if switching to other tabs 
         // to avoid flicker if we switch back, but strictly following previous logic for now
         // just expanding the inclusion criteria. 
-        else if (activeTab !== 'versions' && activeTab !== 'tasks') {
+        else if (activeTab !== 'versions' && activeTab !== 'tasks' && activeTab !== 'snapshots') {
             setHistory([]);
         }
     }, [activeTab, projectRoot, file, getRelativePath]);
@@ -256,6 +267,39 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             }
         } catch (e) {
             console.error(e);
+        }
+        setLoading(false);
+    };
+
+    const handleCreateSnapshot = async () => {
+        if (!versionLabel || !projectRoot || !file) return;
+        setLoading(true);
+        try {
+            // Use logical relative path or . for root
+            const relPath = getRelativePath() || '.';
+            const result = await window.api.draft.createSnapshot(projectRoot, relPath, versionLabel);
+
+            if (result && result.success && result.versionId) {
+                setActiveVersionId(result.versionId);
+                toast.success("Snapshot created successfully");
+            } else {
+                toast.error("Failed to create snapshot");
+            }
+
+            setVersionLabel('');
+            setIsCreating(false);
+
+            // Refresh history
+            const refreshScope = getRelativePath();
+            if (refreshScope !== null) {
+                const p = refreshScope === '' ? '.' : refreshScope;
+                const filtered = await window.api.draft.getHistory(projectRoot, p);
+                setHistory(filtered);
+                onRefresh?.();
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Error creating snapshot");
         }
         setLoading(false);
     };
@@ -327,7 +371,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     const handleDownload = async (ver: any, customVerNum: number) => {
         if (!file || !projectRoot) return;
         const relativePath = getRelativePath();
-        if (!relativePath) return;
+        if (relativePath === null) return;
 
         const parts = file.name.split('.');
         let nameWithoutExt = file.name;
@@ -377,8 +421,9 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 await window.api.draft.delete(projectRoot, vId);
 
                 const relPath = getRelativePath();
-                if (relPath) {
-                    const filtered = await window.api.draft.getHistory(projectRoot, relPath);
+                if (relPath !== null) {
+                    const p = relPath === '' ? '.' : relPath;
+                    const filtered = await window.api.draft.getHistory(projectRoot, p);
                     setHistory(filtered);
                     onRefresh?.();
                 } else {
@@ -413,8 +458,9 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
                     // Refresh the history
                     const relPath = getRelativePath();
-                    if (relPath) {
-                        const filtered = await window.api.draft.getHistory(projectRoot, relPath);
+                    if (relPath !== null) {
+                        const p = relPath === '' ? '.' : relPath;
+                        const filtered = await window.api.draft.getHistory(projectRoot, p);
                         setHistory(filtered);
                     } else {
                         setHistory([]);
@@ -438,8 +484,9 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
             // Refresh the history
             const relPath = getRelativePath();
-            if (relPath) {
-                const filtered = await window.api.draft.getHistory(projectRoot, relPath);
+            if (relPath !== null) {
+                const p = relPath === '' ? '.' : relPath;
+                const filtered = await window.api.draft.getHistory(projectRoot, p);
                 setHistory(filtered);
             }
         } catch (e) {
@@ -626,6 +673,25 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                         onRename={handleRenameVersion}
                     />
                 );
+            case 'snapshots':
+                return (
+                    <SnapshotsTab
+                        history={history}
+                        isCreating={isCreating}
+                        setIsCreating={setIsCreating}
+                        versionLabel={versionLabel}
+                        setVersionLabel={setVersionLabel}
+                        onCreateVersion={handleCreateSnapshot}
+                        loading={loading}
+                        activeVersionId={activeVersionId}
+                        file={file}
+                        onDownload={handleDownload}
+                        onDelete={handleDeleteVersion}
+                        onRestore={handleRestore}
+                        onRename={handleRenameVersion}
+                        projectRoot={projectRoot}
+                    />
+                );
             case 'attachments':
                 return (
                     <AttachmentsTab
@@ -666,13 +732,24 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                     <CheckCircle size={18} />
                 </button>
 
-                <button
-                    className={`sidebar-icon-btn ${activeTab === 'versions' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('versions')}
-                    title="Versions"
-                >
-                    <Layers size={18} />
-                </button>
+                {!file?.isDirectory && (
+                    <button
+                        className={`sidebar-icon-btn ${activeTab === 'versions' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('versions')}
+                        title="Versions"
+                    >
+                        <Layers size={18} />
+                    </button>
+                )}
+                {file?.isDirectory && (
+                    <button
+                        className={`sidebar-icon-btn ${activeTab === 'snapshots' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('snapshots')}
+                        title="Snapshots"
+                    >
+                        <HardDrive size={18} />
+                    </button>
+                )}
                 <button
                     className={`sidebar-icon-btn ${activeTab === 'attachments' ? 'active' : ''}`}
                     onClick={() => setActiveTab('attachments')}
@@ -697,9 +774,10 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                     <h3>
                         {activeTab === 'versions' ? 'Versions' :
                             activeTab === 'tasks' ? 'Tasks' :
-                                activeTab === 'attachments' ? 'Attachments' : 'Details'}
+                                activeTab === 'attachments' ? 'Attachments' :
+                                    activeTab === 'snapshots' ? 'Snapshots' : 'Details'}
                     </h3>
-                    {activeTab === 'versions' && (
+                    {(activeTab === 'versions' || activeTab === 'snapshots') && (
                         <div style={{ display: 'flex', gap: 8 }}>
                             {history.length > 1 && (
                                 <button
@@ -736,35 +814,37 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
             />
 
-            {previewImage && (
-                <div
-                    className="image-preview-modal"
-                    style={{
-                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                        backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        animation: 'fadeIn 0.2s ease'
-                    }}
-                    onClick={() => setPreviewImage(null)}
-                >
-                    <button
-                        onClick={() => setPreviewImage(null)}
+            {
+                previewImage && (
+                    <div
+                        className="image-preview-modal"
                         style={{
-                            position: 'absolute', top: 20, right: 20,
-                            background: 'none', border: 'none', color: 'white', cursor: 'pointer'
+                            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                            backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            animation: 'fadeIn 0.2s ease'
                         }}
+                        onClick={() => setPreviewImage(null)}
                     >
-                        <X size={32} />
-                    </button>
-                    <img
-                        src={previewImage}
-                        alt="Preview"
-                        style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-                        onClick={e => e.stopPropagation()}
-                    />
-                </div>
-            )}
-        </aside>
+                        <button
+                            onClick={() => setPreviewImage(null)}
+                            style={{
+                                position: 'absolute', top: 20, right: 20,
+                                background: 'none', border: 'none', color: 'white', cursor: 'pointer'
+                            }}
+                        >
+                            <X size={32} />
+                        </button>
+                        <img
+                            src={previewImage}
+                            alt="Preview"
+                            style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+                            onClick={e => e.stopPropagation()}
+                        />
+                    </div>
+                )
+            }
+        </aside >
     );
 };
 

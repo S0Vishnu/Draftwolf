@@ -1,7 +1,7 @@
 import { FileEntry } from '../FileItem';
 import { TodoItem } from '../TodoList';
 
-export type InspectorTab = 'info' | 'tasks' | 'versions' | 'attachments';
+export type InspectorTab = 'info' | 'tasks' | 'versions' | 'attachments' | 'snapshots';
 
 export interface InspectorPanelProps {
     file: FileEntry | null;
@@ -27,6 +27,7 @@ export interface Version {
     timestamp: number | string;
     files: Record<string, string>;
     totalSize?: number;
+    totalCompressedSize?: number;
     parent?: string;
     parents?: string[];
     parentId?: string;

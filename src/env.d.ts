@@ -44,6 +44,7 @@ interface Window {
     draft: {
       init: (projectRoot: string) => Promise<boolean>;
       commit: (projectRoot: string, label: string, files: string[]) => Promise<{ success: boolean; versionId?: string; error?: string }>;
+      createSnapshot: (projectRoot: string, folderPath: string, label: string) => Promise<{ success: boolean; versionId?: string; error?: string }>;
       getHistory: (projectRoot: string, relativePath?: string) => Promise<{ id: string; label: string; timestamp: string | number; files: Record<string, string>; totalSize?: number; parent?: string; parents?: string[]; parentId?: string }[]>;
       restore: (projectRoot: string, versionId: string) => Promise<{ success: boolean; error?: string; code?: string }>;
       delete: (projectRoot: string, versionId: string) => Promise<boolean>;

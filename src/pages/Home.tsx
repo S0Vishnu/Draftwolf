@@ -313,11 +313,14 @@ const Home = () => {
             let latestVersion: string | undefined;
             let tags: string[] = [];
 
-            if (rootDir && entry.path.startsWith(rootDir) && !stats?.isDirectory) {
+            if (rootDir && entry.path.startsWith(rootDir)) {
                 // Calculate relative path
                 let rel = entry.path.substring(rootDir.length);
                 if (rel.startsWith('\\') || rel.startsWith('/')) rel = rel.substring(1);
 
+                // Get version info for both files and directories
+                // Note: For directories, getFileVersion (backed by getLatestVersionForFile)
+                // relies on getHistory being able to detect folder snapshots.
                 const v = await window.api.draft.getFileVersion(rootDir, rel);
                 if (v) latestVersion = v;
 

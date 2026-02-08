@@ -128,6 +128,20 @@ async function handleRenameVersion(res: http.ServerResponse, body: PostBody): Pr
     sendJson(res, 200, { success: true });
 }
 
+async function handleCreateSnapshot(res: http.ServerResponse, body: PostBody): Promise<void> {
+    const dcs = new DraftControlSystem(body.projectRoot!);
+    // limit snapshot to specific folder if provided, or root
+    const targetFolder = body.relativePath || '.';
+    const versionId = await dcs.createSnapshot(targetFolder, body.label!);
+    sendJson(res, 200, { success: true, versionId });
+}
+
+async function handleStorageStats(res: http.ServerResponse, body: PostBody): Promise<void> {
+    const dcs = new DraftControlSystem(body.projectRoot!);
+    const stats = await dcs.getStorageReport();
+    sendJson(res, 200, stats);
+}
+
 function sendJson(res: http.ServerResponse, status: number, data: object): void {
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
@@ -145,6 +159,8 @@ const ROUTES: Record<string, RouteHandler | (() => Promise<void>)> = {
     [routeKey('POST', '/draft/extract-temp')]: (res, body) => handleExtractTemp(res, body),
     [routeKey('POST', '/draft/restore')]: (res, body) => handleRestore(res, body),
     [routeKey('POST', '/draft/rename-version')]: (res, body) => handleRenameVersion(res, body),
+    [routeKey('POST', '/draft/snapshot/create')]: (res, body) => handleCreateSnapshot(res, body),
+    [routeKey('POST', '/draft/storage/stats')]: (res, body) => handleStorageStats(res, body),
 };
 
 async function dispatchRequest(

@@ -40,6 +40,7 @@ const api = {
   draft: {
     init: (projectRoot) => electronAPI.ipcRenderer.invoke('draft:init', projectRoot),
     commit: (projectRoot, label, files) => electronAPI.ipcRenderer.invoke('draft:commit', { projectRoot, label, files }),
+    createSnapshot: (projectRoot, folderPath, label) => electronAPI.ipcRenderer.invoke('draft:createSnapshot', { projectRoot, folderPath, label }),
     getHistory: (projectRoot, relativePath) => electronAPI.ipcRenderer.invoke('draft:history', { projectRoot, relativePath }),
     restore: (projectRoot, versionId) => electronAPI.ipcRenderer.invoke('draft:restore', { projectRoot, versionId }),
     delete: (projectRoot, versionId) => electronAPI.ipcRenderer.invoke('draft:delete', { projectRoot, versionId }),

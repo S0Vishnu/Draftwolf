@@ -1,16 +1,18 @@
-
 import fs from 'fs/promises';
-import { createReadStream, existsSync } from 'fs';
+import { createReadStream, createWriteStream, existsSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { pipeline } from 'stream/promises';
+import { createBrotliCompress, createBrotliDecompress } from 'zlib';
 
 // --- Types ---
 
 export type Hash = string;
 
 export interface FileMetadata {
-  size: number;
+  size: number; // Original size
+  compressedSize: number; // Size on disk (in objects/)
+  isCompressed: boolean;
   refCount: number;
   path?: string; // Original relative path for debugging/recovery
 }
@@ -29,14 +31,19 @@ export interface VersionManifest {
   files: Record<string, Hash>;
   fileIds?: Record<string, string>; // Mapping of relativePath -> unique file ID
   parentId: string | null;
+  totalSize?: number;
+  totalCompressedSize?: number;
+  scope?: string; // The relative folder path this snapshot was created for
 }
 
 export interface FileMetadataStore {
   id: string;
   path: string;
   previousPaths: string[];
+  renamedTo?: string;
   tags?: string[];
   tasks?: any[];
+  attachments?: any[];
   [key: string]: any;
 }
 
@@ -341,47 +348,65 @@ export class DraftControlSystem {
   /**
    * Create a new version snapshot.
    */
-  async commit(label: string, filesToTrack: string[]): Promise<string> {
+  /**
+   * Create a new snapshot of a folder.
+   */
+  async createSnapshot(folderPath: string, label: string): Promise<string> {
     await this.init();
     const index = await this.readIndex();
     const fileHashes: Record<string, Hash> = {};
     const fileIds: Record<string, string> = {};
     const newObjects: Record<Hash, FileMetadata> = {};
 
-    // 1. Hash files and store new blobs
-    for (const filePath of filesToTrack) {
-      const relativePath = path.isAbsolute(filePath)
-        ? path.relative(this.projectRoot, filePath)
-        : filePath;
-
-      const fullPath = path.join(this.projectRoot, relativePath);
-
-      if (!existsSync(fullPath)) continue;
-
-      const hash = await this.hashFile(fullPath);
-      const stats = await fs.stat(fullPath);
-      const id = await this.getOrCreateFileId(relativePath);
-
-      fileHashes[relativePath] = hash;
-
-      // Validation: Ensure ID is preserved/created
-      if (!id) {
-        console.error(`[DraftControl] Failed to generate ID for ${relativePath}`);
-      }
-      fileIds[relativePath] = id;
-
-      const blobPath = path.join(this.objectsPath, hash);
-      if (!index.objects[hash] || !existsSync(blobPath)) {
-        await this.copyFileToBlob(fullPath, blobPath);
-        newObjects[hash] = {
-          size: stats.size,
-          refCount: 0,
-          path: relativePath
-        };
-      }
+    // Normalize folderPath to be relative and use forward slashes
+    let scope = this.normalizePath(folderPath);
+    if (path.isAbsolute(folderPath) && folderPath.startsWith(this.projectRoot)) {
+      scope = this.normalizePath(path.relative(this.projectRoot, folderPath));
     }
+    if (scope === '') scope = '.';
 
-    // 2. Determine Version Number
+    // 1. Recursively scan and process files
+    const scanDir = async (dir: string) => {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        const relativePath = path.relative(this.projectRoot, fullPath);
+
+        if (entry.isDirectory()) {
+          if (entry.name !== '.draft') { // Skip .draft folder
+            await scanDir(fullPath);
+          }
+        } else if (entry.isFile()) {
+          // Process file
+          const { hash, originalSize, compressedSize } = await this.addFileToCAS(fullPath);
+
+          // Get or create ID
+          const id = await this.getOrCreateFileId(relativePath);
+
+          fileHashes[relativePath] = hash;
+          fileIds[relativePath] = id;
+
+          if (!index.objects[hash]) {
+            newObjects[hash] = {
+              size: originalSize,
+              compressedSize: compressedSize,
+              isCompressed: true,
+              refCount: 0,
+              path: relativePath
+            };
+          }
+        }
+      }
+    };
+
+    const absoluteScanPath = path.resolve(this.projectRoot, scope);
+    if (!existsSync(absoluteScanPath)) {
+      // If it was meant to be ".", and doesn't exist? (unlikely)
+      throw new Error(`Path not found: ${absoluteScanPath}`);
+    }
+    await scanDir(absoluteScanPath);
+
+    // 2. Determine Version Number (Same logic as commit)
     let nextVerNum = "1.0";
     const parentId = index.currentHead;
 
@@ -399,23 +424,20 @@ export class DraftControlSystem {
         if (index.currentHead === index.latestVersion) {
           nextVerNum = (pMajor + 1).toString();
         } else {
-          const allManifests = await this.getHistory();
+          const allManifests = await this.getHistory(); // Could optimize
           let maxMinor = pMinor;
           for (const m of allManifests) {
             const mParts = m.versionNumber.split('.');
             const mMajor = parseInt(mParts[0]);
             const mMinor = mParts.length > 1 ? parseInt(mParts[1]) : 0;
-
-            if (mMajor === pMajor) {
-              if (mMinor > maxMinor) maxMinor = mMinor;
-            }
+            if (mMajor === pMajor && mMinor > maxMinor) maxMinor = mMinor;
           }
           nextVerNum = `${pMajor}.${maxMinor + 1}`;
         }
       }
     }
 
-    // 2b. Create Version Manifest
+    // 3. Create Version Manifest
     const versionId = `v${Date.now()}`;
     const manifest: VersionManifest = {
       id: versionId,
@@ -424,12 +446,13 @@ export class DraftControlSystem {
       timestamp: new Date().toISOString(),
       files: fileHashes,
       fileIds: fileIds,
-      parentId: parentId || null
+      parentId: parentId || null,
+      scope: scope
     };
 
     await this.writeJson(path.join(this.versionsPath, `${versionId}.json`), manifest);
 
-    // 3. Update Index
+    // 4. Update Index
     Object.assign(index.objects, newObjects);
 
     for (const hash of Object.values(fileHashes)) {
@@ -446,6 +469,104 @@ export class DraftControlSystem {
   }
 
   /**
+   * Create a new version snapshot (Legacy/Single File support).
+   */
+  async commit(label: string, filesToTrack: string[]): Promise<string> {
+    // Re-implemented to reuse addFileToCAS logic for consistency
+    await this.init();
+    const index = await this.readIndex();
+    const fileHashes: Record<string, Hash> = {};
+    const fileIds: Record<string, string> = {};
+    const newObjects: Record<Hash, FileMetadata> = {};
+
+    for (const filePath of filesToTrack) {
+      const relativePath = path.isAbsolute(filePath)
+        ? path.relative(this.projectRoot, filePath)
+        : filePath;
+
+      const fullPath = path.join(this.projectRoot, relativePath);
+
+      if (!existsSync(fullPath)) continue;
+
+      const { hash, originalSize, compressedSize } = await this.addFileToCAS(fullPath);
+      const id = await this.getOrCreateFileId(relativePath);
+
+      fileHashes[relativePath] = hash;
+      fileIds[relativePath] = id;
+
+      if (!index.objects[hash]) {
+        newObjects[hash] = {
+          size: originalSize,
+          compressedSize: compressedSize,
+          isCompressed: true,
+          refCount: 0,
+          path: relativePath
+        };
+      }
+    }
+
+    // Version Number Logic (Duplicate of createSnapshot - could be extracted)
+    let nextVerNum = "1.0";
+    const parentId = index.currentHead;
+
+    if (parentId) {
+      let parentManifest: VersionManifest | null = null;
+      try {
+        parentManifest = await this.readJson(path.join(this.versionsPath, `${parentId}.json`));
+      } catch (e) { /* ignore */ }
+
+      if (parentManifest) {
+        const parts = parentManifest.versionNumber.split('.');
+        const pMajor = parseInt(parts[0]);
+        const pMinor = parts.length > 1 ? parseInt(parts[1]) : 0;
+
+        if (index.currentHead === index.latestVersion) {
+          nextVerNum = (pMajor + 1).toString();
+        } else {
+          const allManifests = await this.getHistory(); // Warning: performance check needed
+          let maxMinor = pMinor;
+          for (const m of allManifests) {
+            const mParts = m.versionNumber.split('.');
+            const mMajor = parseInt(mParts[0]);
+            const mMinor = mParts.length > 1 ? parseInt(mParts[1]) : 0;
+            if (mMajor === pMajor) {
+              if (mMinor > maxMinor) maxMinor = mMinor;
+            }
+          }
+          nextVerNum = `${pMajor}.${maxMinor + 1}`;
+        }
+      }
+    }
+
+    const versionId = `v${Date.now()}`;
+    const manifest: VersionManifest = {
+      id: versionId,
+      versionNumber: nextVerNum,
+      label,
+      timestamp: new Date().toISOString(),
+      files: fileHashes,
+      fileIds: fileIds,
+      parentId: parentId || null
+    };
+
+    await this.writeJson(path.join(this.versionsPath, `${versionId}.json`), manifest);
+
+    Object.assign(index.objects, newObjects);
+    for (const hash of Object.values(fileHashes)) {
+      if (index.objects[hash]) index.objects[hash].refCount++;
+    }
+
+    index.latestVersion = versionId;
+    index.currentHead = versionId;
+    await this.writeIndex(index);
+
+    return versionId;
+  }
+
+  /**
+   * Restore the working directory to a specific version.
+   */
+  /**
    * Restore the working directory to a specific version.
    */
   async restore(versionId: string): Promise<void> {
@@ -455,6 +576,55 @@ export class DraftControlSystem {
     }
 
     const manifest: VersionManifest = await this.readJson(manifestPath);
+
+    // 1. If this is a scoped snapshot (folder snapshot), we must CLEAN the directory first
+    // Remove files that exist in the directory but are NOT in the snapshot manifest.
+    if (manifest.scope) {
+      const scopePath = path.resolve(this.projectRoot, manifest.scope === '.' ? '' : manifest.scope);
+
+      if (existsSync(scopePath)) {
+        // Recursive deletion helper
+        const cleanDir = async (dir: string) => {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.name === '.draft') continue; // NEVER touch .draft
+
+            const fullPath = path.join(dir, entry.name);
+            const relativePath = path.relative(this.projectRoot, fullPath); // Forward slashes on Windows?
+            // normalize relative path to match manifest keys
+            const normPath = this.normalizePath(relativePath);
+
+            if (entry.isDirectory()) {
+              await cleanDir(fullPath);
+              // If directory is empty after cleaning, remove it? 
+              // Only if it's not the scope itself and not in manifests?
+              // For now let's just clean files. Empty dirs might be annoying but safe.
+              const remaining = await fs.readdir(fullPath);
+              if (remaining.length === 0 && fullPath !== scopePath) {
+                await fs.rmdir(fullPath);
+              }
+            } else {
+              // It's a file. Check if it exists in the manifest.
+              // We check by Path AND by ID if possible.
+              // But strictly speaking, if a file is at "src/foo.ts" and manifest doesn't have "src/foo.ts",
+              // then "src/foo.ts" is an untracked file added AFTER the snapshot.
+              // In a true "restore to state", it should be removed.
+
+              if (!manifest.files[normPath]) {
+                // Double check: maybe it was renamed? 
+                // If it was renamed, the OLD path (normPath) wouldn't be in manifest.
+                // The NEW path would be.
+                // So if normPath is not in manifest, it's an extra file. Delete it.
+                console.log(`[Restore] Removing untracked file: ${normPath}`);
+                await fs.unlink(fullPath);
+              }
+            }
+          }
+        };
+
+        await cleanDir(scopePath);
+      }
+    }
 
     for (const [relativePath, hash] of Object.entries(manifest.files)) {
       // Determine the actual destination path
@@ -528,6 +698,7 @@ export class DraftControlSystem {
         continue;
       }
 
+      // Check content before expensive restore
       let currentHash = '';
       if (existsSync(destPath)) {
         currentHash = await this.hashFile(destPath);
@@ -535,7 +706,15 @@ export class DraftControlSystem {
 
       if (currentHash !== hash) {
         await fs.mkdir(path.dirname(destPath), { recursive: true });
-        await fs.copyFile(blobPath, destPath);
+
+        // Decompress and Restore
+        // Check if object is compressed via Index or just try decompress
+        const index = await this.readIndex();
+        const objMeta = index.objects[hash];
+
+        // If metadata says compressed, OR if we want to be robust (try decompress)
+        // For now, let's implement extraction with decompression support
+        await this.restoreBlobToFile(blobPath, destPath, objMeta?.isCompressed);
       }
     }
 
@@ -633,15 +812,19 @@ export class DraftControlSystem {
       }
 
       let totalSize = 0;
+      let totalCompressedSize = 0;
       if (index && index.objects) {
         for (const hash of Object.values(manifests[i].files)) {
           if (index.objects[hash]) {
             totalSize += index.objects[hash].size;
+            totalCompressedSize += (index.objects[hash].compressedSize || index.objects[hash].size);
           }
         }
       }
       // @ts-ignore
       manifests[i].totalSize = totalSize;
+      // @ts-ignore
+      manifests[i].totalCompressedSize = totalCompressedSize;
     }
 
     let result = manifests;
@@ -714,6 +897,7 @@ export class DraftControlSystem {
       try {
         const stats = await fs.stat(path.join(this.projectRoot, target));
         isDirectory = stats.isDirectory();
+        console.log(`[Draft] getHistory: target=${target} isDirectory=${isDirectory}`);
       } catch {
         // If not physical, check if any version manifest has it as a folder prefix
         // or if we have historical paths that were folders
@@ -745,6 +929,16 @@ export class DraftControlSystem {
       allRelatedPaths.forEach(p => searchPaths.add(p.toLowerCase()));
 
       result = result.filter(m => {
+        // 0. Match by Scope (Priority for Folder Snapshots)
+        if (m.scope) {
+          const normScope = this.normalizePath(m.scope);
+          // Check if the scope matches the target OR any of its historical paths (searchPaths)
+          if (searchPaths.has(normScope) || searchPaths.has(normScope.toLowerCase())) return true;
+
+          // Fallback for root
+          if (target === '' && normScope === '.') return true;
+        }
+
         if (!m.files) return false;
 
         // 1. Match by ID (Best for post-ID commits)
@@ -761,6 +955,8 @@ export class DraftControlSystem {
 
           // Directory match (if any file in version is inside the target folder)
           if (isDirectory) {
+            // FIX: Ensure searchPaths includes the folder properly (without trailing slash)
+            // norm.startsWith('src/') works if sPath is 'src'
             for (const sPath of searchPaths) {
               if (norm.startsWith(sPath + '/')) return true;
             }
@@ -775,6 +971,7 @@ export class DraftControlSystem {
       if (index && index.objects) {
         for (const m of result) {
           let relevantSize = 0;
+          let relevantCompressedSize = 0;
           if (!m.files) continue;
 
           for (const [fPath, fHash] of Object.entries(m.files)) {
@@ -802,11 +999,14 @@ export class DraftControlSystem {
 
             if (isMatch && index.objects[fHash]) {
               relevantSize += index.objects[fHash].size;
+              relevantCompressedSize += (index.objects[fHash].compressedSize || index.objects[fHash].size);
             }
           }
 
           // @ts-ignore
           m.totalSize = relevantSize;
+          // @ts-ignore
+          m.totalCompressedSize = relevantCompressedSize;
         }
       }
     }
@@ -869,7 +1069,11 @@ export class DraftControlSystem {
     }
 
     await fs.mkdir(path.dirname(destPath), { recursive: true });
-    await fs.copyFile(blobPath, destPath);
+
+    // Decompress/Copy
+    const index = await this.readIndex();
+    const objMeta = index.objects[hash];
+    await this.restoreBlobToFile(blobPath, destPath, objMeta?.isCompressed);
   }
 
   /**
@@ -889,8 +1093,53 @@ export class DraftControlSystem {
     return hash.digest('hex');
   }
 
-  private async copyFileToBlob(src: string, dest: string): Promise<void> {
-    await fs.copyFile(src, dest);
+  /**
+   * Core function to add a file to CAS. 
+   * Hashes original content, compresses, and stores in objects/.
+   */
+  private async addFileToCAS(filePath: string): Promise<{ hash: string, originalSize: number, compressedSize: number }> {
+    const hash = await this.hashFile(filePath);
+    const blobPath = path.join(this.objectsPath, hash);
+    const stats = await fs.stat(filePath);
+
+    // If already exists, return info (we assume it's valid if hash matches)
+    if (existsSync(blobPath)) {
+      const blobStats = await fs.stat(blobPath);
+      return {
+        hash,
+        originalSize: stats.size,
+        compressedSize: blobStats.size
+      };
+    }
+
+    // Compress and write
+    await this.compressFileToBlob(filePath, blobPath);
+    const blobStats = await fs.stat(blobPath);
+
+    return {
+      hash,
+      originalSize: stats.size,
+      compressedSize: blobStats.size
+    };
+  }
+
+  private async compressFileToBlob(src: string, dest: string): Promise<void> {
+    const source = createReadStream(src);
+    const destination = createWriteStream(dest);
+    const brotli = createBrotliCompress(); // High default compression
+    await pipeline(source, brotli, destination);
+  }
+
+  private async restoreBlobToFile(srcBlob: string, destFile: string, isCompressed?: boolean): Promise<void> {
+    if (isCompressed) {
+      const source = createReadStream(srcBlob);
+      const destination = createWriteStream(destFile);
+      const brotli = createBrotliDecompress();
+      await pipeline(source, brotli, destination);
+    } else {
+      // Fallback for legacy uncompressed blobs
+      await fs.copyFile(srcBlob, destFile);
+    }
   }
 
   private async readIndex(): Promise<VersionIndex> {
@@ -918,6 +1167,9 @@ export class DraftControlSystem {
   /**
    * Get storage usage report.
    */
+  /**
+   * Get storage usage report.
+   */
   async getStorageReport(): Promise<any> {
     const history = await this.getHistory();
     const index = await this.readIndex();
@@ -931,55 +1183,70 @@ export class DraftControlSystem {
     }> = {};
 
     for (const v of history) {
-      for (const [filePath, hash] of Object.entries(v.files)) {
-        const normPath = this.normalizePath(filePath);
-        if (normPath.startsWith('.draft/') || normPath === ('.draft')) continue;
-
-        if (!files[normPath]) {
-          files[normPath] = {
-            path: normPath,
-            versionCount: 0,
-            latestDate: v.timestamp,
-            latestVersionId: v.id,
-            uniqueBlobs: new Set()
-          };
-        }
-
-        files[normPath].versionCount++;
-        files[normPath].uniqueBlobs.add(hash);
-
-        if (new Date(v.timestamp) > new Date(files[normPath].latestDate)) {
-          files[normPath].latestDate = v.timestamp;
-          files[normPath].latestVersionId = v.id;
-        }
-      }
+      if (!v.files) continue; // Safety check
+      this.processManifestFiles(v, files);
     }
 
     const fileReports = Object.values(files).map(f => {
       let size = 0;
+      let compressedSize = 0;
       f.uniqueBlobs.forEach(hash => {
-        if (index.objects[hash]) size += index.objects[hash].size;
+        if (index.objects[hash]) {
+          size += index.objects[hash].size;
+          compressedSize += (index.objects[hash].compressedSize || index.objects[hash].size);
+        }
       });
       return {
         path: f.path,
         versionCount: f.versionCount,
         latestDate: f.latestDate,
-        totalHistorySize: size
+        totalHistorySize: size,
+        totalCompressedSize: compressedSize
       };
     });
 
     let totalSize = 0;
+    let totalCompressedSize = 0;
+
     if (index.objects) {
       for (const obj of Object.values(index.objects)) {
         totalSize += obj.size;
+        totalCompressedSize += (obj.compressedSize || obj.size);
       }
     }
 
     return {
       totalSize,
+      totalCompressedSize,
+      compressionRatio: totalSize > 0 ? (totalCompressedSize / totalSize).toFixed(2) : 1,
       fileCount: fileReports.length,
       files: fileReports.sort((a, b) => b.totalHistorySize - a.totalHistorySize)
     };
+  }
+
+  private processManifestFiles(v: VersionManifest, files: Record<string, any>) {
+    for (const [filePath, hash] of Object.entries(v.files)) {
+      const normPath = this.normalizePath(filePath);
+      if (normPath.startsWith('.draft/') || normPath === ('.draft')) continue;
+
+      if (!files[normPath]) {
+        files[normPath] = {
+          path: normPath,
+          versionCount: 0,
+          latestDate: v.timestamp,
+          latestVersionId: v.id,
+          uniqueBlobs: new Set()
+        };
+      }
+
+      files[normPath].versionCount++;
+      files[normPath].uniqueBlobs.add(hash);
+
+      if (new Date(v.timestamp) > new Date(files[normPath].latestDate)) {
+        files[normPath].latestDate = v.timestamp;
+        files[normPath].latestVersionId = v.id;
+      }
+    }
   }
 
   /**

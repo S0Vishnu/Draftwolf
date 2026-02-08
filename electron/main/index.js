@@ -190,42 +190,48 @@ function createWindow() {
     const pinnedSubmenu =
       pinnedFoldersForTray.length > 0
         ? pinnedFoldersForTray.map((f) => ({
-            label: (f.name || f.path).slice(0, 50),
-            click: () => {
-              const win = BrowserWindow.getAllWindows()[0];
-              if (win) {
-                win.show();
-                win.focus();
-                win.webContents.send("tray:open-folder", f.path);
-              }
-            },
-          }))
+          label: (f.name || f.path).slice(0, 50),
+          click: () => {
+            const win = BrowserWindow.getAllWindows()[0];
+            if (win) {
+              win.show();
+              win.focus();
+              win.webContents.send("tray:open-folder", f.path);
+            }
+          },
+        }))
         : [{ label: "No pinned folders", enabled: false }];
 
     return Menu.buildFromTemplate([
-      { label: "Open DraftWolf", click: () => {
-        const win = BrowserWindow.getAllWindows()[0];
-        if (win) {
-          win.show();
-          win.focus();
+      {
+        label: "Open DraftWolf", click: () => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win) {
+            win.show();
+            win.focus();
+          }
         }
-      }},
+      },
       { type: "separator" },
       { label: "Pinned folders", submenu: pinnedSubmenu },
       { type: "separator" },
-      { label: "Settings", click: () => {
-        const win = BrowserWindow.getAllWindows()[0];
-        if (win) {
-          win.show();
-          win.focus();
-          win.webContents.send("tray:navigate", "/settings");
+      {
+        label: "Settings", click: () => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win) {
+            win.show();
+            win.focus();
+            win.webContents.send("tray:navigate", "/settings");
+          }
         }
-      }},
+      },
       { type: "separator" },
-      { label: "Quit", click: () => {
-        app.isQuitting = true;
-        app.quit();
-      }},
+      {
+        label: "Quit", click: () => {
+          app.isQuitting = true;
+          app.quit();
+        }
+      },
     ]);
   }
 
@@ -285,42 +291,48 @@ ipcMain.on("tray:set-pinned-folders", (_, folders) => {
     const pinnedSubmenu =
       pinnedFoldersForTray.length > 0
         ? pinnedFoldersForTray.map((f) => ({
-            label: (f.name || f.path).slice(0, 50),
-            click: () => {
-              const win = BrowserWindow.getAllWindows()[0];
-              if (win) {
-                win.show();
-                win.focus();
-                win.webContents.send("tray:open-folder", f.path);
-              }
-            },
-          }))
+          label: (f.name || f.path).slice(0, 50),
+          click: () => {
+            const win = BrowserWindow.getAllWindows()[0];
+            if (win) {
+              win.show();
+              win.focus();
+              win.webContents.send("tray:open-folder", f.path);
+            }
+          },
+        }))
         : [{ label: "No pinned folders", enabled: false }];
     tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: "Open DraftWolf", click: () => {
-          const win = BrowserWindow.getAllWindows()[0];
-          if (win) {
-            win.show();
-            win.focus();
+        {
+          label: "Open DraftWolf", click: () => {
+            const win = BrowserWindow.getAllWindows()[0];
+            if (win) {
+              win.show();
+              win.focus();
+            }
           }
-        }},
+        },
         { type: "separator" },
         { label: "Pinned folders", submenu: pinnedSubmenu },
         { type: "separator" },
-        { label: "Settings", click: () => {
-          const win = BrowserWindow.getAllWindows()[0];
-          if (win) {
-            win.show();
-            win.focus();
-            win.webContents.send("tray:navigate", "/settings");
+        {
+          label: "Settings", click: () => {
+            const win = BrowserWindow.getAllWindows()[0];
+            if (win) {
+              win.show();
+              win.focus();
+              win.webContents.send("tray:navigate", "/settings");
+            }
           }
-        }},
+        },
         { type: "separator" },
-        { label: "Quit", click: () => {
-          app.isQuitting = true;
-          app.quit();
-        }},
+        {
+          label: "Quit", click: () => {
+            app.isQuitting = true;
+            app.quit();
+          }
+        },
       ])
     );
   }
@@ -807,6 +819,17 @@ ipcMain.handle("draft:commit", async (_, { projectRoot, label, files }) => {
     return { success: true, versionId };
   } catch (e) {
     console.error("Draft Commit Failed:", e);
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle("draft:createSnapshot", async (_, { projectRoot, folderPath, label }) => {
+  try {
+    const dcs = new DraftControlSystem(projectRoot);
+    const versionId = await dcs.createSnapshot(folderPath, label);
+    return { success: true, versionId };
+  } catch (e) {
+    console.error("Draft Snapshot Failed:", e);
     return { success: false, error: e.message };
   }
 });

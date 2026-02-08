@@ -77,12 +77,3 @@ To transition from a "local tool for freelancers" to a viable competitor against
 ### 6. Team Permissions & ACLs
 *   **Requirement:** Admin controls to define who can read/write specifically folders or projects.
 *   **Why:** Studios need to protect IP and prevent contractors from accessing sensitive core code.
-
-
-create another document which should be a set of prompts to continue in a fresh chat to implement that entire feature,
-
-1) Ask user to specify the location to save versions, can be changed in settings.
-2) File Locking
-3) Partial Woekspace
-4) Add visual diffrence
-5) since the app runs always on the background read files in the opend

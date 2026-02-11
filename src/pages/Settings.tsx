@@ -12,6 +12,7 @@ import {
     Edit2, X, Check, Coffee, Monitor
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+
 import '../styles/Settings.css';
 
 interface UserSettings {
@@ -22,7 +23,6 @@ interface UserSettings {
     notificationsEnabled: boolean;
     avatarSeed: string;
     checkUpdates: boolean;
-
 }
 
 const Settings = () => {
@@ -41,7 +41,6 @@ const Settings = () => {
         notificationsEnabled: true,
         avatarSeed: '',
         checkUpdates: true,
-
     };
 
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
@@ -400,6 +399,7 @@ const Settings = () => {
                                             <span className="toggle-slider"><span className="toggle-knob"></span></span>
                                         </label>
                                     </div>
+
 
                                 </div>
                             </div>

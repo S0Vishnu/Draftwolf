@@ -5,23 +5,23 @@ import { Search, RefreshCw, PanelLeftClose, PanelLeftOpen, PanelRightClose, Pane
 interface HeaderProps {
     isSidebarOpen: boolean;
     toggleSidebar: () => void;
-    isPreviewOpen: boolean;
-    togglePreview: () => void;
-    searchQuery: string;
-    setSearchQuery: (query: string) => void;
-    refreshDirectory: () => void;
-    isLoading: boolean;
+    isPreviewOpen?: boolean;
+    togglePreview?: () => void;
+    searchQuery?: string;
+    setSearchQuery?: (query: string) => void;
+    refreshDirectory?: () => void;
+    isLoading?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
     isSidebarOpen,
     toggleSidebar,
-    isPreviewOpen,
-    togglePreview,
-    searchQuery,
-    setSearchQuery,
-    refreshDirectory,
-    isLoading
+    isPreviewOpen = false,
+    togglePreview = () => {},
+    searchQuery = '',
+    setSearchQuery = () => {},
+    refreshDirectory = () => {},
+    isLoading = false
 }) => {
     return (
         <header className="top-bar">

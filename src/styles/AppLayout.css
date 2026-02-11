@@ -29,202 +29,112 @@
     font-size: 13px;
 }
 
-/* Sidebar */
+/* ============================================================
+   SIDEBAR 
+   ============================================================ */
+
 .sidebar {
-    width: 64px;
+    width: 240px;
     background: var(--bg-sidebar);
     border-right: 1px solid var(--border);
     flex-shrink: 0;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
+    transition: width 0.3s ease-in-out;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    position: relative;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
 }
 
 .sidebar.collapsed {
-    width: 0;
-    border: none;
+    width: 68px;
 }
 
 .sidebar-content {
     height: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    padding: 16px 0;
-    /* Removed justify-content: space-between because we use flex: 1 on projects */
+    padding: 12px 0;
 }
 
-.sidebar-top {
+.sidebar-top, .sidebar-bottom, .sidebar-projects {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    flex-shrink: 0;
-    /* Keep top fixed */
+    padding: 0 12px;
 }
 
-.sidebar-bottom {
-    display: flex;
-    flex-direction: column;
+.sidebar.collapsed .sidebar-top,
+.sidebar.collapsed .sidebar-bottom,
+.sidebar.collapsed .sidebar-projects {
+    padding: 0;
     align-items: center;
-    flex-shrink: 0;
-    /* Keep bottom fixed */
-    margin-top: auto;
-    /* Push to bottom if no projects */
+    width: 100%;
 }
 
 .sidebar-projects {
     flex: 1;
     overflow-y: auto;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 8px 0;
     scrollbar-width: none;
+    margin: 12px 0;
+    gap: 4px;
 }
 
 .sidebar-projects::-webkit-scrollbar {
     display: none;
 }
 
-.sidebar-divider {
-    width: 32px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-    margin: 12px 0;
+/* Typography & Section Labels */
+.section-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    padding: 24px 12px 10px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: linear-gradient(90deg, #3b82f6, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0.9;
 }
 
+.sidebar.collapsed .section-label {
+    display: none;
+}
+
+/* Button Foundation */
 .side-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    width: 100%;
+    height: 44px;
+    border-radius: 10px;
     border: none;
     background: transparent;
     color: var(--text-muted);
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     cursor: pointer;
-    margin-bottom: 8px;
-    transition: all 0.2s;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
     flex-shrink: 0;
-}
-
-.project-btn {
-    font-weight: 700;
-    font-size: 16px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 0 12px;
+    gap: 12px;
     position: relative;
-    overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    outline: none;
 }
 
-.project-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(168, 85, 247, 0.4));
-    opacity: 0;
-    transition: opacity 0.3s;
-    z-index: 0;
+.side-btn svg {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    min-height: 22px;
+    display: block;
 }
 
-.project-btn::after {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    background: var(--bg-sidebar);
-    border-radius: 7px;
-    z-index: 0;
-    transition: background 0.3s;
-}
-
-.project-btn:hover {
-    transform: translateY(-2px) scale(1.05);
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.project-btn:hover::before {
-    opacity: 1;
-}
-
-.project-letter {
-    position: relative;
-    z-index: 1;
-    background: linear-gradient(135deg, #e4e4e7 0%, #a1a1aa 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-    font-family: 'Outfit', sans-serif;
-    font-size: 18px;
-    transition: all 0.3s;
-}
-
-.project-btn:hover .project-letter {
-    background: linear-gradient(135deg, #fff 0%, #e4e4e7 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
-    transform: scale(1.1);
-}
-
-.project-btn.active {
-    border-color: rgba(59, 130, 246, 0.5);
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.25);
-}
-
-.project-btn.active::before {
-    opacity: 1;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.6), rgba(168, 85, 247, 0.6));
-}
-
-.project-btn.active .project-letter {
-    background: #fff;
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
-    transform: scale(1.1);
-}
-
-.side-btn.settings-btn {
-    width: 40px;
-    height: 40px;
-    /* Fixed styles for profile pic */
-    border-radius: 8px;
-    /* Match other buttons */
-    /* ...keep original logic or just override side-btn... */
-    /* Original had circle for profile, let's keep it consistent? 
-       Actually user didn't ask to change profile button, but re-using .side-btn works.
-       I'll keep settings-btn roughly as is but ensure it fits layout.
-    */
-    border-radius: 50%;
+.sidebar.collapsed .side-btn {
+    width: 44px;
     padding: 0;
-    border: none;
-    cursor: pointer;
-    outline: 1px solid transparent;
-    transition: all 0.2s;
-    outline-offset: -1px;
-
-    img {
-        height: 100%;
-        width: 100%;
-        object-fit: cover;
-        transition: all 0.2s;
-        border-radius: 50%;
-        /* Ensure rounded */
-    }
-
-    &:hover {
-        outline-color: var(--accent);
-
-        img {
-            scale: 0.8;
-        }
-    }
+    justify-content: center;
+    margin: 0 auto;
 }
 
 .side-btn:hover {
@@ -233,13 +143,140 @@
 }
 
 .side-btn.active {
-    background: rgba(59, 130, 246, 0.1);
-    color: var(--accent);
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
-    border: 1px solid rgba(59, 130, 246, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
 }
 
-/* Main */
+.side-btn.active svg {
+    color: var(--accent);
+}
+
+.btn-label {
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar.collapsed .btn-label {
+    display: none;
+}
+
+/* Project Styling */
+.project-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    position: relative;
+    padding-right: 42px !important;
+}
+
+.sidebar.collapsed .project-btn {
+    background: transparent;
+    padding-right: 12px !important;
+}
+
+.project-icon-wrapper {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.project-letter {
+    font-size: 13px;
+    font-weight: 800;
+    font-family: 'Outfit', sans-serif;
+    line-height: 1;
+}
+
+.project-btn:hover {
+    transform: scale(1.01);
+}
+
+.project-settings-trigger {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.project-btn:hover .project-settings-trigger {
+    opacity: 0.7;
+}
+
+.project-settings-trigger:hover {
+    opacity: 1 !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--accent) !important;
+}
+
+.project-btn.active .project-settings-trigger {
+    opacity: 0.4;
+}
+
+.project-btn.active:hover .project-settings-trigger {
+    opacity: 0.7;
+}
+
+/* Dividers */
+.sidebar-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 12px;
+    opacity: 0.5;
+}
+
+.sidebar.collapsed .sidebar-divider {
+    width: 24px;
+    margin: 8px auto;
+}
+
+/* Settings */
+.settings-icon-wrapper {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-profile-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.side-btn.settings-btn.active .settings-icon-wrapper {
+    border-color: var(--accent);
+}
+
+/* ============================================================
+   MAIN CONTENT & LAYOUT
+   ============================================================ */
+
 .main-content {
     flex: 1;
     display: flex;
@@ -426,7 +463,6 @@
     padding: 6px 12px;
     border-radius: 6px;
     cursor: pointer;
-    display: flex;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -890,6 +926,42 @@
     color: #a1a1aa;
     font-size: 11px;
     margin-left: 12px;
+}
+
+/* ============================================================
+   SETTINGS PAGE REDESIGN
+   ============================================================ */
+
+.settings-section {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.section-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.section-body {
+    padding: 24px;
+}
+
+.setting-row {
+    position: relative;
+}
+
+.setting-info label {
+    font-size: 14px;
+    color: white;
+}
+
+.setting-info p {
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 .version-indicator-tile {

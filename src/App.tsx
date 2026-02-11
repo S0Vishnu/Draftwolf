@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import Cleanup from './pages/Cleanup';
 import Community from './pages/Community';
 import Extensions from './pages/Extensions';
+import ProjectSettings from './pages/ProjectSettings';
 
 import UpdateModal from './components/UpdateModal';
 
@@ -177,7 +178,7 @@ function App() {
           <Route path="/cleanup" element={user ? <Cleanup /> : <Navigate to="/" replace />} />
           <Route path="/community" element={user ? <Community /> : <Navigate to="/" replace />} />
           <Route path="/extensions" element={user ? <Extensions /> : <Navigate to="/" replace />} />
-
+          <Route path="/project-settings" element={user ? <ProjectSettings /> : <Navigate to="/" replace />} />
         </Routes>
       </Router>
       <UpdateModal

@@ -12,8 +12,11 @@ import FileList from '../components/FileList';
 import InspectorPanel from '../components/InspectorPanel';
 import ContextMenu from '../components/ContextMenu';
 import ConfirmDialog from '../components/ConfirmDialog';
+import CustomPopup from '../components/CustomPopup';
 import RecentWorkspaces from '../components/RecentWorkspaces';
 import { toast } from 'react-toastify';
+import { FolderOpen } from 'lucide-react';
+import logo from '../assets/icons/logo.png';
 
 // Styles
 import '../styles/AuthShared.css';
@@ -43,7 +46,10 @@ const Home = () => {
         try {
             const saved = localStorage.getItem('recentWorkspaces');
             return saved ? JSON.parse(saved) : [];
-        } catch (e) { return []; }
+        } catch (e) {
+            console.error('Error loading recent workspaces:', e);
+            return [];
+        }
     });
 
     useEffect(() => {
@@ -51,11 +57,20 @@ const Home = () => {
     }, [recentWorkspaces]);
 
     // Pinned Folders
-    const [pinnedFolders, setPinnedFolders] = useState<{ path: string, name: string }[]>(() => {
+    const [pinnedFolders, setPinnedFolders] = useState<{ 
+        path: string, 
+        name: string, 
+        color?: string,
+        showHiddenFiles?: boolean,
+        showExtensions?: boolean 
+    }[]>(() => {
         try {
             const saved = localStorage.getItem('pinnedFolders');
             return saved ? JSON.parse(saved) : [];
-        } catch (e) { return []; }
+        } catch (e) {
+            console.error('Error loading pinned folders:', e);
+            return [];
+        }
     });
 
     useEffect(() => {
@@ -90,7 +105,7 @@ const Home = () => {
     const addToPinned = (path: string) => {
         setPinnedFolders(prev => {
             if (prev.some(f => f.path === path)) return prev;
-            return [...prev, { path, name: path.split(/[/\\]/).pop() || path }];
+            return [...prev, { path, name: path.split(/[/\\]/).pop() || path, color: '#3b82f6' }];
         });
     };
 
@@ -115,6 +130,16 @@ const Home = () => {
     const removeFromRecents = (path: string) => {
         setRecentWorkspaces(prev => prev.filter(w => w.path !== path));
     };
+
+    useEffect(() => {
+        if (currentPath) {
+            const project = pinnedFolders.find(p => currentPath === p.path || currentPath.startsWith(p.path + (p.path.endsWith('/') ? '' : '/')));
+            if (project) {
+                if (project.showHiddenFiles !== undefined) setShowHiddenFiles(project.showHiddenFiles);
+                if (project.showExtensions !== undefined) setShowExtensions(project.showExtensions);
+            }
+        }
+    }, [currentPath, pinnedFolders]);
 
     useEffect(() => {
         if (currentPath) {
@@ -233,6 +258,10 @@ const Home = () => {
     // Dialogs
     const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean, targets: FileEntry[] }>({ isOpen: false, targets: [] });
 
+    // Backup Setup
+    const [backupSetupProject, setBackupSetupProject] = useState<string | null>(null);
+    const [backupSetupPath, setBackupSetupPath] = useState<string>('');
+
     // View Options
     const [showHiddenFiles, setShowHiddenFiles] = useState(() => localStorage.getItem('showHiddenFiles') === 'true');
     const [showExtensions, setShowExtensions] = useState(() => localStorage.getItem('showExtensions') !== 'false'); // Default true
@@ -270,10 +299,10 @@ const Home = () => {
         if (!currentPath) return;
 
         // Start watching the current directory
-        window.api.watchDir(currentPath).catch(err => console.error("Watcher error:", err));
+        globalThis.api.watchDir(currentPath).catch(err => console.error("Watcher error:", err));
 
         let timeout: NodeJS.Timeout;
-        const unsubscribe = window.api.onFileChange((data) => {
+        const unsubscribe = globalThis.api.onFileChange((data) => {
             clearTimeout(timeout);
             timeout = setTimeout(() => {
                 refreshDirectory();
@@ -288,8 +317,8 @@ const Home = () => {
 
     const handleCloseApp = async () => {
         try {
-            if (window.api && window.api.quitApp) {
-                window.api.quitApp();
+            if (globalThis.api?.quitApp) {
+                globalThis.api.quitApp();
             }
         } catch (error) {
             console.error("Error closing app:", error);
@@ -308,7 +337,7 @@ const Home = () => {
     // Data Loading
     const fetchStats = async (entry: FileEntry): Promise<FileEntry> => {
         try {
-            const stats = await window.api.getStats(entry.path);
+            const stats = await globalThis.api.getStats(entry.path);
 
             let latestVersion: string | undefined;
             let tags: string[] = [];
@@ -321,12 +350,11 @@ const Home = () => {
                 // Get version info for both files and directories
                 // Note: For directories, getFileVersion (backed by getLatestVersionForFile)
                 // relies on getHistory being able to detect folder snapshots.
-                const v = await window.api.draft.getFileVersion(rootDir, rel);
+                const v = await globalThis.api.draft.getFileVersion(rootDir, rel);
                 if (v) latestVersion = v;
 
-                // @ts-ignore
-                const meta = await window.api.draft.getMetadata(rootDir, rel);
-                if (meta && meta.tags) {
+                const meta = await globalThis.api.draft.getMetadata(rootDir, rel);
+                if (meta?.tags) {
                     tags = meta.tags;
                 }
             }
@@ -341,7 +369,9 @@ const Home = () => {
                     tags
                 };
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error('Error fetching file stats:', e);
+        }
         return entry;
     };
 
@@ -351,14 +381,14 @@ const Home = () => {
 
         // Security: Check for restricted paths
         const parts = path.split(/[/\\]/);
-        if (parts.some(p => p === '.draft')) {
+        if (parts.includes('.draft')) {
             toast.error("Access restricted");
             return;
         }
 
         setIsLoading(true);
         try {
-            const entries = await window.api.readDir(path);
+            const entries = await globalThis.api.readDir(path);
             // Filter out .draft
             const visibleEntries = entries.filter((e: FileEntry) => e.name !== '.draft');
             let processed = await Promise.all(visibleEntries.map(fetchStats));
@@ -373,14 +403,10 @@ const Home = () => {
             }
 
             setFiles(processed);
-            if (path !== currentPath) {
-                setCurrentPath(path);
-                setSelectedPaths(new Set());
-                setLastSelectedPath(null);
-            } else {
+            if (path === currentPath) {
                 // Refreshing: Preserve selection if files still exist
                 // Use normalized paths for comparison (lowercase + forward slashes) to handle Windows case-insensitivity and separator inconsistencies
-                const normalizePath = (p: string) => p.toLowerCase().replace(/[\\/]/g, '/');
+                const normalizePath = (p: string) => p.toLowerCase().replaceAll(/[\\/]/g, '/');
                 const existPathsMap = new Map<string, string>();
                 processed.forEach(p => existPathsMap.set(normalizePath(p.path), p.path));
 
@@ -390,7 +416,8 @@ const Home = () => {
                         const normP = normalizePath(p);
                         if (existPathsMap.has(normP)) {
                             // Use the path from the new file list to ensure exact match
-                            next.add(existPathsMap.get(normP)!);
+                            const originalPath = existPathsMap.get(normP);
+                            if (originalPath) next.add(originalPath);
                         }
                     });
                     return next;
@@ -399,8 +426,12 @@ const Home = () => {
                 setLastSelectedPath(prev => {
                     if (!prev) return null;
                     const normPrev = normalizePath(prev);
-                    return existPathsMap.has(normPrev) ? existPathsMap.get(normPrev)! : null;
+                    return existPathsMap.has(normPrev) ? existPathsMap.get(normPrev) || null : null;
                 });
+            } else {
+                setCurrentPath(path);
+                setSelectedPaths(new Set());
+                setLastSelectedPath(null);
             }
             setIsCreating(null);
         } catch (error: any) {
@@ -445,13 +476,13 @@ const Home = () => {
         if (file.isDirectory) {
             navigateTo(path);
         } else {
-            window.api.openPath(path);
+            globalThis.api?.openPath(path);
         }
     };
 
     const handleSort = (key: keyof FileEntry) => {
         let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+        if (sortConfig?.key === key && sortConfig.direction === 'asc') {
             direction = 'desc';
         }
         setSortConfig({ key, direction });
@@ -461,19 +492,107 @@ const Home = () => {
     const refreshDirectory = () => { if (currentPath) loadDirectory(currentPath); };
 
     // Navigation
-    const openWorkspace = (path: string) => {
-        if (path.split(/[/\\]/).some(p => p === '.draft')) {
+    const openWorkspace = async (path: string) => {
+        if (path.split(/[/\\]/).includes('.draft')) {
             toast.error("Access restricted");
             return;
         }
-        setRootDir(path); // Set the root directory for breadcrumbs
-        setHistory([path]);
+
+        // Check if project already has a backupPath configured
+        const pinned = pinnedFolders.find(f => f.path === path);
+        const recent = recentWorkspaces.find(w => w.path === path);
+        const hasBackup = (pinned as any)?.backupPath || (recent as any)?.backupPath;
+
+        if (hasBackup) {
+            // Already configured — just open
+            setRootDir(path);
+            setHistory([path]);
+            setHistoryIndex(0);
+            loadDirectory(path);
+            return;
+        }
+
+        // Check if .draft folder already exists on disk (existing project)
+        const separator = path.includes('/') ? '/' : '\\';
+        const draftPath = path.endsWith(separator) ? `${path}.draft` : `${path}${separator}.draft`;
+        try {
+            const stats = await globalThis.api.getStats(draftPath);
+            if (stats?.isDirectory) {
+                // Existing project — auto-set backup to project's own path
+                toast.info("Opening existing project...");
+                saveBackupPath(path, path);
+                setRootDir(path);
+                setHistory([path]);
+                setHistoryIndex(0);
+                loadDirectory(path);
+                return;
+            }
+        } catch {
+            // .draft doesn't exist — this is a new project
+        }
+
+        // New project — show backup setup popup
+        toast.info("New project detected - Setup required");
+        setBackupSetupProject(path);
+        setBackupSetupPath(path); // Default to the project's own path
+    };
+
+    const saveBackupPath = (projPath: string, bPath: string) => {
+        setPinnedFolders(prev =>
+            prev.map(f =>
+                f.path === projPath ? { ...f, backupPath: bPath } as any : f
+            )
+        );
+        setRecentWorkspaces(prev =>
+            prev.map(w =>
+                w.path === projPath ? { ...w, backupPath: bPath } as any : w
+            )
+        );
+    };
+
+    const confirmBackupSetup = async () => {
+        if (!backupSetupProject || !backupSetupPath) return;
+
+        const bPath = backupSetupPath;
+        const projPath = backupSetupProject;
+        
+        // Create .draft folder
+        const separator = bPath.includes('/') ? '/' : '\\';
+        const draftDir = bPath.endsWith(separator) ? `${bPath}.draft` : `${bPath}${separator}.draft`;
+        
+        try {
+            const res = await globalThis.api.createFolder(draftDir);
+            if (!res.success && !res.error?.includes('exists')) {
+                toast.error(`Failed to create backup folder: ${res.error}`);
+                return;
+            }
+            if (res.success) toast.success("Created backup folder (.draft)");
+        } catch (e) {
+            console.error(e);
+            // Non-critical if it fails (maybe already exists), but good to know
+        }
+
+        // Save backup path to pinned & recents
+        saveBackupPath(projPath, bPath);
+
+        // Close popup and open workspace
+        setBackupSetupProject(null);
+        setBackupSetupPath('');
+
+        // Proceed to open
+        setRootDir(projPath);
+        setHistory([projPath]);
         setHistoryIndex(0);
-        loadDirectory(path);
+        loadDirectory(projPath);
+    };
+
+    const cancelBackupSetup = () => {
+        setBackupSetupProject(null);
+        setBackupSetupPath('');
     };
 
     const handleOpenFolder = async () => {
-        const path = await window.api.openFolder();
+        const path = await globalThis.api.openFolder();
         if (path) {
             openWorkspace(path);
         }
@@ -504,50 +623,52 @@ const Home = () => {
         }
     };
 
-    // Selection
-    const handleSelectFile = (e: React.MouseEvent, file: FileEntry) => {
-        // Only handle left click
-        if (e.button !== 0) return;
+    // Selection Logic
+    const toggleSelection = (path: string) => {
+        setSelectedPaths(prev => {
+            const next = new Set(prev);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            return next;
+        });
+        setLastSelectedPath(path);
+    };
 
-        e.stopPropagation();
+    const selectRange = (targetPath: string) => {
+        if (!lastSelectedPath) return;
+        const lastIndex = filteredFiles.findIndex(f => f.path === lastSelectedPath);
+        const currentIndex = filteredFiles.findIndex(f => f.path === targetPath);
+        if (lastIndex === -1 || currentIndex === -1) return;
 
-        // Prevent refresh if clicking the same file that is already selected
-        if (!e.ctrlKey && !e.shiftKey && selectedPaths.size === 1 && selectedPaths.has(file.path)) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+        const newSelection = new Set<string>();
+        for (let i = start; i <= end; i++) {
+            newSelection.add(filteredFiles[i].path);
+        }
+        setSelectedPaths(newSelection);
+    };
+
+    const selectSingle = (path: string) => {
+        if (selectedPaths.size === 1 && selectedPaths.has(path)) {
+            if (lastSelectedPath !== path) setLastSelectedPath(path);
             return;
         }
+        setSelectedPaths(new Set([path]));
+        setLastSelectedPath(path);
+    };
 
-        let newSelection = new Set(selectedPaths);
+    const handleSelectFile = (e: React.MouseEvent, file: FileEntry) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+
         if (e.ctrlKey) {
-            if (newSelection.has(file.path)) {
-                newSelection.delete(file.path);
-            } else {
-                newSelection.add(file.path);
-            }
-            setLastSelectedPath(file.path);
+            toggleSelection(file.path);
         } else if (e.shiftKey && lastSelectedPath) {
-            const lastIndex = filteredFiles.findIndex(f => f.path === lastSelectedPath);
-            const currentIndex = filteredFiles.findIndex(f => f.path === file.path);
-            if (lastIndex !== -1 && currentIndex !== -1) {
-                const start = Math.min(lastIndex, currentIndex);
-                const end = Math.max(lastIndex, currentIndex);
-                newSelection = new Set();
-                for (let i = start; i <= end; i++) {
-                    newSelection.add(filteredFiles[i].path);
-                }
-            }
+            selectRange(file.path);
         } else {
-            // Check if this file is already solely selected
-            if (selectedPaths.size === 1 && selectedPaths.has(file.path)) {
-                // If clicked again, we might want to ensure lastSelectedPath is set, but usually it is.
-                // Avoid state update to prevent InspectorPanel flicker/reset
-                if (lastSelectedPath !== file.path) setLastSelectedPath(file.path);
-                return;
-            }
-            newSelection = new Set([file.path]);
-            setLastSelectedPath(file.path);
+            selectSingle(file.path);
         }
-
-        setSelectedPaths(newSelection);
     };
 
     // Box Selection
@@ -563,11 +684,11 @@ const Home = () => {
         }
 
         // Clear selection if not Ctrl
-        if (!e.ctrlKey) {
+        if (e.ctrlKey) {
+            initialSelection.current = new Set(selectedPaths);
+        } else {
             setSelectedPaths(new Set());
             initialSelection.current = new Set();
-        } else {
-            initialSelection.current = new Set(selectedPaths);
         }
 
         const rect = contentRef.current.getBoundingClientRect();
@@ -623,7 +744,7 @@ const Home = () => {
 
             items.forEach((item) => {
                 const itemRect = item.getBoundingClientRect();
-                const path = item.getAttribute('data-path');
+                const path = (item as HTMLElement).dataset.path;
 
                 const intersects = !(
                     selRect.left > itemRect.right ||
@@ -649,12 +770,12 @@ const Home = () => {
         };
 
         if (isSelecting) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
+            globalThis.addEventListener('mousemove', handleMouseMove);
+            globalThis.addEventListener('mouseup', handleMouseUp);
         }
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
+            globalThis.removeEventListener('mousemove', handleMouseMove);
+            globalThis.removeEventListener('mouseup', handleMouseUp);
         };
     }, [isSelecting]);
 
@@ -695,7 +816,7 @@ const Home = () => {
         try {
             let successCount = 0;
             for (const t of targets) {
-                const success = await window.api.deleteEntry(t.path);
+                const success = await globalThis.api.deleteEntry(t.path);
                 if (success) successCount++;
             }
             if (successCount > 0) {
@@ -722,7 +843,7 @@ const Home = () => {
     const handleRenameSubmit = async () => {
         if (!renamingFile || !currentPath || !renameValue) return;
         const newPath = joinPath(currentPath, renameValue);
-        const result = await window.api.renameEntry(renamingFile, newPath);
+        const result = await globalThis.api.renameEntry(renamingFile, newPath);
         if (result.success) {
             const oldPath = renamingFile;
             setRenamingFile(null);
@@ -746,10 +867,10 @@ const Home = () => {
         }
     };
 
-    const getUniqueName = (baseName: string, isFolder: boolean) => {
+    const getUniqueName = (baseName: string, _isFolder: boolean) => {
         let name = baseName;
         let counter = 1;
-        while (files.find(f => f.name === name)) {
+        while (files.some(f => f.name === name)) {
             name = `${baseName} (${counter})`;
             counter++;
         }
@@ -784,8 +905,8 @@ const Home = () => {
         }
         const targetPath = joinPath(currentPath, creationName.trim());
         const result = isCreating === 'folder'
-            ? await window.api.createFolder(targetPath)
-            : await window.api.createFile(targetPath);
+            ? await globalThis.api.createFolder(targetPath)
+            : await globalThis.api.createFile(targetPath);
 
         if (result.success) {
             setIsCreating(null);
@@ -796,17 +917,13 @@ const Home = () => {
         }
     };
 
-    const handleDelete = async (e: React.MouseEvent | undefined, entry: FileEntry) => {
-        e?.stopPropagation();
-        confirmDelete([entry]);
-    };
 
     const menuActions = {
         open: () => {
             const targets = getSelectedFiles();
             if (targets.length === 1) {
                 if (targets[0].isDirectory) navigateTo(targets[0].path);
-                else window.api.openPath(targets[0].path);
+                else globalThis.api.openPath(targets[0].path);
             }
         },
         preview: () => {
@@ -846,16 +963,16 @@ const Home = () => {
                     const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
                     const base = nameParts.join('.');
 
-                    while (files.find(f => f.name === finalName)) {
+                    while (files.some(f => f.name === finalName)) {
                         finalName = `${base} (${counter})${ext}`;
                         counter++;
                     }
                     dest = joinPath(currentPath, finalName);
-                    await window.api.copyEntry(src, dest);
+                    await globalThis.api.copyEntry(src, dest);
                 }
                 else {
                     // Cut/Move
-                    await window.api.renameEntry(src, dest);
+                    await globalThis.api.renameEntry(src, dest);
                 }
             }
             if (appClipboard.op === 'cut') setAppClipboard(null);
@@ -867,7 +984,7 @@ const Home = () => {
         refresh: () => refreshDirectory(),
         showInExplorer: () => {
             const targets = getSelectedFiles();
-            if (targets.length === 1) window.api.showInFolder(targets[0].path);
+            if (targets.length === 1) globalThis.api.showInFolder(targets[0].path);
         },
         pin: () => {
             const targets = getSelectedFiles();
@@ -927,10 +1044,88 @@ const Home = () => {
 
     // Keyboard Shortcuts
     useEffect(() => {
+        const handleBasicKeyAction = (e: KeyboardEvent) => {
+            if (e.key === 'Backspace') {
+                e.preventDefault();
+                navigateBack();
+                return true;
+            }
+            if (e.key === 'Enter' && selectedPaths.size === 1) {
+                const file = filteredFiles.find(f => f.path === lastSelectedPath);
+                if (file?.isDirectory) navigateTo(file.path);
+                else if (file) globalThis.api?.openPath(file.path);
+                return true;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setSelectedPaths(new Set());
+                return true;
+            }
+            return false;
+        };
+
+        const handleFileActionShortcuts = (e: KeyboardEvent) => {
+            if (e.key === 'F2') { e.preventDefault(); menuActions.rename(); }
+            else if (e.key === 'Delete') { e.preventDefault(); menuActions.delete(); }
+        };
+
+        const handleCtrlShortcuts = (e: KeyboardEvent, key: string) => {
+            if (key === 'c' && selectedPaths.size > 0) { e.preventDefault(); menuActions.copy(); }
+            else if (key === 'x' && selectedPaths.size > 0) { e.preventDefault(); menuActions.cut(); }
+            else if (key === 'v') { e.preventDefault(); menuActions.paste(); }
+            else if (key === 'a') { e.preventDefault(); setSelectedPaths(new Set(filteredFiles.map(f => f.path))); }
+            else if (e.shiftKey && key === 'n') { e.preventDefault(); initCreateFolder(); }
+            else if (key === 'n') { e.preventDefault(); initCreateFile(); }
+        };
+
+        const calculateGridNextIndex = (currentIndex: number, key: string) => {
+            if (key === 'ArrowLeft') return Math.max(0, currentIndex - 1);
+            if (key === 'ArrowRight') return Math.min(filteredFiles.length - 1, currentIndex + 1);
+
+            let cols = 1;
+            if (contentRef.current) {
+                const width = contentRef.current.clientWidth - 32;
+                cols = Math.floor(width / 116);
+                if (cols < 1) cols = 1;
+            }
+
+            if (key === 'ArrowUp') return Math.max(0, currentIndex - cols);
+            if (key === 'ArrowDown') return Math.min(filteredFiles.length - 1, currentIndex + cols);
+            return currentIndex;
+        };
+
+        const handleArrowNavigation = (e: KeyboardEvent) => {
+            e.preventDefault();
+            if (filteredFiles.length === 0) return;
+
+            let nextIndex = 0;
+            const currentIndex = lastSelectedPath
+                ? filteredFiles.findIndex(f => f.path === lastSelectedPath)
+                : -1;
+
+            if (currentIndex !== -1) {
+                if (viewMode === 'list') {
+                    if (e.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - 1);
+                    else if (e.key === 'ArrowDown') nextIndex = Math.min(filteredFiles.length - 1, currentIndex + 1);
+                    else nextIndex = currentIndex;
+                } else {
+                    nextIndex = calculateGridNextIndex(currentIndex, e.key);
+                }
+            }
+
+            if (nextIndex >= 0 && nextIndex < filteredFiles.length) {
+                const nextFile = filteredFiles[nextIndex];
+                setSelectedPaths(new Set([nextFile.path]));
+                setLastSelectedPath(nextFile.path);
+
+                const el = document.querySelector(`[data-path="${nextFile.path.replaceAll('\\', '\\\\')}"]`);
+                if (el) el.scrollIntoView({ block: 'nearest' });
+            }
+        };
+
         const handleKeyDown = (e: KeyboardEvent) => {
             const isCtrl = e.ctrlKey || e.metaKey;
             const key = e.key.toLowerCase();
-
 
             if (renamingFile || isCreating) {
                 if (e.key === 'Escape') {
@@ -942,86 +1137,16 @@ const Home = () => {
             }
 
             const target = e.target as HTMLElement;
-            if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) {
-                return;
-            }
+            if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
 
-            // Global shortcuts
-            if (isCtrl && key === 'c' && selectedPaths.size > 0) { e.preventDefault(); menuActions.copy(); }
-            if (isCtrl && key === 'x' && selectedPaths.size > 0) { e.preventDefault(); menuActions.cut(); }
-            if (isCtrl && key === 'v') { e.preventDefault(); menuActions.paste(); }
-            if (isCtrl && key === 'a') { e.preventDefault(); setSelectedPaths(new Set(filteredFiles.map(f => f.path))); }
-            if (e.key === 'Escape') { e.preventDefault(); setSelectedPaths(new Set()); }
-
-            if (isCtrl && e.shiftKey && key === 'n') { e.preventDefault(); initCreateFolder(); }
-            else if (isCtrl && key === 'n') { e.preventDefault(); initCreateFile(); }
-
-            if (e.key === 'Backspace' && !renamingFile && !isCreating) {
-                e.preventDefault();
-                navigateBack();
-            }
-
-            if (selectedPaths.size > 0 || lastSelectedPath) {
-                if (e.key === 'F2') { e.preventDefault(); menuActions.rename(); }
-                if (e.key === 'Delete') { e.preventDefault(); menuActions.delete(); }
-            }
-
-            // Arrow Navigation
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                e.preventDefault();
-                if (filteredFiles.length === 0) return;
-
-                let nextIndex = 0;
-                const currentIndex = lastSelectedPath
-                    ? filteredFiles.findIndex(f => f.path === lastSelectedPath)
-                    : -1;
-
-                if (currentIndex === -1) {
-                    nextIndex = 0;
-                } else {
-                    if (viewMode === 'list') {
-                        if (e.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - 1);
-                        if (e.key === 'ArrowDown') nextIndex = Math.min(filteredFiles.length - 1, currentIndex + 1);
-                        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') nextIndex = currentIndex;
-                    } else {
-                        // Grid Heuristics
-                        if (e.key === 'ArrowLeft') nextIndex = Math.max(0, currentIndex - 1);
-                        if (e.key === 'ArrowRight') nextIndex = Math.min(filteredFiles.length - 1, currentIndex + 1);
-
-                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                            let cols = 1;
-                            if (contentRef.current) {
-                                const width = contentRef.current.clientWidth - 32;
-                                cols = Math.floor(width / 116);
-                                if (cols < 1) cols = 1;
-                            }
-                            if (e.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - cols);
-                            if (e.key === 'ArrowDown') nextIndex = Math.min(filteredFiles.length - 1, currentIndex + cols);
-                        }
-                    }
-                }
-
-                if (nextIndex >= 0 && nextIndex < filteredFiles.length) {
-                    const nextFile = filteredFiles[nextIndex];
-                    setSelectedPaths(new Set([nextFile.path]));
-                    setLastSelectedPath(nextFile.path);
-
-                    const el = document.querySelector(`[data-path="${nextFile.path.replace(/\\/g, '\\\\')}"]`);
-                    if (el) el.scrollIntoView({ block: 'nearest' });
-                }
-            }
-
-            if (e.key === 'Enter') {
-                if (selectedPaths.size === 1) {
-                    const file = filteredFiles.find(f => f.path === lastSelectedPath);
-                    if (file && file.isDirectory) { navigateTo(file.path); }
-                    else if (file) { window.api.openPath(file.path); }
-                }
-            }
+            if (handleBasicKeyAction(e)) return;
+            if (isCtrl) { handleCtrlShortcuts(e, key); return; }
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) { handleArrowNavigation(e); return; }
+            if (selectedPaths.size > 0 || lastSelectedPath) handleFileActionShortcuts(e);
         };
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        globalThis.addEventListener('keydown', handleKeyDown);
+        return () => globalThis.removeEventListener('keydown', handleKeyDown);
     }, [selectedPaths, lastSelectedPath, renamingFile, isCreating, filteredFiles, appClipboard, currentPath, viewMode]);
 
     return (
@@ -1079,6 +1204,9 @@ const Home = () => {
                                 ref={contentRef}
                                 onMouseDown={handleMouseDown}
                                 onContextMenu={(e) => handleContextMenu(e)}
+                                role="grid"
+                                aria-label="File explorer content area"
+                                tabIndex={0}
                             >
                                 {/* File List / Grid */}
                                 <FileList
@@ -1164,6 +1292,42 @@ const Home = () => {
                 onConfirm={handleDeleteConfirmAction}
                 onCancel={handleDeleteCancel}
             />
+
+            {/* Backup Setup Popup */}
+            <CustomPopup
+                isOpen={!!backupSetupProject}
+                title="Set Backup Location"
+                message="Choose where project backups will be stored. This cannot be changed later."
+                icon={<FolderOpen size={24} color="#6e7bf2" />}
+                confirmText="Confirm & Open"
+                cancelText="Cancel"
+                onConfirm={confirmBackupSetup}
+                onCancel={cancelBackupSetup}
+            >
+                <div className="backup-path-display">
+                    <img src={logo} alt="" />
+                    <span>{backupSetupPath || 'No folder selected'}</span>
+                </div>
+                <button
+                    style={{
+                        padding: '8px 14px',
+                        fontSize: '13px',
+                        borderRadius: '8px',
+                        border: '1px solid #3f3f46',
+                        background: 'transparent',
+                        color: '#e4e4e7',
+                        cursor: 'pointer',
+                        alignSelf: 'flex-start',
+                        transition: 'all 0.2s',
+                    }}
+                    onClick={async () => {
+                        const path = await globalThis.api.openFolder();
+                        if (path) setBackupSetupPath(path);
+                    }}
+                >
+                    Browse...
+                </button>
+            </CustomPopup>
         </div>
     );
 };

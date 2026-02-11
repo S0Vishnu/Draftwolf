@@ -73,11 +73,26 @@ const Cleanup = () => {
     const [versionsToDelete, setVersionsToDelete] = useState<Set<string>>(new Set());
 
     const rootDir = localStorage.getItem('rootDir');
+    const [backupPath, setBackupPath] = useState<string | undefined>(undefined);
+
+    useEffect(() => {
+        if (!rootDir) return;
+        try {
+            const pinned = JSON.parse(localStorage.getItem('pinnedFolders') || '[]');
+            const recent = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
+            const p = pinned.find((f: any) => f.path === rootDir);
+            const r = recent.find((w: any) => w.path === rootDir);
+            const bp = (p as any)?.backupPath || (r as any)?.backupPath;
+            setBackupPath(bp);
+        } catch (e) {
+            console.error(e);
+        }
+    }, [rootDir]);
 
     const fetchReport = () => {
         if (rootDir) {
             setIsLoading(true);
-            (window as any).api.draft.getStorageReport(rootDir).then((data: any) => {
+            (window as any).api.draft.getStorageReport(rootDir, backupPath).then((data: any) => {
                 if (data) setStorageReport(data);
                 setIsLoading(false);
             });
@@ -86,7 +101,7 @@ const Cleanup = () => {
 
     useEffect(() => {
         fetchReport();
-    }, [rootDir]);
+    }, [rootDir, backupPath]);
 
     // Click outside dropdown handler
     useEffect(() => {
@@ -107,7 +122,7 @@ const Cleanup = () => {
         setVersionsToDelete(new Set());
         setSelectedVersion(null);
         if (rootDir) {
-            const history = await (window as any).api.draft.getHistory(rootDir, file.path);
+            const history = await (window as any).api.draft.getHistory(rootDir, file.path, backupPath);
             setFileVersions(history);
             if (history.length > 0) {
                 setSelectedVersion(history[0]);
@@ -137,7 +152,7 @@ const Cleanup = () => {
 
         let successCount = 0;
         for (const vid of versionsToDelete) {
-            const success = await (window as any).api.draft.delete(rootDir, vid);
+            const success = await (window as any).api.draft.delete(rootDir, vid, backupPath);
             if (success) successCount++;
         }
 
@@ -145,7 +160,7 @@ const Cleanup = () => {
             toast.success(`Deleted ${successCount} version(s)`);
             // Refresh
             if (inspectingFile) {
-                const history = await (window as any).api.draft.getHistory(rootDir, inspectingFile.path);
+                const history = await (window as any).api.draft.getHistory(rootDir, inspectingFile.path, backupPath);
                 setFileVersions(history);
                 setVersionsToDelete(new Set());
                 // Update global report background

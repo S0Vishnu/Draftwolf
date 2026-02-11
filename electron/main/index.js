@@ -537,9 +537,9 @@ ipcMain.handle("fs:renameEntry", async (_, { oldPath, newPath }) => {
 
 // ... (keeping existing handlers)
 
-ipcMain.handle("draft:saveAttachment", async (_, { projectRoot, filePath }) => {
+ipcMain.handle("draft:saveAttachment", async (_, { projectRoot, filePath, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath);
     const internalPath = await dcs.saveAttachment(filePath);
     return { success: true, path: internalPath };
   } catch (e) {
@@ -550,9 +550,9 @@ ipcMain.handle("draft:saveAttachment", async (_, { projectRoot, filePath }) => {
 
 ipcMain.handle(
   "draft:saveMetadata",
-  async (_, { projectRoot, relativePath, metadata }) => {
+  async (_, { projectRoot, relativePath, metadata, backupPath }) => {
     try {
-      const dcs = new DraftControlSystem(projectRoot);
+      const dcs = new DraftControlSystem(projectRoot, backupPath);
       await dcs.saveMetadata(relativePath, metadata);
       return true;
     } catch (e) {
@@ -564,9 +564,9 @@ ipcMain.handle(
 
 ipcMain.handle(
   "draft:getMetadata",
-  async (_, { projectRoot, relativePath }) => {
+  async (_, { projectRoot, relativePath, backupPath }) => {
     try {
-      const dcs = new DraftControlSystem(projectRoot);
+      const dcs = new DraftControlSystem(projectRoot, backupPath);
       const meta = await dcs.getMetadata(relativePath);
       return meta;
     } catch (e) {
@@ -801,9 +801,9 @@ ipcMain.handle("fs:watchDir", async (event, dirPath) => {
 
 // --- Draft Control System ---
 
-ipcMain.handle("draft:init", async (_, projectRoot) => {
+ipcMain.handle("draft:init", async (_, { projectRoot, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     await dcs.init();
     return true;
   } catch (e) {
@@ -812,9 +812,9 @@ ipcMain.handle("draft:init", async (_, projectRoot) => {
   }
 });
 
-ipcMain.handle("draft:commit", async (_, { projectRoot, label, files }) => {
+ipcMain.handle("draft:commit", async (_, { projectRoot, label, files, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     const versionId = await dcs.commit(label, files);
     return { success: true, versionId };
   } catch (e) {
@@ -823,9 +823,9 @@ ipcMain.handle("draft:commit", async (_, { projectRoot, label, files }) => {
   }
 });
 
-ipcMain.handle("draft:createSnapshot", async (_, { projectRoot, folderPath, label }) => {
+ipcMain.handle("draft:createSnapshot", async (_, { projectRoot, folderPath, label, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     const versionId = await dcs.createSnapshot(folderPath, label);
     return { success: true, versionId };
   } catch (e) {
@@ -834,9 +834,9 @@ ipcMain.handle("draft:createSnapshot", async (_, { projectRoot, folderPath, labe
   }
 });
 
-ipcMain.handle("draft:history", async (_, { projectRoot, relativePath }) => {
+ipcMain.handle("draft:history", async (_, { projectRoot, relativePath, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     const history = await dcs.getHistory(relativePath);
     return history;
   } catch (e) {
@@ -845,9 +845,9 @@ ipcMain.handle("draft:history", async (_, { projectRoot, relativePath }) => {
   }
 });
 
-ipcMain.handle("draft:restore", async (_, { projectRoot, versionId }) => {
+ipcMain.handle("draft:restore", async (_, { projectRoot, versionId, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     await dcs.restore(versionId);
     return { success: true };
   } catch (e) {
@@ -856,9 +856,9 @@ ipcMain.handle("draft:restore", async (_, { projectRoot, versionId }) => {
   }
 });
 
-ipcMain.handle("draft:delete", async (_, { projectRoot, versionId }) => {
+ipcMain.handle("draft:delete", async (_, { projectRoot, versionId, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     await dcs.deleteVersion(versionId);
     return true;
   } catch (e) {
@@ -869,9 +869,9 @@ ipcMain.handle("draft:delete", async (_, { projectRoot, versionId }) => {
 
 ipcMain.handle(
   "draft:extract",
-  async (_, { projectRoot, versionId, relativePath, destPath }) => {
+  async (_, { projectRoot, versionId, relativePath, destPath, backupPath }) => {
     try {
-      const dcs = new DraftControlSystem(projectRoot);
+      const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
       await dcs.extractFile(versionId, relativePath, destPath);
       return true;
     } catch (e) {
@@ -883,9 +883,9 @@ ipcMain.handle(
 
 ipcMain.handle(
   "draft:renameVersion",
-  async (_, { projectRoot, versionId, newLabel }) => {
+  async (_, { projectRoot, versionId, newLabel, backupPath }) => {
     try {
-      const dcs = new DraftControlSystem(projectRoot);
+      const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
       await dcs.renameVersion(versionId, newLabel);
       return true;
     } catch (e) {
@@ -897,9 +897,9 @@ ipcMain.handle(
 
 ipcMain.handle(
   "draft:getFileVersion",
-  async (_, { projectRoot, relativePath }) => {
+  async (_, { projectRoot, relativePath, backupPath }) => {
     try {
-      const dcs = new DraftControlSystem(projectRoot);
+      const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
       const version = await dcs.getLatestVersionForFile(relativePath);
       return version;
     } catch (e) {
@@ -909,9 +909,9 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle("draft:getCurrentHead", async (_, projectRoot) => {
+ipcMain.handle("draft:getCurrentHead", async (_, { projectRoot, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     return await dcs.getCurrentHead();
   } catch (e) {
     console.error("Draft Get Current Head Failed:", e);
@@ -919,9 +919,9 @@ ipcMain.handle("draft:getCurrentHead", async (_, projectRoot) => {
   }
 });
 
-ipcMain.handle("draft:storageReport", async (_, projectRoot) => {
+ipcMain.handle("draft:storageReport", async (_, { projectRoot, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     return await dcs.getStorageReport();
   } catch (e) {
     console.error("Draft Storage Report Failed:", e);
@@ -929,9 +929,9 @@ ipcMain.handle("draft:storageReport", async (_, projectRoot) => {
   }
 });
 
-ipcMain.handle("draft:validate", async (_, projectRoot) => {
+ipcMain.handle("draft:validate", async (_, { projectRoot, backupPath }) => {
   try {
-    const dcs = new DraftControlSystem(projectRoot);
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
     return await dcs.validateIntegrity();
   } catch (e) {
     console.error("Draft Validate Failed:", e);

@@ -63,9 +63,11 @@ export class DraftControlSystem {
   private versionsPath: string;
   private indexPath: string;
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, storageRoot?: string) {
     this.projectRoot = projectRoot;
-    this.draftPath = path.join(projectRoot, DRAFT_DIR);
+    // If storageRoot is provided, use it for .draft location. Otherwise default to projectRoot.
+    const rootForDraft = storageRoot || projectRoot;
+    this.draftPath = path.join(rootForDraft, DRAFT_DIR);
     this.objectsPath = path.join(this.draftPath, OBJECTS_DIR);
     this.versionsPath = path.join(this.draftPath, VERSIONS_DIR);
     this.indexPath = path.join(this.draftPath, INDEX_FILE);

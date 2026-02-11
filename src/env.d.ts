@@ -42,20 +42,20 @@ interface Window {
     onTrayOpenFolder: (callback: (path: string) => void) => () => void;
     onTrayNavigate: (callback: (path: string) => void) => () => void;
     draft: {
-      init: (projectRoot: string) => Promise<boolean>;
-      commit: (projectRoot: string, label: string, files: string[]) => Promise<{ success: boolean; versionId?: string; error?: string }>;
-      createSnapshot: (projectRoot: string, folderPath: string, label: string) => Promise<{ success: boolean; versionId?: string; error?: string }>;
-      getHistory: (projectRoot: string, relativePath?: string) => Promise<{ id: string; label: string; timestamp: string | number; files: Record<string, string>; totalSize?: number; parent?: string; parents?: string[]; parentId?: string }[]>;
-      restore: (projectRoot: string, versionId: string) => Promise<{ success: boolean; error?: string; code?: string }>;
-      delete: (projectRoot: string, versionId: string) => Promise<boolean>;
-      renameVersion: (projectRoot: string, versionId: string, newLabel: string) => Promise<boolean>;
-      extract: (projectRoot: string, versionId: string, relativePath: string, destPath: string) => Promise<boolean>;
-      saveAttachment: (projectRoot: string, filePath: string) => Promise<{ success: boolean; path: string }>;
-      saveMetadata: (projectRoot: string, relativePath: string, metadata: any) => Promise<boolean>;
-      getMetadata: (projectRoot: string, relativePath: string) => Promise<any>;
-      getFileVersion: (projectRoot: string, relativePath: string) => Promise<string | null>;
-      getCurrentHead: (projectRoot: string) => Promise<string | null>;
-      getStorageReport: (projectRoot: string) => Promise<any>;
+      init: (projectRoot: string, backupPath?: string) => Promise<boolean>;
+      commit: (projectRoot: string, label: string, files: string[], backupPath?: string) => Promise<{ success: boolean; versionId?: string; error?: string }>;
+      createSnapshot: (projectRoot: string, folderPath: string, label: string, backupPath?: string) => Promise<{ success: boolean; versionId?: string; error?: string }>;
+      getHistory: (projectRoot: string, relativePath?: string, backupPath?: string) => Promise<{ id: string; label: string; timestamp: string | number; files: Record<string, string>; totalSize?: number; parent?: string; parents?: string[]; parentId?: string; totalCompressedSize?: number }[]>;
+      restore: (projectRoot: string, versionId: string, backupPath?: string) => Promise<{ success: boolean; error?: string; code?: string }>;
+      delete: (projectRoot: string, versionId: string, backupPath?: string) => Promise<boolean>;
+      renameVersion: (projectRoot: string, versionId: string, newLabel: string, backupPath?: string) => Promise<boolean>;
+      extract: (projectRoot: string, versionId: string, relativePath: string, destPath: string, backupPath?: string) => Promise<boolean>;
+      saveAttachment: (projectRoot: string, filePath: string, backupPath?: string) => Promise<{ success: boolean; path: string }>;
+      saveMetadata: (projectRoot: string, relativePath: string, metadata: any, backupPath?: string) => Promise<boolean>;
+      getMetadata: (projectRoot: string, relativePath: string, backupPath?: string) => Promise<any>;
+      getFileVersion: (projectRoot: string, relativePath: string, backupPath?: string) => Promise<string | null>;
+      getCurrentHead: (projectRoot: string, backupPath?: string) => Promise<string | null>;
+      getStorageReport: (projectRoot: string, backupPath?: string) => Promise<any>;
     };
     auth: {
       login: () => Promise<void>;
@@ -70,7 +70,6 @@ interface Window {
       install: () => Promise<void>;
       onAvailable: (callback: (info: any) => void) => () => void;
       onDownloaded: (callback: (info: any) => void) => () => void;
-      onProgress: (callback: (info: any) => void) => () => void;
       onProgress: (callback: (info: any) => void) => () => void;
       onError: (callback: (error: string) => void) => () => void;
     };

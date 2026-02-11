@@ -18,6 +18,7 @@ interface SnapshotsTabProps {
     onRestore: (id: string) => void;
     onRename: (id: string, newLabel: string) => void;
     projectRoot: string;
+    backupPath?: string;
 }
 
 const LANE_COLORS = [
@@ -53,7 +54,8 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
     onDelete,
     onRestore,
     onRename,
-    projectRoot
+    projectRoot,
+    backupPath
 }) => {
     const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
     const [editingLabel, setEditingLabel] = useState<string>('');
@@ -63,7 +65,7 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
         const fetchStats = async () => {
             try {
                 // @ts-ignore
-                const s = await globalThis.api.draft.getStorageReport(projectRoot);
+                const s = await globalThis.api.draft.getStorageReport(projectRoot, backupPath);
                 setStats(s);
             } catch (e) {
                 console.error("Failed to fetch storage stats", e);

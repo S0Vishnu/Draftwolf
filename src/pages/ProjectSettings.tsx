@@ -6,7 +6,7 @@ import { auth } from '../firebase';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import CustomPopup from '../components/CustomPopup';
-import { Settings as SettingsIcon, Save, ChevronLeft, FolderOpen, HardDrive } from 'lucide-react';
+import { Settings as SettingsIcon, Save, ChevronLeft, FolderOpen, ExternalLink, Trash2 } from 'lucide-react';
 import '../styles/AppLayout.css';
 import '../styles/Settings.css';
 
@@ -29,10 +29,14 @@ const ProjectSettings: React.FC = () => {
         setPinnedFolders(pinned);
         setRecentWorkspaces(recents);
 
+        // Normalize for comparison
+        const normProjectPath = projectPath?.toLowerCase().replaceAll('\\', '/');
+
         // Get backup path from pinned or recent
-        const pinnedFolder = pinned.find((f: any) => f.path === projectPath);
-        const recentFolder = recents.find((r: any) => r.path === projectPath);
-        setBackupPath(pinnedFolder?.backupPath || recentFolder?.backupPath || '');
+        const pinnedFolder = pinned.find((f: any) => f.path.toLowerCase().replaceAll('\\', '/') === normProjectPath);
+        const recentFolder = recents.find((r: any) => r.path.toLowerCase().replaceAll('\\', '/') === normProjectPath);
+        const foundBackupPath = pinnedFolder?.backupPath || recentFolder?.backupPath || '';
+        setBackupPath(foundBackupPath);
 
         const folder = pinnedFolder;
         if (folder) {
@@ -65,6 +69,26 @@ const ProjectSettings: React.FC = () => {
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
     const handleBack = () => navigate('/home');
 
+    const handleOpenDraftFolder = () => {
+        if (!projectPath) return;
+        const actualRoot = backupPath || projectPath;
+        // Handle path joining safely for different platforms although we are mainly windows currently
+        const separator = actualRoot.includes('\\') ? '\\' : '/';
+        const draftFolder = actualRoot.endsWith(separator) 
+            ? `${actualRoot}.draft` 
+            : `${actualRoot}${separator}.draft`;
+        
+        // @ts-ignore
+        globalThis.api.openPath(draftFolder).catch(err => {
+            console.error("Failed to open .draft folder", err);
+            toast.error("Could not open .draft folder");
+        });
+    };
+
+    const handleClearBackupPath = () => {
+        setBackupPath('');
+    };
+
     const handleSave = () => {
         // Update Pinned Folders
         let updatedPinned = [...pinnedFolders];
@@ -75,7 +99,8 @@ const ProjectSettings: React.FC = () => {
                 name: settings.projectName, 
                 color: settings.color,
                 showHiddenFiles: settings.showHiddenFiles,
-                showExtensions: settings.showExtensions
+                showExtensions: settings.showExtensions,
+                backupPath: backupPath
             };
             if (index !== -1) {
                 updatedPinned[index] = folderData;
@@ -89,7 +114,7 @@ const ProjectSettings: React.FC = () => {
 
         // Update Recent Workspaces
         const updatedRecents = recentWorkspaces.map(r => 
-            r.path === projectPath ? { ...r, name: settings.projectName } : r
+            r.path === projectPath ? { ...r, name: settings.projectName, backupPath: backupPath } : r
         );
         localStorage.setItem('recentWorkspaces', JSON.stringify(updatedRecents));
         
@@ -282,44 +307,32 @@ const ProjectSettings: React.FC = () => {
                                     <div className="setting-row">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                                             <FolderOpen size={16} color="#6e7bf2" />
-                                            <label style={{ fontWeight: 600 }}>Backup Location</label>
+                                            <span style={{ fontWeight: 600 }}>Backup Location</span>
                                         </div>
                                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>Where project backups are stored. Set during first open.</p>
-                                        <div style={{
-                                            padding: '10px 14px',
-                                            background: 'rgba(0,0,0,0.3)',
-                                            border: '1px solid rgba(255,255,255,0.06)',
-                                            borderRadius: '10px',
-                                            fontSize: '13px',
-                                            color: backupPath ? 'var(--text-secondary, #d4d4d8)' : 'var(--text-muted)',
-                                            wordBreak: 'break-all' as const,
-                                            opacity: 0.9
-                                        }}>
-                                            {backupPath || 'Not configured'}
-                                        </div>
-                                    </div>
-
-                                    <div className="setting-row" style={{ paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                                            <HardDrive size={16} color="#a1a1aa" />
-                                            <label style={{ fontWeight: 600 }}>.draft Folder</label>
-                                        </div>
-                                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>Internal version data is stored here.</p>
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            padding: '10px 14px',
-                                            background: 'rgba(0,0,0,0.3)',
-                                            border: '1px solid rgba(255,255,255,0.06)',
-                                            borderRadius: '10px',
-                                            fontSize: '13px',
-                                            color: 'var(--text-muted)',
-                                            userSelect: 'none' as const
-                                        }}>
-                                            <span style={{ color: 'var(--text-secondary, #d4d4d8)' }}>{settings.projectName || 'Project Root'}</span>
-                                            <span style={{ opacity: 0.4 }}>/</span>
-                                            <span style={{ opacity: 0.6, fontFamily: 'monospace' }}>.draft</span>
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                            <div style={{
+                                                flex: 1,
+                                                padding: '10px 14px',
+                                                background: 'rgba(0,0,0,0.3)',
+                                                border: '1px solid rgba(255,255,255,0.06)',
+                                                borderRadius: '10px',
+                                                fontSize: '13px',
+                                                color: backupPath ? 'var(--text-secondary, #d4d4d8)' : 'var(--text-muted)',
+                                                wordBreak: 'break-all' as const,
+                                                opacity: 0.9,
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }}>
+                                                <span title={backupPath ? "Custom backup location" : "Default project root"}>
+                                                    {(() => {
+                                                        const actualRoot = backupPath || projectPath || '';
+                                                        if (!actualRoot) return 'Path not found';
+                                                        return actualRoot
+                                                    })()}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

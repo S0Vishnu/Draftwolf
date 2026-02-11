@@ -18,7 +18,7 @@ import { InspectorPanelProps, AttachmentItem, InspectorTab } from './inspector/t
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 800;
 
-const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onClose, onRefresh, initialTab }) => {
+const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onClose, onRefresh, initialTab, backupPath }) => {
     const [activeTab, setActiveTab] = useState<InspectorTab>(initialTab || 'versions');
     const [width, setWidth] = useState(420);
     const [isResizing, setIsResizing] = useState(false);
@@ -92,7 +92,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             if (!relPath) return;
 
             try {
-                const meta = await window.api.draft.getMetadata(projectRoot, relPath);
+                const meta = await window.api.draft.getMetadata(projectRoot, relPath, backupPath);
                 if (meta) {
                     setTodos(meta.tasks || []);
                     setAttachments(meta.attachments || []);
@@ -119,7 +119,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 tasks: newTodos,
                 attachments: newAttachments,
                 tags: tags // Pass current tags
-            });
+            }, backupPath);
         } catch (e) {
             console.error("Failed to save metadata", e);
         }
@@ -136,7 +136,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             tasks: todos,
             attachments: attachments,
             tags: newTags
-        }).catch((e: any) => console.error(e));
+        }, backupPath).catch((e: any) => console.error(e));
     };
 
     const addTag = (val: string) => {
@@ -196,8 +196,8 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 if (relPath === '') relPath = '.'; // Handle root directory
 
                 try {
-                    const filtered = await window.api.draft.getHistory(projectRoot, relPath);
-                    const currentHead = await window.api.draft.getCurrentHead(projectRoot);
+                    const filtered = await window.api.draft.getHistory(projectRoot, relPath, backupPath);
+                    const currentHead = await window.api.draft.getCurrentHead(projectRoot, backupPath);
 
                     if (currentHead && filtered.some(v => v.id === currentHead)) {
                         setActiveVersionId(currentHead);
@@ -249,7 +249,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
             console.log('📦 Creating version for:', filesToVersion);
 
-            const result = await window.api.draft.commit(projectRoot, versionLabel, filesToVersion);
+            const result = await window.api.draft.commit(projectRoot, versionLabel, filesToVersion, backupPath);
             if (result && result.success && result.versionId) {
                 setActiveVersionId(result.versionId);
             }
@@ -259,7 +259,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
             const relPath = getRelativePath();
             if (relPath) {
-                const filtered = await window.api.draft.getHistory(projectRoot, relPath);
+                const filtered = await window.api.draft.getHistory(projectRoot, relPath, backupPath);
                 setHistory(filtered);
                 onRefresh?.();
             } else {
@@ -277,7 +277,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         try {
             // Use logical relative path or . for root
             const relPath = getRelativePath() || '.';
-            const result = await window.api.draft.createSnapshot(projectRoot, relPath, versionLabel);
+            const result = await window.api.draft.createSnapshot(projectRoot, relPath, versionLabel, backupPath);
 
             if (result && result.success && result.versionId) {
                 setActiveVersionId(result.versionId);
@@ -293,7 +293,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             const refreshScope = getRelativePath();
             if (refreshScope !== null) {
                 const p = refreshScope === '' ? '.' : refreshScope;
-                const filtered = await window.api.draft.getHistory(projectRoot, p);
+                const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
                 setHistory(filtered);
                 onRefresh?.();
             }
@@ -313,7 +313,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             isDangerous: true,
             onConfirm: async () => {
                 try {
-                    const result = await window.api.draft.restore(projectRoot, vId);
+                    const result = await window.api.draft.restore(projectRoot, vId, backupPath);
 
                     if (result && result.success) {
                         setActiveVersionId(vId);
@@ -387,7 +387,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
 
         const performExtraction = async () => {
             try {
-                await window.api.draft.extract(projectRoot, ver.id, relativePath, destPath);
+                await window.api.draft.extract(projectRoot, ver.id, relativePath, destPath, backupPath);
             } catch (e: any) {
                 toast.error(`Failed to save: ${e.message || e}`);
             }
@@ -418,12 +418,12 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             confirmText: 'Delete',
             isDangerous: true,
             onConfirm: async () => {
-                await window.api.draft.delete(projectRoot, vId);
+                await window.api.draft.delete(projectRoot, vId, backupPath);
 
                 const relPath = getRelativePath();
                 if (relPath !== null) {
                     const p = relPath === '' ? '.' : relPath;
-                    const filtered = await window.api.draft.getHistory(projectRoot, p);
+                    const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
                     setHistory(filtered);
                     onRefresh?.();
                 } else {
@@ -453,14 +453,14 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                 try {
                     // Delete all versions except the current one
                     for (const ver of versionsToDelete) {
-                        await window.api.draft.delete(projectRoot, ver.id);
+                        await window.api.draft.delete(projectRoot, ver.id, backupPath);
                     }
 
                     // Refresh the history
                     const relPath = getRelativePath();
                     if (relPath !== null) {
                         const p = relPath === '' ? '.' : relPath;
-                        const filtered = await window.api.draft.getHistory(projectRoot, p);
+                        const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
                         setHistory(filtered);
                     } else {
                         setHistory([]);
@@ -480,13 +480,13 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         if (!projectRoot || !newLabel.trim()) return;
 
         try {
-            await window.api.draft.renameVersion(projectRoot, vId, newLabel.trim());
+            await window.api.draft.renameVersion(projectRoot, vId, newLabel.trim(), backupPath);
 
             // Refresh the history
             const relPath = getRelativePath();
             if (relPath !== null) {
                 const p = relPath === '' ? '.' : relPath;
-                const filtered = await window.api.draft.getHistory(projectRoot, p);
+                const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
                 setHistory(filtered);
             }
         } catch (e) {
@@ -532,7 +532,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         });
 
         if (filePath) {
-            const result = await window.api.draft.saveAttachment(projectRoot, filePath);
+            const result = await window.api.draft.saveAttachment(projectRoot, filePath, backupPath);
 
             if (result.success) {
                 const newAttach: AttachmentItem = {
@@ -602,7 +602,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
             if (!filePath) continue;
 
             try {
-                const result = await window.api.draft.saveAttachment(projectRoot, filePath);
+                const result = await window.api.draft.saveAttachment(projectRoot, filePath, backupPath);
 
                 if (result.success) {
                     newAttachments.push({

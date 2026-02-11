@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase';
 import { FileEntry } from '../components/FileItem';
@@ -28,6 +29,7 @@ const joinPath = (dir: string, file: string) => {
 };
 
 const Home = () => {
+    const navigate = useNavigate();
     const [user] = useAuthState(auth);
 
     // Layout
@@ -117,11 +119,15 @@ const Home = () => {
 
     const addToRecents = (path: string) => {
         setRecentWorkspaces(prev => {
-            const filtered = prev.filter(w => w.path !== path);
+            const normPath = path.toLowerCase().replaceAll('\\', '/');
+            const existing = prev.find(w => w.path.toLowerCase().replaceAll('\\', '/') === normPath);
+            const filtered = prev.filter(w => w.path.toLowerCase().replaceAll('\\', '/') !== normPath);
+            
             const newItem = {
-                path,
+                ...existing,
+                path: existing?.path || path, // Prefer existing path casing if available
                 lastOpened: Date.now(),
-                name: path.split(/[/\\]/).pop() || path
+                name: existing?.name || path.split(/[/\\]/).pop() || path
             };
             return [newItem, ...filtered].slice(0, 10);
         });
@@ -335,6 +341,15 @@ const Home = () => {
     };
 
     // Data Loading
+    const getBackupPath = (projectPath: string | null) => {
+        if (!projectPath) return undefined;
+        const pinned = pinnedFolders.find(f => f.path === projectPath);
+        if (pinned && (pinned as any).backupPath) return (pinned as any).backupPath;
+        const recent = recentWorkspaces.find(w => w.path === projectPath);
+        if (recent && (recent as any).backupPath) return (recent as any).backupPath;
+        return undefined;
+    };
+
     const fetchStats = async (entry: FileEntry): Promise<FileEntry> => {
         try {
             const stats = await globalThis.api.getStats(entry.path);
@@ -350,10 +365,11 @@ const Home = () => {
                 // Get version info for both files and directories
                 // Note: For directories, getFileVersion (backed by getLatestVersionForFile)
                 // relies on getHistory being able to detect folder snapshots.
-                const v = await globalThis.api.draft.getFileVersion(rootDir, rel);
+                const bp = getBackupPath(rootDir);
+                const v = await globalThis.api.draft.getFileVersion(rootDir, rel, bp);
                 if (v) latestVersion = v;
 
-                const meta = await globalThis.api.draft.getMetadata(rootDir, rel);
+                const meta = await globalThis.api.draft.getMetadata(rootDir, rel, bp);
                 if (meta?.tags) {
                     tags = meta.tags;
                 }
@@ -504,7 +520,7 @@ const Home = () => {
         const hasBackup = (pinned as any)?.backupPath || (recent as any)?.backupPath;
 
         if (hasBackup) {
-            // Already configured — just open
+            // Priority 1: Already configured — just open
             setRootDir(path);
             setHistory([path]);
             setHistoryIndex(0);
@@ -512,7 +528,8 @@ const Home = () => {
             return;
         }
 
-        // Check if .draft folder already exists on disk (existing project)
+        // Priority 2: Check if .draft folder already exists on disk (existing project)
+        // Only do this if NO backup path is configured.
         const separator = path.includes('/') ? '/' : '\\';
         const draftPath = path.endsWith(separator) ? `${path}.draft` : `${path}${separator}.draft`;
         try {
@@ -520,6 +537,7 @@ const Home = () => {
             if (stats?.isDirectory) {
                 // Existing project — auto-set backup to project's own path
                 toast.info("Opening existing project...");
+                // Explicitly save project root as backup path to avoid ambiguity in future
                 saveBackupPath(path, path);
                 setRootDir(path);
                 setHistory([path]);
@@ -557,19 +575,19 @@ const Home = () => {
         const projPath = backupSetupProject;
         
         // Create .draft folder
-        const separator = bPath.includes('/') ? '/' : '\\';
-        const draftDir = bPath.endsWith(separator) ? `${bPath}.draft` : `${bPath}${separator}.draft`;
-        
+        // Initialize the draft system structure at the confirmed backup path
         try {
-            const res = await globalThis.api.createFolder(draftDir);
-            if (!res.success && !res.error?.includes('exists')) {
-                toast.error(`Failed to create backup folder: ${res.error}`);
+             // API will handle creating .draft/objects/versions/metadata etc.
+            const success = await globalThis.api.draft.init(projPath, bPath);
+            if (!success) {
+                toast.error("Failed to initialize backup system");
                 return;
             }
-            if (res.success) toast.success("Created backup folder (.draft)");
+            toast.success("Initialized backup system (.draft)");
         } catch (e) {
-            console.error(e);
-            // Non-critical if it fails (maybe already exists), but good to know
+            console.error("Init Error:", e);
+            toast.error("Error initializing backup system");
+            return;
         }
 
         // Save backup path to pinned & recents
@@ -1173,6 +1191,17 @@ const Home = () => {
                         setSearchQuery={setSearchQuery}
                         refreshDirectory={refreshDirectory}
                         isLoading={isLoading}
+                        onSettings={rootDir ? () => navigate(`/project-settings?path=${encodeURIComponent(rootDir)}`) : undefined}
+                        onTogglePin={rootDir ? () => {
+                            if (pinnedFolders.some(f => f.path === rootDir)) {
+                                removeFromPinned(rootDir!);
+                                toast.success("Unpinned project");
+                            } else {
+                                addToPinned(rootDir!);
+                                toast.success("Pinned project");
+                            }
+                        } : undefined}
+                        isPinned={rootDir ? pinnedFolders.some(f => f.path === rootDir) : false}
                     />
 
                     {currentPath ? (
@@ -1264,9 +1293,10 @@ const Home = () => {
                     <InspectorPanel
                         file={activeFile}
                         projectRoot={rootDir || currentPath || ''}
-                        onClose={handleInspectorClose}
-                        onRefresh={() => loadDirectory(currentPath || '')}
+                        onClose={() => setInspectorTab(undefined)}
+                        onRefresh={refreshDirectory}
                         initialTab={inspectorTab}
+                        backupPath={getBackupPath(rootDir)}
                     />
                 )}
             </div>

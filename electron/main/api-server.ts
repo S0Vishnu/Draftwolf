@@ -30,7 +30,9 @@ interface PostBody {
     versionId?: string;
     relativePath?: string;
     newLabel?: string;
+    newLabel?: string;
     targetFile?: string;
+    backupPath?: string;
 }
 
 /** Derive a display name from email (local part, capitalized) so we never show raw email. */
@@ -83,29 +85,29 @@ async function handleFindRoot(res: http.ServerResponse, body: PostBody): Promise
 }
 
 async function handleInit(res: http.ServerResponse, body: PostBody): Promise<void> {
-    const dcs = new DraftControlSystem(body.projectRoot!);
+    const dcs = new DraftControlSystem(body.projectRoot!, body.backupPath);
     await dcs.init();
     sendJson(res, 200, { success: true });
 }
 
 async function handleCommit(res: http.ServerResponse, body: PostBody): Promise<void> {
-    const dcs = new DraftControlSystem(body.projectRoot!);
+    const dcs = new DraftControlSystem(body.projectRoot!, body.backupPath);
     const versionId = await dcs.commit(body.label!, body.files!);
     sendJson(res, 200, { success: true, versionId });
 }
 
 async function handleHistory(res: http.ServerResponse, body: PostBody): Promise<void> {
     const filterPath = body.targetFile || body.relativePath;
-    console.log(`[API] History Request: Root="${body.projectRoot}", Filter="${filterPath}"`);
-    const dcs = new DraftControlSystem(body.projectRoot!);
+    console.log(`[API] History Request: Root="${body.projectRoot}", Filter="${filterPath}", Backup="${body.backupPath}"`);
+    const dcs = new DraftControlSystem(body.projectRoot!, body.backupPath);
     const history = await dcs.getHistory(filterPath!);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(history));
 }
 
 async function handleExtractTemp(res: http.ServerResponse, body: PostBody): Promise<void> {
-    const dcs = new DraftControlSystem(body.projectRoot!);
-    const tempDir = path.join(body.projectRoot!, '.draft', 'temp');
+    const dcs = new DraftControlSystem(body.projectRoot!, body.backupPath);
+    const tempDir = path.join(body.projectRoot!, '.draft', 'temp'); // TODO: Does temp dir need to be in backupPath too? Currently keeps in projectRoot which is fine for temp.
     if (!(await fs.stat(tempDir).catch(() => false))) {
         await fs.mkdir(tempDir, { recursive: true });
     }
@@ -117,19 +119,19 @@ async function handleExtractTemp(res: http.ServerResponse, body: PostBody): Prom
 }
 
 async function handleRestore(res: http.ServerResponse, body: PostBody): Promise<void> {
-    const dcs = new DraftControlSystem(body.projectRoot!);
+    const dcs = new DraftControlSystem(body.projectRoot!, body.backupPath);
     await dcs.restore(body.versionId!);
     sendJson(res, 200, { success: true });
 }
 
 async function handleRenameVersion(res: http.ServerResponse, body: PostBody): Promise<void> {
-    const dcs = new DraftControlSystem(body.projectRoot!);
+    const dcs = new DraftControlSystem(body.projectRoot!, body.backupPath);
     await dcs.renameVersion(body.versionId!, body.newLabel!);
     sendJson(res, 200, { success: true });
 }
 
 async function handleCreateSnapshot(res: http.ServerResponse, body: PostBody): Promise<void> {
-    const dcs = new DraftControlSystem(body.projectRoot!);
+    const dcs = new DraftControlSystem(body.projectRoot!, body.backupPath);
     // limit snapshot to specific folder if provided, or root
     const targetFolder = body.relativePath || '.';
     const versionId = await dcs.createSnapshot(targetFolder, body.label!);
@@ -137,7 +139,7 @@ async function handleCreateSnapshot(res: http.ServerResponse, body: PostBody): P
 }
 
 async function handleStorageStats(res: http.ServerResponse, body: PostBody): Promise<void> {
-    const dcs = new DraftControlSystem(body.projectRoot!);
+    const dcs = new DraftControlSystem(body.projectRoot!, body.backupPath);
     const stats = await dcs.getStorageReport();
     sendJson(res, 200, stats);
 }

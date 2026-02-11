@@ -10,13 +10,13 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    animation: fadeIn 0.2s ease-out;
+    animation: menuFadeIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .modal-dialog {
-    background: #18181b;
+    background: var(--bg-panel);
     /* Dark zinc */
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-default);
     border-radius: 12px;
     width: 400px;
     max-width: 90%;
@@ -26,7 +26,7 @@
     flex-direction: column;
     gap: 16px;
     transform: translateY(0);
-    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: menuFadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .modal-title {
@@ -62,7 +62,7 @@
 }
 
 .modal-btn:focus-visible {
-    box-shadow: 0 0 0 2px #5e6ad2;
+    box-shadow: 0 0 0 2px var(--accent-primary);
 }
 
 .modal-btn.secondary {
@@ -77,13 +77,13 @@
 }
 
 .modal-btn.primary {
-    background-color: #6e7bf2;
+    background-color: var(--accent-primary);
     /* Matching InspectorPanel accent */
     color: white;
 }
 
 .modal-btn.primary:hover {
-    background-color: #4f5bbf;
+    background-color: var(--accent-hover);
 }
 
 .modal-btn.danger {
@@ -115,5 +115,16 @@
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes menuFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }

@@ -31,7 +31,7 @@
     font-size: 2.5rem;
     font-weight: 700;
     margin: 0;
-    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+    background: linear-gradient(135deg, var(--text-main) 0%, var(--text-muted) 100%);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -62,10 +62,10 @@
 
 /* Glassmorphism Panels */
 .glass-panel {
-    background: rgba(24, 24, 27, 0.6);
+    background: var(--bg-card);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
     border-radius: 24px;
     padding: 2rem;
     transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -88,7 +88,7 @@
     justify-content: space-between;
     align-items: center;
     padding-bottom: 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-default);
     margin-bottom: 0.5rem;
 }
 
@@ -99,7 +99,7 @@
     gap: 0.75rem;
     margin: 0;
     font-weight: 600;
-    color: #f3f4f6;
+    color: var(--text-main);
     letter-spacing: -0.01em;
 }
 
@@ -123,7 +123,7 @@
     height: 100%;
     border-radius: 50%;
     /* Animated Gradient Ring */
-    background: linear-gradient(135deg, var(--accent), #8b5cf6, #ec4899);
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), #ec4899);
     padding: 3px;
     position: absolute;
     top: 0;
@@ -147,9 +147,9 @@
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    border: 4px solid #18181b;
+    border: 4px solid var(--bg-sidebar);
     /* Matches panel bg */
-    background-color: #18181b;
+    background-color: var(--bg-sidebar);
     object-fit: cover;
     position: relative;
     z-index: 1;
@@ -159,8 +159,8 @@
     position: absolute;
     bottom: 5px;
     right: 5px;
-    background: var(--accent);
-    border: 4px solid #18181b;
+    background: var(--accent-primary);
+    border: 4px solid var(--bg-sidebar);
     border-radius: 50%;
     width: 42px;
     height: 42px;
@@ -200,8 +200,8 @@
     width: 100%;
     padding: 12px 16px;
     border-radius: 12px;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
     color: white;
     font-size: 1rem;
     outline: none;
@@ -210,8 +210,8 @@
 }
 
 .input-styled:focus {
-    background: rgba(0, 0, 0, 0.3);
-    border-color: var(--accent);
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
 
@@ -230,7 +230,7 @@ textarea.input-styled {
     font-size: 1.75rem;
     font-weight: 700;
     margin: 0 0 0.5rem 0;
-    color: white;
+    color: var(--text-main);
 }
 
 .user-bio {
@@ -273,7 +273,7 @@ textarea.input-styled {
     font-size: 1rem;
     font-weight: 600;
     margin: 0 0 0.25rem 0;
-    color: #e4e4e7;
+    color: var(--text-main);
 }
 
 .setting-info p {
@@ -305,10 +305,10 @@ textarea.input-styled {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--bg-hover);
     border-radius: 34px;
     transition: 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-default);
 }
 
 .toggle-knob {
@@ -325,8 +325,8 @@ textarea.input-styled {
 }
 
 .toggle-input:checked+.toggle-slider {
-    background-color: var(--accent);
-    border-color: var(--accent);
+    background-color: var(--accent-hover);
+    border-color: var(--accent-primary);
 }
 
 .toggle-input:checked+.toggle-slider .toggle-knob {
@@ -335,11 +335,11 @@ textarea.input-styled {
 
 /* Time Inputs */
 .dnd-settings {
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--bg-input);
     border-radius: 12px;
     padding: 1.25rem;
     margin-top: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
 }
 
 .dnd-inputs {
@@ -362,8 +362,8 @@ textarea.input-styled {
 }
 
 .time-wrapper:focus-within {
-    background: rgba(0, 0, 0, 0.3);
-    border-color: var(--accent);
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
 }
 
 .time-input {
@@ -378,8 +378,8 @@ textarea.input-styled {
 
 /* Feature Cards (Blender, etc) */
 .feature-card {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: linear-gradient(145deg, var(--bg-shimmer) 0%, transparent 100%);
+    border: 1px solid var(--border-subtle);
     border-radius: 16px;
     padding: 1.5rem;
     display: flex;
@@ -407,7 +407,7 @@ textarea.input-styled {
 }
 
 .btn-action-primary {
-    background: var(--accent);
+    background: var(--accent-primary);
     color: white;
     border: none;
     padding: 0.75rem 1.25rem;
@@ -433,8 +433,8 @@ textarea.input-styled {
     width: 100%;
     margin-top: 1.5rem;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-hover);
+    border: 1px solid var(--border-subtle);
     border-radius: 12px;
     color: white;
     font-weight: 600;
@@ -473,7 +473,7 @@ textarea.input-styled {
 }
 
 .btn-save {
-    background: var(--accent);
+    background: var(--accent-primary);
     color: white;
 }
 
@@ -487,7 +487,7 @@ textarea.input-styled {
 }
 
 .btn-cancel {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-hover);
     color: var(--text-muted);
 }
 
@@ -536,9 +536,9 @@ textarea.input-styled {
 }
 
 .btn-signout {
+    background: var(--danger);
+    color: white;
     padding: 12px 24px;
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
     border: 1px solid rgba(239, 68, 68, 0.2);
     border-radius: 8px;
     cursor: pointer;

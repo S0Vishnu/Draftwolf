@@ -11,8 +11,8 @@
 
 .community-sidebar {
     width: 240px;
-    background-color: var(--bg-secondary, #252526);
-    border-right: 1px solid var(--border-color, #333);
+    background-color: var(--bg-panel);
+    border-right: 1px solid var(--border-default);
     display: flex;
     flex-direction: column;
 }
@@ -71,7 +71,7 @@
     padding: 0 1.5rem;
     font-weight: 600;
     font-size: 1.1rem;
-    background: var(--bg-secondary, #252526);
+    background: var(--bg-panel);
 }
 
 /* Message Item Styles */
@@ -161,8 +161,8 @@
     position: absolute;
     right: 16px;
     top: -12px;
-    background: var(--bg-secondary, #252526);
-    border: 1px solid var(--border-color, #333);
+    background: var(--bg-panel);
+    border: 1px solid var(--border-default);
     border-radius: 4px;
     display: flex;
     padding: 2px;
@@ -310,7 +310,7 @@
 }
 
 .poll-option.voted {
-    border-color: #4a9eff;
+    border-color: var(--accent-primary);
 }
 
 .poll-bar-bg {
@@ -325,12 +325,13 @@
 
 .poll-bar-fill {
     height: 100%;
-    background: rgba(74, 158, 255, 0.15);
+    background: var(--bg-selected);
     transition: width 0.3s ease-out;
 }
 
 .poll-option.voted .poll-bar-fill {
-    background: rgba(74, 158, 255, 0.3);
+    background: var(--bg-selected);
+    filter: brightness(1.2);
 }
 
 .poll-option-content {
@@ -391,7 +392,7 @@
 
 .poll-input:focus {
     outline: none;
-    border-color: #4a9eff;
+    border-color: var(--accent-primary);
     background: #333;
 }
 
@@ -409,7 +410,7 @@
 }
 
 .btn-primary {
-    background: #1565c0;
+    background: var(--accent-primary);
     color: #ffffff;
     border: none;
     padding: 8px 16px;
@@ -420,7 +421,7 @@
 }
 
 .btn-primary:hover {
-    background: #3b82f6;
+    background: var(--accent-hover);
 }
 
 .btn-secondary {
@@ -446,6 +447,6 @@
 }
 
 .community-search:focus-within {
-    border-color: #4a9eff !important;
+    border-color: var(--accent-primary) !important;
     background: #2a2d2e !important;
 }

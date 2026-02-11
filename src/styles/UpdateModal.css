@@ -10,8 +10,8 @@
 
 .update-modal {
   pointer-events: auto;
-  background: rgba(20, 20, 30, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
   padding: 10px 12px;
   width: 220px;
@@ -26,7 +26,7 @@
 }
 
 .update-modal-icon {
-  color: #8b5cf6;
+  color: var(--accent-secondary);
   flex-shrink: 0;
 }
 
@@ -59,7 +59,7 @@
   padding: 5px 10px;
   border-radius: 6px;
   border: none;
-  background: #8b5cf6;
+  background: var(--accent-primary);
   color: white;
   font-size: 0.75rem;
   font-weight: 500;
@@ -68,7 +68,7 @@
 }
 
 .btn-update-primary:hover {
-  background: #7c3aed;
+  background: var(--accent-hover);
 }
 
 .btn-update-ignore {

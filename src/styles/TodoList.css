@@ -37,7 +37,7 @@
 }
 
 .search-input:focus {
-    border-color: rgba(110, 123, 242, 0.5) !important;
+    border-color: var(--accent-primary) !important;
 }
 
 .search-icon {
@@ -116,7 +116,7 @@
 }
 
 .add-btn {
-    background: #4a5db5;
+    background: var(--accent-primary);
     border: none;
     border-radius: 8px;
     width: 32px;
@@ -186,7 +186,7 @@
 }
 
 .tag-trigger-btn.active {
-    color: #6e7bf2;
+    color: var(--accent-primary);
 }
 
 .active-tags-list {
@@ -196,8 +196,8 @@
 }
 
 .tag-badge {
-    background: rgba(110, 123, 242, 0.2);
-    color: #a0aaff;
+    background: var(--bg-selected);
+    color: var(--accent-secondary);
     font-size: 10px;
     padding: 2px 6px;
     border-radius: 4px;
@@ -306,7 +306,7 @@
 
 .checkbox-btn.checked {
     border: none;
-    background: #4a5db5;
+    background: var(--accent-primary);
 }
 
 .checkbox-btn:active {
@@ -474,7 +474,7 @@
 
 .suggestion-item.active,
 .suggestion-item:hover {
-    background: rgba(110, 123, 242, 0.1);
+    background: var(--bg-selected);
 }
 
 .suggestion-label {

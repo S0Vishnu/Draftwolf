@@ -69,7 +69,7 @@
 }
 
 .poll-option.voted {
-    border-color: #4a9eff;
+    border-color: var(--accent-primary);
 }
 
 .poll-bar-bg {
@@ -84,12 +84,13 @@
 
 .poll-bar-fill {
     height: 100%;
-    background: rgba(74, 158, 255, 0.15);
+    background: var(--bg-selected);
     transition: width 0.3s ease-out;
 }
 
 .poll-option.voted .poll-bar-fill {
-    background: rgba(74, 158, 255, 0.3);
+    background: var(--bg-selected);
+    filter: brightness(1.2);
 }
 
 .poll-option-content {
@@ -141,7 +142,7 @@
 
 .poll-input:focus {
     outline: none;
-    border-color: #4a9eff;
+    border-color: var(--accent-primary);
 }
 
 .poll-creator-footer {
@@ -152,7 +153,7 @@
 }
 
 .btn-primary {
-    background: #4a9eff;
+    background: var(--accent-primary);
     color: white;
     border: none;
     padding: 6px 16px;

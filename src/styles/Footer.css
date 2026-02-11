@@ -1,8 +1,8 @@
 .app-footer {
     height: 28px;
-    background-color: #09090b;
+    background-color: var(--bg-app);
     /* Match app-bg usually, or slightly lighter/darker */
-    border-top: 1px solid #27272a;
+    border-top: 1px solid var(--border-default);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -53,12 +53,12 @@
 .footer-divider {
     width: 1px;
     height: 14px;
-    background-color: #3f3f46;
+    background-color: var(--border-subtle);
     margin: 0 4px;
 }
 
 .footer-message-box {
-    background-color: #27272a;
+    background-color: var(--bg-hover);
     padding: 2px 10px;
     border-radius: 4px;
     color: #e4e4e7;
@@ -101,5 +101,5 @@
 }
 
 .status-icon.info {
-    color: #60a5fa;
+    color: var(--accent-secondary);
 }

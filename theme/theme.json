@@ -3,8 +3,7 @@
   "id": "dracula",
   "version": "1.0.0",
   "author": "DraftWolf",
-  "description": "A dark, minimal theme for DraftWolf with teal accents. Easy on the eyes for long sessions.",
+  "description": "A stylized gothic horror theme. Ominous, premium, and restrained.",
   "compatibility": ">=1.0.0",
-  "accentColor": "#2AAFA1",
-  "repository": "https://github.com/sathishTSR/draftwolf-dracula-theme"
+  "accentColor": "#5B0000"
 }

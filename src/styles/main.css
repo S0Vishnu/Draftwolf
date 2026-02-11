@@ -6,15 +6,15 @@ body {
   width: 100vw;
   height: 100vh;
   font-family: 'Inter', sans-serif;
-  background-color: var(--app-bg, #09090b);
-  color: var(--text-color, #ffffff);
+  background-color: var(--bg-app);
+  color: var(--text-main);
 }
 
 code {
   font-weight: 600;
   padding: 3px 5px;
   border-radius: 2px;
-  background-color: var(--color-background-mute);
+  background-color: var(--bg-panel);
   font-family:
     ui-monospace,
     SFMono-Regular,
@@ -47,14 +47,14 @@ code {
 .creator {
   font-size: 14px;
   line-height: 16px;
-  color: var(--ev-c-text-2);
+  color: var(--text-secondary);
   font-weight: 600;
   margin-bottom: 10px;
 }
 
 .text {
   font-size: 28px;
-  color: var(--ev-c-text-1);
+  color: var(--text-main);
   font-weight: 700;
   line-height: 32px;
   text-align: center;
@@ -65,7 +65,7 @@ code {
 .tip {
   font-size: 16px;
   line-height: 24px;
-  color: var(--ev-c-text-2);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -102,15 +102,15 @@ code {
   padding: 0 20px;
   line-height: 38px;
   font-size: 14px;
-  border-color: var(--ev-button-alt-border);
-  color: var(--ev-button-alt-text);
-  background-color: var(--ev-button-alt-bg);
+  border-color: transparent;
+  color: var(--text-main);
+  background-color: var(--bg-card);
 }
 
 .action a:hover {
-  border-color: var(--ev-button-alt-hover-border);
-  color: var(--ev-button-alt-hover-text);
-  background-color: var(--ev-button-alt-hover-bg);
+  border-color: transparent;
+  color: var(--text-main);
+  background-color: var(--bg-hover);
 }
 
 .versions {
@@ -123,14 +123,14 @@ code {
   overflow: hidden;
   align-items: center;
   border-radius: 22px;
-  background-color: #202127;
+  background-color: var(--bg-card);
   backdrop-filter: blur(24px);
 }
 
 .versions li {
   display: block;
   float: left;
-  border-right: 1px solid var(--ev-c-gray-1);
+  border-right: 1px solid var(--border-default);
   padding: 0 20px;
   font-size: 14px;
   line-height: 14px;
@@ -172,12 +172,12 @@ code {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--ev-c-gray-3);
+  background: var(--bg-hover);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ev-c-gray-2);
+  background: var(--text-muted);
 }
 
 ::-webkit-scrollbar-corner {
@@ -201,7 +201,7 @@ code {
 .date-separator {
   display: flex;
   align-items: center;
-  color: var(--ev-c-text-2, #aaa);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   margin: 20px 0;
   justify-content: center;

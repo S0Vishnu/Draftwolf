@@ -1,18 +1,4 @@
-:root {
-    --bg-app: #09090b;
-    --bg-sidebar: #18181b;
-    --bg-header: #09090b;
-    --bg-content: #09090b;
-    --bg-hover: #27272a;
-    --bg-selected: rgba(59, 130, 246, 0.15);
-    --border: #27272a;
-    --text-main: #e4e4e7;
-    --text-muted: #a1a1aa;
-    --accent: #3b82f6;
-    --danger: #ef4444;
-    --folder-color: #eab308;
-    --file-color: #3b82f6;
-}
+/* Variables moved to base.css */
 
 * {
     box-sizing: border-box;
@@ -32,8 +18,8 @@
 /* Sidebar */
 .sidebar {
     width: 64px;
-    background: var(--bg-sidebar);
-    border-right: 1px solid var(--border);
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-default);
     flex-shrink: 0;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
@@ -123,7 +109,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(168, 85, 247, 0.4));
+    background: linear-gradient(135deg, rgba(91, 0, 0, 0.4), rgba(229, 152, 152, 0.4));
     opacity: 0;
     transition: opacity 0.3s;
     z-index: 0;
@@ -133,7 +119,7 @@
     content: '';
     position: absolute;
     inset: 1px;
-    background: var(--bg-sidebar);
+    background: var(--bg-panel);
     border-radius: 7px;
     z-index: 0;
     transition: background 0.3s;
@@ -167,18 +153,18 @@
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+    filter: drop-shadow(0 0 8px var(--accent-secondary));
     transform: scale(1.1);
 }
 
 .project-btn.active {
-    border-color: rgba(59, 130, 246, 0.5);
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.25);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 15px var(--bg-selected);
 }
 
 .project-btn.active::before {
     opacity: 1;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.6), rgba(168, 85, 247, 0.6));
+    background: linear-gradient(135deg, rgba(91, 0, 0, 0.6), rgba(229, 152, 152, 0.6));
 }
 
 .project-btn.active .project-letter {
@@ -219,7 +205,7 @@
     }
 
     &:hover {
-        outline-color: var(--accent);
+        outline-color: var(--accent-primary);
 
         img {
             scale: 0.8;
@@ -234,7 +220,7 @@
 
 .side-btn.active {
     background: rgba(59, 130, 246, 0.1);
-    color: var(--accent);
+    color: var(--accent-primary);
     box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
     border: 1px solid rgba(59, 130, 246, 0.2);
 }
@@ -251,7 +237,7 @@
 /* Top Bar */
 .top-bar {
     height: 52px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-default);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -282,8 +268,8 @@
     flex: 1;
     max-width: 480px;
     height: 32px;
-    background: var(--bg-sidebar);
-    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    border: 1px solid var(--border-default);
     border-radius: 6px;
     display: flex;
     align-items: center;
@@ -293,7 +279,7 @@
 }
 
 .search-container:focus-within {
-    border-color: var(--accent);
+    border-color: var(--accent-primary);
 }
 
 .search-icon {
@@ -329,7 +315,7 @@
 /* Toolbar */
 .toolbar {
     height: 48px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-default);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -371,7 +357,7 @@
 .divider-v {
     width: 1px;
     height: 20px;
-    background: var(--border);
+    background: var(--border-default);
 }
 
 .breadcrumbs-list {
@@ -406,7 +392,7 @@
 }
 
 .primary-btn {
-    background: var(--accent);
+    background: var(--accent-primary);
     color: white;
     border: none;
     padding: 6px 12px;
@@ -420,8 +406,8 @@
 }
 
 .action-btn {
-    background: var(--bg-sidebar);
-    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    border: 1px solid var(--border-default);
     color: var(--text-main);
     padding: 6px 12px;
     border-radius: 6px;
@@ -468,7 +454,7 @@
 
 .icon-btn.active {
     background: var(--bg-selected);
-    color: var(--accent);
+    color: var(--accent-primary);
 }
 
 
@@ -484,8 +470,8 @@
     right: 0;
     margin-top: 8px;
     width: 220px;
-    background: var(--bg-sidebar);
-    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    border: 1px solid var(--border-default);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     border-radius: 6px;
     padding: 6px;
@@ -512,7 +498,7 @@
 }
 
 .option-item .check {
-    color: var(--accent);
+    color: var(--accent-primary);
 }
 
 
@@ -523,7 +509,7 @@
     padding: 0 16px;
     height: 36px;
     align-items: center;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-default);
     color: var(--text-muted);
     font-size: 12px;
     font-weight: 600;
@@ -617,7 +603,7 @@
 
 .version-badge-list {
     background: transparent;
-    color: var(--accent);
+    color: var(--accent-primary);
     padding: 0;
     font-size: 12px;
     font-weight: 600;
@@ -720,8 +706,8 @@
 /* Inspector Panel */
 .inspector-panel {
     width: 280px;
-    background: var(--bg-sidebar);
-    border-left: 1px solid var(--border);
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border-default);
     display: flex;
     overflow-y: auto;
 }
@@ -807,7 +793,7 @@
 
 .inspector-btn {
     background: var(--bg-hover);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-default);
     color: var(--text-main);
     padding: 8px;
     border-radius: 6px;
@@ -816,7 +802,7 @@
 }
 
 .inspector-btn:hover {
-    background: #3f3f46;
+    background: var(--bg-hover);
 }
 
 .inspector-btn.danger {
@@ -847,8 +833,8 @@
 .context-menu {
     position: fixed;
     z-index: 1000;
-    background: #18181b;
-    border: 1px solid #27272a;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     padding: 4px;
@@ -861,7 +847,7 @@
 .menu-item {
     background: transparent;
     border: none;
-    color: #e4e4e7;
+    color: var(--text-main);
     padding: 6px 12px;
     text-align: left;
     cursor: pointer;
@@ -873,12 +859,12 @@
 }
 
 .menu-item:hover:not(:disabled) {
-    background: #3b82f6;
+    background: var(--accent-primary);
     color: white;
 }
 
 .menu-item.danger:hover:not(:disabled) {
-    background: #ef4444;
+    background: var(--danger);
 }
 
 .menu-item:disabled {
@@ -887,7 +873,7 @@
 }
 
 .menu-item .shortcut {
-    color: #a1a1aa;
+    color: var(--text-secondary);
     font-size: 11px;
     margin-left: 12px;
 }
@@ -896,7 +882,7 @@
     position: absolute;
     top: 6px;
     right: 6px;
-    background: var(--accent);
+    background: var(--accent-primary);
     color: white;
     padding: 2px 6px;
     border-radius: 10px;

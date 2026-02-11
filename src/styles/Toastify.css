@@ -1,20 +1,20 @@
 /* Minimal react-toastify overrides – uses app theme (base.css vars) */
 
 .Toastify__toast-container {
-  --toastify-color-light: var(--color-background-soft, #222);
-  --toastify-color-dark: var(--color-background-soft, #222);
-  --toastify-color-success: var(--ev-c-text-1);
-  --toastify-color-warning: var(--ev-c-text-2);
-  --toastify-color-error: #f87171;
-  --toastify-color-info: var(--ev-c-text-2);
-  --toastify-text-color-light: var(--color-text);
-  --toastify-text-color-dark: var(--color-text);
+  --toastify-color-light: var(--bg-panel);
+  --toastify-color-dark: var(--bg-panel);
+  --toastify-color-success: var(--text-main);
+  --toastify-color-warning: var(--text-secondary);
+  --toastify-color-error: var(--danger);
+  --toastify-color-info: var(--text-secondary);
+  --toastify-text-color-light: var(--text-main);
+  --toastify-text-color-dark: var(--text-main);
 }
 
 .Toastify__toast {
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--color-background-mute, #282828);
+  border: 1px solid var(--border-default);
   padding: 12px 16px;
   font-family: inherit;
   font-size: 14px;
@@ -22,16 +22,16 @@
 }
 
 .Toastify__toast-body {
-  color: var(--color-text);
+  color: var(--text-main);
   padding: 0;
 }
 
 .Toastify__progress-bar {
-  background: var(--ev-c-text-3);
+  background: var(--accent-primary);
 }
 
 .Toastify__close-button {
-  color: var(--ev-c-text-3);
+  color: var(--text-muted);
   opacity: 0.8;
 }
 

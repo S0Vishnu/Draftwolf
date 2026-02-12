@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, RefreshCw, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings, Pin } from 'lucide-react';
+import { Search, RefreshCw, PanelRightClose, PanelRightOpen, Settings, Pin } from 'lucide-react';
 
 
 interface HeaderProps {
@@ -35,9 +35,6 @@ const Header: React.FC<HeaderProps> = ({
     return (
         <header className="top-bar">
             <div className="header-left">
-                <button className="icon-btn-ghost" onClick={toggleSidebar}>
-                    {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-                </button>
             </div>
 
             <div className="search-container">

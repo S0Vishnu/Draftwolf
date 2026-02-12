@@ -576,6 +576,34 @@ ipcMain.handle(
   },
 );
 
+ipcMain.handle(
+  "draft:saveProjectMetadata",
+  async (_, { projectRoot, metadata, backupPath }) => {
+    try {
+      const dcs = new DraftControlSystem(projectRoot, backupPath);
+      await dcs.saveProjectMetadata(metadata);
+      return true;
+    } catch (e) {
+      console.error("Failed to save project metadata:", e);
+      return false;
+    }
+  }
+);
+
+ipcMain.handle(
+  "draft:getProjectMetadata",
+  async (_, { projectRoot, backupPath }) => {
+    try {
+      const dcs = new DraftControlSystem(projectRoot, backupPath);
+      const meta = await dcs.getProjectMetadata();
+      return meta;
+    } catch (e) {
+      console.error("Failed to get project metadata:", e);
+      return null;
+    }
+  }
+);
+
 ipcMain.handle("fs:copyEntry", async (_, { sourcePath, destPath }) => {
   try {
     const fs = await import("node:fs/promises");

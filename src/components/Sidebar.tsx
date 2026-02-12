@@ -1,10 +1,12 @@
 import React from 'react';
-import { Home as HomeIcon, Folder, Settings as SettingsIcon, Database, Users, Package } from 'lucide-react';
+import { Home as HomeIcon, Folder, Settings as SettingsIcon, Database, Users, Package, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
+import logo from '../assets/icons/logo.png';
 
 interface SidebarProps {
     isOpen: boolean;
+    toggleSidebar?: () => void;
     user: User | null | undefined;
     onOpenFolder?: () => void;
     onGoHome?: () => void;
@@ -25,7 +27,10 @@ interface SidebarProjectLinkProps {
 const SidebarProjectLink: React.FC<SidebarProjectLinkProps> = ({ folder, isActive, isOpen, onSelect, navigate }) => (
     <button
         className={`side-btn project-btn ${isActive ? 'active' : ''}`}
-        onClick={() => onSelect(folder.path)}
+        onClick={(e) => {
+            e.stopPropagation();
+            onSelect(folder.path);
+        }}
         title={isOpen ? "" : folder.name}
     >
         <div className="project-icon-wrapper" style={{ 
@@ -56,6 +61,7 @@ const SidebarProjectLink: React.FC<SidebarProjectLinkProps> = ({ folder, isActiv
 
 const Sidebar: React.FC<SidebarProps> = ({
     isOpen,
+    toggleSidebar,
     user,
     onOpenFolder,
     onGoHome,
@@ -78,14 +84,34 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 
     return (
-        <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`}>
+        <aside 
+            className={`sidebar ${isOpen ? '' : 'collapsed'}`}
+            onClick={(e) => {
+                // Only trigger if clicking the aside background or non-button elements
+                if (!isOpen && toggleSidebar) {
+                    toggleSidebar();
+                }
+            }}
+        >
             <div className="sidebar-content">
+                <div className="sidebar-header">
+                    <div className="sidebar-logo-container">
+                        <img src={logo} alt="DraftWolf" className="sidebar-logo-img" />
+                        {isOpen && <span className="app-logo-text">DraftWolf</span>}
+                    </div>
+                    <button className="sidebar-toggle-btn" onClick={(e) => { e.stopPropagation(); toggleSidebar?.(); }} title={isOpen ? "Close sidebar" : "Open sidebar"}>
+                        {isOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+                    </button>
+                </div>
                 <div className="sidebar-top">
                     {isOpen && <div className="section-label">GENERAL</div>}
                     {/* Home / Recent Workspaces Button */}
                     <button
                         className={`side-btn ${isActive('/home') && !hasActiveWorkspace ? 'active' : ''}`}
-                        onClick={handleRecentsClick}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleRecentsClick();
+                        }}
                         title={isOpen ? "" : "Recent Workspaces"}
                     >
                         <HomeIcon size={22} />
@@ -95,7 +121,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {onOpenFolder && (
                         <button
                             className="side-btn"
-                            onClick={onOpenFolder}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenFolder();
+                            }}
                             title={isOpen ? "" : "Open Folder"}
                         >
                             <Folder size={22} />
@@ -105,7 +134,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                     <button
                         className={`side-btn ${isActive('/community') ? 'active' : ''}`}
-                        onClick={() => navigate('/community')}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/community');
+                        }}
                         title={isOpen ? "" : "Community"}
                     >
                         <Users size={22} />
@@ -137,7 +169,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <div className="sidebar-divider" />
                     <button
                         className={`side-btn ${isActive('/extensions') ? 'active' : ''}`}
-                        onClick={() => navigate('/extensions')}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/extensions');
+                        }}
                         title={isOpen ? "" : "Extensions"}
                     >
                         <Package size={22} />
@@ -145,7 +180,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                     <button
                         className={`side-btn ${isActive('/cleanup') ? 'active' : ''}`}
-                        onClick={() => navigate('/cleanup')}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/cleanup');
+                        }}
                         title={isOpen ? "" : "Cleanup & Storage"}
                     >
                         <Database size={22} />
@@ -154,7 +192,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                     <button
                         className={`side-btn settings-btn ${isActive('/settings') ? 'active' : ''}`}
-                        onClick={() => navigate('/settings')}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/settings');
+                        }}
                         title={isOpen ? "" : "Settings & Profile"}
                     >
                         <div className="settings-icon-wrapper">

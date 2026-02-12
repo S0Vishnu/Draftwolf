@@ -105,10 +105,19 @@ const Extensions = () => {
     return null;
   };
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
   return (
     <div className="extensions-container">
       <div className="app-inner ext-app-inner">
-        <Sidebar isOpen={true} user={user} />
+        <Sidebar
+            isOpen={isSidebarOpen}
+            toggleSidebar={() => {
+                const newState = !isSidebarOpen;
+                setIsSidebarOpen(newState);
+                localStorage.setItem('isSidebarOpen', String(newState));
+            }}
+            user={user}
+        />
 
         <main className="extensions-content">
           <header className="extensions-header">

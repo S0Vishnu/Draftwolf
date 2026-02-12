@@ -6,13 +6,13 @@ import { auth } from '../firebase';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import CustomPopup from '../components/CustomPopup';
-import { Settings as SettingsIcon, Save, ChevronLeft, FolderOpen, ExternalLink, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, ChevronLeft, FolderOpen, Trash2 } from 'lucide-react';
 import '../styles/AppLayout.css';
 import '../styles/Settings.css';
 
 const ProjectSettings: React.FC = () => {
     const [user] = useAuthState(auth);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const projectPath = searchParams.get('path');
@@ -38,24 +38,49 @@ const ProjectSettings: React.FC = () => {
         const foundBackupPath = pinnedFolder?.backupPath || recentFolder?.backupPath || '';
         setBackupPath(foundBackupPath);
 
-        const folder = pinnedFolder;
-        if (folder) {
-            setSettings({
-                projectName: folder.name,
-                color: folder.color || '#3b82f6',
-                isPinned: true,
-                showHiddenFiles: folder.showHiddenFiles ?? (localStorage.getItem('showHiddenFiles') === 'true'),
-                showExtensions: folder.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false')
-            });
-        } else {
-            setSettings({
-                projectName: recentFolder?.name || projectPath?.split(/[\\/]/).pop() || 'Project',
-                color: '#3b82f6',
-                isPinned: false,
-                showHiddenFiles: localStorage.getItem('showHiddenFiles') === 'true',
-                showExtensions: localStorage.getItem('showExtensions') !== 'false'
-            });
-        }
+        // Fetch from metadata.json first, then fallback to localStorage
+        const fetchProjectDetails = async () => {
+            if (!projectPath) return;
+            
+            try {
+                // @ts-ignore
+                const projectMeta = await globalThis.api.draft.getProjectMetadata(projectPath, foundBackupPath);
+                
+                if (projectMeta) {
+                    setSettings({
+                        projectName: projectMeta.name || projectMeta.projectName || 'Project',
+                        color: projectMeta.color || '#3b82f6',
+                        isPinned: pinnedFolder ? true : false,
+                        showHiddenFiles: projectMeta.showHiddenFiles ?? (localStorage.getItem('showHiddenFiles') === 'true'),
+                        showExtensions: projectMeta.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false')
+                    });
+                } else {
+                    // Fallback to existing logic
+                    const folder = pinnedFolder;
+                    if (folder) {
+                        setSettings({
+                            projectName: folder.name,
+                            color: folder.color || '#3b82f6',
+                            isPinned: true,
+                            showHiddenFiles: folder.showHiddenFiles ?? (localStorage.getItem('showHiddenFiles') === 'true'),
+                            showExtensions: folder.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false')
+                        });
+                    } else {
+                        setSettings({
+                            projectName: recentFolder?.name || projectPath?.split(/[\\/]/).pop() || 'Project',
+                            color: '#3b82f6',
+                            isPinned: false,
+                            showHiddenFiles: localStorage.getItem('showHiddenFiles') === 'true',
+                            showExtensions: localStorage.getItem('showExtensions') !== 'false'
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch project metadata:", err);
+            }
+        };
+
+        fetchProjectDetails();
     }, [projectPath]);
 
     const [settings, setSettings] = useState({
@@ -66,8 +91,27 @@ const ProjectSettings: React.FC = () => {
         showExtensions: true
     });
 
-    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+    const toggleSidebar = () => {
+        const newState = !isSidebarOpen;
+        setIsSidebarOpen(newState);
+        localStorage.setItem('isSidebarOpen', String(newState));
+    };
+    const handleGoToProject = () => {
+        if (projectPath) {
+            localStorage.setItem('lastPath', projectPath);
+            localStorage.setItem('rootDir', projectPath);
+            navigate('/home');
+        }
+    };
+
+    const handleGoToProjects = () => {
+        localStorage.removeItem('lastPath');
+        localStorage.removeItem('rootDir');
+        navigate('/home');
+    };
+
     const handleBack = () => navigate('/home');
+
 
     const handleOpenDraftFolder = () => {
         if (!projectPath) return;
@@ -89,19 +133,23 @@ const ProjectSettings: React.FC = () => {
         setBackupPath('');
     };
 
-    const handleSave = () => {
+    // Use a ref to prevent saving on initial mount
+    const isInitialMount = React.useRef(true);
+
+    const performSave = async () => {
         // Update Pinned Folders
         let updatedPinned = [...pinnedFolders];
+        const folderData = { 
+            path: projectPath || '', 
+            name: settings.projectName, 
+            color: settings.color,
+            showHiddenFiles: settings.showHiddenFiles,
+            showExtensions: settings.showExtensions,
+            backupPath: backupPath
+        };
+
         if (settings.isPinned) {
             const index = updatedPinned.findIndex(f => f.path === projectPath);
-            const folderData = { 
-                path: projectPath || '', 
-                name: settings.projectName, 
-                color: settings.color,
-                showHiddenFiles: settings.showHiddenFiles,
-                showExtensions: settings.showExtensions,
-                backupPath: backupPath
-            };
             if (index !== -1) {
                 updatedPinned[index] = folderData;
             } else if (projectPath) {
@@ -111,16 +159,45 @@ const ProjectSettings: React.FC = () => {
             updatedPinned = updatedPinned.filter(f => f.path !== projectPath);
         }
         localStorage.setItem('pinnedFolders', JSON.stringify(updatedPinned));
+        setPinnedFolders(updatedPinned); // Update state to reflect changes in sidebar
 
         // Update Recent Workspaces
         const updatedRecents = recentWorkspaces.map(r => 
             r.path === projectPath ? { ...r, name: settings.projectName, backupPath: backupPath } : r
         );
         localStorage.setItem('recentWorkspaces', JSON.stringify(updatedRecents));
-        
-        toast.success('Project settings saved');
-        navigate('/home');
+        setRecentWorkspaces(updatedRecents);
+
+        // Save to metadata.json in .draft folder
+        if (projectPath) {
+            try {
+                // @ts-ignore
+                await globalThis.api.draft.saveProjectMetadata(projectPath, {
+                    name: settings.projectName,
+                    color: settings.color,
+                    showHiddenFiles: settings.showHiddenFiles,
+                    showExtensions: settings.showExtensions,
+                    lastUpdated: new Date().toISOString()
+                }, backupPath);
+            } catch (err) {
+                console.error("Failed to save project metadata to file:", err);
+            }
+        }
     };
+
+    // Auto-save effect
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            performSave();
+        }, 800); // 800ms debounce
+
+        return () => clearTimeout(timer);
+    }, [settings, backupPath, projectPath]);
 
     const handleDelete = () => {
         setDeletePopupOpen(true);
@@ -139,6 +216,7 @@ const ProjectSettings: React.FC = () => {
         <div className="app-shell">
             <Sidebar 
                 isOpen={isSidebarOpen} 
+                toggleSidebar={toggleSidebar}
                 user={user} 
                 pinnedFolders={pinnedFolders}
                 activePath={projectPath}
@@ -158,9 +236,21 @@ const ProjectSettings: React.FC = () => {
                         </button>
                         <div className="divider-v" />
                         <div className="breadcrumbs-list">
-                            <span className="crumb-home">Projects</span>
+                            <span 
+                                className="crumb-home clickable" 
+                                onClick={handleGoToProjects}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                Projects
+                            </span>
                             <span className="crumb-sep">/</span>
-                            <span className="crumb-part">{settings.projectName}</span>
+                            <span 
+                                className="crumb-part clickable"
+                                onClick={handleGoToProject}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                {settings.projectName}
+                            </span>
                             <span className="crumb-sep">/</span>
                             <span className="crumb-part" style={{ color: 'var(--accent)' }}>Settings</span>
                         </div>
@@ -366,13 +456,7 @@ const ProjectSettings: React.FC = () => {
                                 </div>
                             </section>
 
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px', paddingBottom: '40px' }}>
-                                <button className="action-btn" style={{ padding: '10px 24px' }} onClick={handleBack}>Cancel</button>
-                                <button className="primary-btn" style={{ padding: '10px 24px', display: 'flex', alignItems: 'center', gap: '10px' }} onClick={handleSave}>
-                                    <Save size={18} />
-                                    Save Changes
-                                </button>
-                            </div>
+                            <div style={{ height: '40px' }} />
                         </div>
                     </div>
                 </div>

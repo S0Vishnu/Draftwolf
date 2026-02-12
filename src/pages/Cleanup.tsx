@@ -52,6 +52,7 @@ const Cleanup = () => {
     const [user] = useAuthState(auth);
     const [storageReport, setStorageReport] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
 
     const [activeTab, setActiveTab] = useState<'versioned' | 'snapshots'>('versioned');
 
@@ -517,7 +518,12 @@ const Cleanup = () => {
     return (
         <div style={{ display: 'flex', height: '100vh', width: '100vw', background: 'var(--ev-c-black)' }}>
             <Sidebar
-                isOpen={true}
+                isOpen={isSidebarOpen}
+                toggleSidebar={() => {
+                    const newState = !isSidebarOpen;
+                    setIsSidebarOpen(newState);
+                    localStorage.setItem('isSidebarOpen', String(newState));
+                }}
                 user={user}
                 onGoHome={() => navigate('/home')}
             />

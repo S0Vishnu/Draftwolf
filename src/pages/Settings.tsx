@@ -27,6 +27,7 @@ interface UserSettings {
 
 const Settings = () => {
     const [user] = useAuthState(auth);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -221,7 +222,15 @@ const Settings = () => {
     return (
         <div className="settings-container">
             <div className="app-inner" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%' }}>
-                <Sidebar isOpen={true} user={user} />
+                <Sidebar 
+                    isOpen={isSidebarOpen} 
+                    toggleSidebar={() => {
+                        const newState = !isSidebarOpen;
+                        setIsSidebarOpen(newState);
+                        localStorage.setItem('isSidebarOpen', String(newState));
+                    }}
+                    user={user} 
+                />
 
                 <main className="settings-content">
                     <header className="settings-header">

@@ -175,6 +175,26 @@ export class DraftControlSystem {
   }
 
   /**
+   * Save project-wide metadata.
+   */
+  async saveProjectMetadata(metadata: any): Promise<void> {
+    await this.init();
+    const metaFilePath = path.join(this.draftPath, 'metadata.json');
+    await this.writeJson(metaFilePath, metadata);
+  }
+
+  /**
+   * Get project-wide metadata.
+   */
+  async getProjectMetadata(): Promise<any> {
+    const metaFilePath = path.join(this.draftPath, 'metadata.json');
+    if (existsSync(metaFilePath)) {
+      return await this.readJson(metaFilePath);
+    }
+    return null;
+  }
+
+  /**
    * Get or create a unique ID for a file/folder from its metadata.
    */
   async getOrCreateFileId(relativePath: string): Promise<string> {
@@ -370,7 +390,7 @@ export class DraftControlSystem {
     // 1. Recursively scan and process files
     const scanDir = async (dir: string) => {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      for (const entry of entries) {
+      await Promise.all(entries.map(async (entry) => {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.relative(this.projectRoot, fullPath);
 
@@ -398,7 +418,7 @@ export class DraftControlSystem {
             };
           }
         }
-      }
+      }));
     };
 
     const absoluteScanPath = path.resolve(this.projectRoot, scope);
@@ -481,14 +501,14 @@ export class DraftControlSystem {
     const fileIds: Record<string, string> = {};
     const newObjects: Record<Hash, FileMetadata> = {};
 
-    for (const filePath of filesToTrack) {
+    await Promise.all(filesToTrack.map(async (filePath) => {
       const relativePath = path.isAbsolute(filePath)
         ? path.relative(this.projectRoot, filePath)
         : filePath;
 
       const fullPath = path.join(this.projectRoot, relativePath);
 
-      if (!existsSync(fullPath)) continue;
+      if (!existsSync(fullPath)) return;
 
       const { hash, originalSize, compressedSize } = await this.addFileToCAS(fullPath);
       const id = await this.getOrCreateFileId(relativePath);
@@ -505,7 +525,7 @@ export class DraftControlSystem {
           path: relativePath
         };
       }
-    }
+    }));
 
     // Version Number Logic (Duplicate of createSnapshot - could be extracted)
     let nextVerNum = "1.0";
@@ -836,62 +856,14 @@ export class DraftControlSystem {
       const meta = await this.getMetadata(target);
       let targetId = meta?.id || null;
 
-      // Search all metadata files to find any that link to this path
-      // This handles bidirectional linking for renamed files
-      const metadataDir = path.join(this.draftPath, 'metadata');
-      const allRelatedIds = new Set<string>();
+      // Collect all related paths from the target file's metadata
       const allRelatedPaths = new Set<string>();
-
-      if (existsSync(metadataDir)) {
-        try {
-          const metaFiles = await fs.readdir(metadataDir);
-          for (const metaFile of metaFiles) {
-            if (!metaFile.endsWith('.json')) continue;
-
-            try {
-              const metaData = await this.readJson(path.join(metadataDir, metaFile));
-              if (!metaData) continue;
-
-              const metaPath = metaData.path ? this.normalizePath(metaData.path) : null;
-              const renamedTo = metaData.renamedTo ? this.normalizePath(metaData.renamedTo) : null;
-
-              // Check if this metadata is related to our target
-              const isRelated =
-                metaPath === target ||
-                renamedTo === target ||
-                (metaData.previousPaths && metaData.previousPaths.some((p: string) => this.normalizePath(p) === target));
-
-              if (isRelated && metaData.id) {
-                allRelatedIds.add(metaData.id);
-                if (metaPath) allRelatedPaths.add(metaPath);
-                if (renamedTo) allRelatedPaths.add(renamedTo);
-                if (metaData.previousPaths) {
-                  metaData.previousPaths.forEach((p: string) => allRelatedPaths.add(this.normalizePath(p)));
-                }
-              }
-
-              // If we found the target ID, also collect all paths with same ID
-              if (targetId && metaData.id === targetId) {
-                if (metaPath) allRelatedPaths.add(metaPath);
-                if (renamedTo) allRelatedPaths.add(renamedTo);
-                if (metaData.previousPaths) {
-                  metaData.previousPaths.forEach((p: string) => allRelatedPaths.add(this.normalizePath(p)));
-                }
-              }
-            } catch (e) {
-              // Skip invalid metadata files
-              continue;
-            }
-          }
-        } catch (e) {
-          console.error('Error reading metadata directory:', e);
+      if (meta) {
+        if (meta.path) allRelatedPaths.add(this.normalizePath(meta.path));
+        if (meta.renamedTo) allRelatedPaths.add(this.normalizePath(meta.renamedTo));
+        if (meta.previousPaths) {
+          meta.previousPaths.forEach((p: string) => allRelatedPaths.add(this.normalizePath(p)));
         }
-      }
-
-      // If we found related IDs, use them; otherwise use the original targetId
-      if (allRelatedIds.size > 0) {
-        // Use the first ID we found (they should all be the same for linked files)
-        targetId = Array.from(allRelatedIds)[0];
       }
 
       // Robust directory detection
@@ -899,7 +871,6 @@ export class DraftControlSystem {
       try {
         const stats = await fs.stat(path.join(this.projectRoot, target));
         isDirectory = stats.isDirectory();
-        console.log(`[Draft] getHistory: target=${target} isDirectory=${isDirectory}`);
       } catch {
         // If not physical, check if any version manifest has it as a folder prefix
         // or if we have historical paths that were folders

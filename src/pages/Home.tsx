@@ -33,7 +33,7 @@ const Home = () => {
     const [user] = useAuthState(auth);
 
     // Layout
-    const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const [isSidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
     const [isPreviewOpen, setPreviewOpen] = useState(false);
     const [inspectorTab, setInspectorTab] = useState<InspectorTab | undefined>(undefined);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -1172,6 +1172,11 @@ const Home = () => {
             <div className="app-inner" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%' }}>
                 <Sidebar
                     isOpen={isSidebarOpen}
+                    toggleSidebar={() => {
+                        const newState = !isSidebarOpen;
+                        setSidebarOpen(newState);
+                        localStorage.setItem('isSidebarOpen', String(newState));
+                    }}
                     user={user}
                     onOpenFolder={handleOpenFolder}
                     onGoHome={closeWorkspace}
@@ -1184,7 +1189,11 @@ const Home = () => {
                 <main className="main-content">
                     <Header
                         isSidebarOpen={isSidebarOpen}
-                        toggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
+                        toggleSidebar={() => {
+                            const newState = !isSidebarOpen;
+                            setSidebarOpen(newState);
+                            localStorage.setItem('isSidebarOpen', String(newState));
+                        }}
                         isPreviewOpen={isPreviewOpen}
                         togglePreview={() => setPreviewOpen(!isPreviewOpen)}
                         searchQuery={searchQuery}
@@ -1293,7 +1302,7 @@ const Home = () => {
                     <InspectorPanel
                         file={activeFile}
                         projectRoot={rootDir || currentPath || ''}
-                        onClose={() => setInspectorTab(undefined)}
+                        onClose={handleInspectorClose}
                         onRefresh={refreshDirectory}
                         initialTab={inspectorTab}
                         backupPath={getBackupPath(rootDir)}

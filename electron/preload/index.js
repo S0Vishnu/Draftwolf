@@ -89,6 +89,19 @@ const api = {
       return electronAPI.ipcRenderer.on('update:error', sub);
     }
   },
+  monitor: {
+    start: (dirPath, intervalMinutes, enabled) => electronAPI.ipcRenderer.invoke('monitor:start', { dirPath, intervalMinutes, enabled }),
+    stop: () => electronAPI.ipcRenderer.invoke('monitor:stop'),
+    updateSettings: (intervalMinutes, enabled) => electronAPI.ipcRenderer.invoke('monitor:updateSettings', { intervalMinutes, enabled }),
+    getBufferState: () => electronAPI.ipcRenderer.invoke('monitor:getBufferState'),
+    clearBuffer: () => electronAPI.ipcRenderer.invoke('monitor:clearBuffer'),
+    testNotification: () => electronAPI.ipcRenderer.invoke('monitor:testNotification'),
+    onNotificationClicked: (callback) => {
+      const sub = (_event, data) => callback(data);
+      electronAPI.ipcRenderer.on('monitor:notification-clicked', sub);
+      return () => electronAPI.ipcRenderer.removeListener('monitor:notification-clicked', sub);
+    }
+  },
 
 }
 

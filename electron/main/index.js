@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from "ele
 import { join, resolve } from "node:path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { DraftControlSystem } from "./services/DraftControlSystem";
+import { startMonitoring, stopMonitoring, updateSettings as updateMonitorSettings, getBufferState, clearBuffer, testNotification } from "./fileChangeMonitor";
 import icon from "../../public/icon.png?asset";
 import { autoUpdater } from "electron-updater";
 import log from "electron-log";
@@ -964,5 +965,66 @@ ipcMain.handle("draft:validate", async (_, { projectRoot, backupPath }) => {
   } catch (e) {
     console.error("Draft Validate Failed:", e);
     return { valid: false, errors: [e.message] };
+  }
+});
+
+// ─── File Change Monitor ────────────────────────────────────────
+
+ipcMain.handle("monitor:start", async (_, { dirPath, intervalMinutes, enabled }) => {
+  try {
+    await startMonitoring(dirPath, { intervalMinutes, enabled });
+    return true;
+  } catch (e) {
+    console.error("Monitor Start Failed:", e);
+    return false;
+  }
+});
+
+ipcMain.handle("monitor:stop", async () => {
+  try {
+    await stopMonitoring();
+    return true;
+  } catch (e) {
+    console.error("Monitor Stop Failed:", e);
+    return false;
+  }
+});
+
+ipcMain.handle("monitor:updateSettings", async (_, { intervalMinutes, enabled }) => {
+  try {
+    updateMonitorSettings({ intervalMinutes, enabled });
+    return true;
+  } catch (e) {
+    console.error("Monitor Settings Update Failed:", e);
+    return false;
+  }
+});
+
+ipcMain.handle("monitor:getBufferState", async () => {
+  try {
+    return getBufferState();
+  } catch (e) {
+    console.error("Monitor Buffer State Failed:", e);
+    return null;
+  }
+});
+
+ipcMain.handle("monitor:clearBuffer", async () => {
+  try {
+    clearBuffer();
+    return true;
+  } catch (e) {
+    console.error("Monitor Clear Buffer Failed:", e);
+    return false;
+  }
+});
+
+ipcMain.handle("monitor:testNotification", async () => {
+  try {
+    testNotification();
+    return true;
+  } catch (e) {
+    console.error("Monitor Test Notification Failed:", e);
+    return false;
   }
 });

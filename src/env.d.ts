@@ -73,6 +73,24 @@ interface Window {
       onProgress: (callback: (info: any) => void) => () => void;
       onError: (callback: (error: string) => void) => () => void;
     };
+    monitor: {
+      start: (dirPath: string, intervalMinutes?: number, enabled?: boolean) => Promise<boolean>;
+      stop: () => Promise<boolean>;
+      updateSettings: (intervalMinutes?: number, enabled?: boolean) => Promise<boolean>;
+      getBufferState: () => Promise<{
+        watchedDir: string | null;
+        intervalMinutes: number;
+        enabled: boolean;
+        changes: { path: string; type: 'add' | 'change' | 'unlink'; timestamp: number }[];
+        totalChanges: number;
+      } | null>;
+      clearBuffer: () => Promise<boolean>;
+      onNotificationClicked: (callback: (data: {
+        changes: { path: string; type: 'add' | 'change' | 'unlink'; timestamp: number }[];
+        total: number;
+        watchedDir: string;
+      }) => void) => () => void;
+    };
 
   };
 }

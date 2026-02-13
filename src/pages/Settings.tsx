@@ -9,7 +9,7 @@ import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import {
     LogOut, RefreshCw, User, Clock, Shield,
-    Edit2, X, Check, Coffee, Monitor
+    Edit2, X, Check, Coffee, Monitor, Bell
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
@@ -23,6 +23,8 @@ interface UserSettings {
     notificationsEnabled: boolean;
     avatarSeed: string;
     checkUpdates: boolean;
+    fileMonitoringEnabled: boolean;
+    changeNotificationInterval: number;
 }
 
 const Settings = () => {
@@ -42,6 +44,8 @@ const Settings = () => {
         notificationsEnabled: true,
         avatarSeed: '',
         checkUpdates: true,
+        fileMonitoringEnabled: true,
+        changeNotificationInterval: 30,
     };
 
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
@@ -222,14 +226,14 @@ const Settings = () => {
     return (
         <div className="settings-container">
             <div className="app-inner" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%' }}>
-                <Sidebar 
-                    isOpen={isSidebarOpen} 
+                <Sidebar
+                    isOpen={isSidebarOpen}
                     toggleSidebar={() => {
                         const newState = !isSidebarOpen;
                         setIsSidebarOpen(newState);
                         localStorage.setItem('isSidebarOpen', String(newState));
                     }}
-                    user={user} 
+                    user={user}
                 />
 
                 <main className="settings-content">
@@ -413,6 +417,142 @@ const Settings = () => {
                                 </div>
                             </div>
 
+                            {/* File Monitoring */}
+                            <div className="glass-panel" style={{ marginBottom: '2rem' }}>
+                                <div className="panel-header">
+                                    <h2 className="panel-title">
+                                        <Bell size={20} className="text-accent" style={{ color: '#8b5cf6' }} />
+                                        File Monitoring
+                                    </h2>
+                                </div>
+
+                                <div className="settings-list">
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <h3>Background Monitoring</h3>
+                                            <p>Watch workspace files for changes and send OS notifications periodically.</p>
+                                        </div>
+                                        <label className="toggle-switch" aria-label="Background File Monitoring">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.fileMonitoringEnabled ?? true}
+                                                onChange={e => {
+                                                    updatePreference('fileMonitoringEnabled', e.target.checked);
+                                                    // Sync to main process
+                                                    if ((globalThis as any)?.api?.monitor) {
+                                                        (globalThis as any).api.monitor.updateSettings(
+                                                            settings.changeNotificationInterval || 30,
+                                                            e.target.checked
+                                                        );
+                                                    }
+                                                }}
+                                                className="toggle-input"
+                                            />
+                                            <span className="toggle-slider"><span className="toggle-knob"></span></span>
+                                        </label>
+                                    </div>
+
+                                    {(settings.fileMonitoringEnabled ?? true) && (() => {
+                                        const interval = settings.changeNotificationInterval || 30;
+                                        const formatTime = (mins: number) => {
+                                            if (mins < 60) return `${mins} min`;
+                                            const h = Math.floor(mins / 60);
+                                            const m = mins % 60;
+                                            return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
+                                        };
+                                        const presets = [
+                                            { label: '15m', value: 15 },
+                                            { label: '30m', value: 30 },
+                                            { label: '1h', value: 60 },
+                                            { label: '2h', value: 120 },
+                                        ];
+                                        const setInterval = (val: number) => {
+                                            updatePreference('changeNotificationInterval', val);
+                                            if ((globalThis as any)?.api?.monitor) {
+                                                (globalThis as any).api.monitor.updateSettings(val, settings.fileMonitoringEnabled ?? true);
+                                            }
+                                        };
+                                        return (
+                                            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                <div className="setting-info" style={{ width: '100%', marginBottom: '0.75rem' }}>
+                                                    <h3>Notification Interval</h3>
+                                                    <p>How often to check for file changes and notify you.</p>
+                                                </div>
+
+                                                {/* Preset buttons */}
+                                                <div style={{
+                                                    display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', width: '100%'
+                                                }}>
+                                                    {presets.map(p => (
+                                                        <button
+                                                            key={p.value}
+                                                            onClick={() => setInterval(p.value)}
+                                                            style={{
+                                                                flex: 1,
+                                                                padding: '6px 0',
+                                                                borderRadius: '8px',
+                                                                border: interval === p.value
+                                                                    ? '1.5px solid #8b5cf6'
+                                                                    : '1.5px solid rgba(255,255,255,0.08)',
+                                                                background: interval === p.value
+                                                                    ? 'rgba(139, 92, 246, 0.15)'
+                                                                    : 'rgba(255,255,255,0.04)',
+                                                                color: interval === p.value ? '#c4b5fd' : 'rgba(255,255,255,0.5)',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: 600,
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s ease',
+                                                                letterSpacing: '0.02em',
+                                                            }}
+                                                        >
+                                                            {p.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {/* Fine-tune slider */}
+                                                <div style={{
+                                                    display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%'
+                                                }}>
+                                                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>5m</span>
+                                                    <input
+                                                        type="range"
+                                                        min={5}
+                                                        max={120}
+                                                        step={5}
+                                                        value={interval}
+                                                        onChange={e => setInterval(Number.parseInt(e.target.value, 10))}
+                                                        style={{
+                                                            flex: 1,
+                                                            accentColor: '#8b5cf6',
+                                                            height: '4px',
+                                                        }}
+                                                        aria-label="Change Notification Interval"
+                                                    />
+                                                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>2h</span>
+                                                </div>
+
+                                                {/* Current value badge */}
+                                                <div style={{
+                                                    marginTop: '0.5rem',
+                                                    alignSelf: 'center',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: 600,
+                                                    color: '#c4b5fd',
+                                                    background: 'rgba(139, 92, 246, 0.1)',
+                                                    border: '1px solid rgba(139, 92, 246, 0.2)',
+                                                    borderRadius: '20px',
+                                                    padding: '4px 16px',
+                                                    letterSpacing: '0.02em',
+                                                }}>
+                                                    Every {formatTime(interval)}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+
                             {/* Privacy & Danger Zone */}
                             <div className="glass-panel">
                                 <div className="panel-header">
@@ -443,7 +583,7 @@ const Settings = () => {
                                 </div>
 
                                 <div className="danger-zone">
-                                        <button onClick={handleSignOut} className="btn-signout">
+                                    <button onClick={handleSignOut} className="btn-signout">
                                         <LogOut size={16} /> Sign Out
                                     </button>
                                 </div>

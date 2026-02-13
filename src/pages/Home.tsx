@@ -163,6 +163,63 @@ const Home = () => {
         else localStorage.removeItem('rootDir');
     }, [rootDir]);
 
+    // ─── Background File Monitor ────────────────────────────────────
+    useEffect(() => {
+        if (!rootDir) return;
+        const api = (globalThis as any).api;
+        if (!api?.monitor) return;
+
+        // Read user settings from localStorage to get monitoring preferences
+        let intervalMinutes = 30;
+        let fileMonitoringEnabled = true;
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key?.startsWith('user_settings_')) {
+                    const data = JSON.parse(localStorage.getItem(key) || '{}');
+                    if (data.changeNotificationInterval !== undefined) {
+                        intervalMinutes = data.changeNotificationInterval;
+                    }
+                    if (data.fileMonitoringEnabled !== undefined) {
+                        fileMonitoringEnabled = data.fileMonitoringEnabled;
+                    }
+                    break;
+                }
+            }
+        } catch (e) {
+            console.error("Error reading monitor settings:", e);
+        }
+
+        // Start the background monitor
+        api.monitor.start(rootDir, intervalMinutes, fileMonitoringEnabled).catch((err: any) =>
+            console.error("Failed to start file monitor:", err)
+        );
+
+        return () => {
+            api.monitor.stop().catch((err: any) =>
+                console.error("Failed to stop file monitor:", err)
+            );
+        };
+    }, [rootDir]);
+
+    // Handle notification clicks — bring app to foreground and refresh
+    useEffect(() => {
+        const api = (globalThis as any).api;
+        if (!api?.monitor?.onNotificationClicked) return;
+
+        const unsub = api.monitor.onNotificationClicked((_data: any) => {
+            // The main process already shows/focuses the window.
+            // On the renderer side, refresh the current directory.
+            if (currentPath) {
+                loadDirectory(currentPath);
+            }
+        });
+
+        return () => {
+            if (typeof unsub === 'function') unsub();
+        };
+    }, [currentPath]);
+
     // Support Notification
     useEffect(() => {
         const hasShownSupport = sessionStorage.getItem('shown_support_toast');
@@ -1215,10 +1272,10 @@ const Home = () => {
                         onSettings={rootDir ? () => navigate(`/project-settings?path=${encodeURIComponent(rootDir)}`) : undefined}
                         onTogglePin={rootDir ? () => {
                             if (pinnedFolders.some(f => f.path === rootDir)) {
-                                removeFromPinned(rootDir!);
+                                removeFromPinned(rootDir);
                                 toast.success("Unpinned project");
                             } else {
-                                addToPinned(rootDir!);
+                                addToPinned(rootDir);
                                 toast.success("Pinned project");
                             }
                         } : undefined}

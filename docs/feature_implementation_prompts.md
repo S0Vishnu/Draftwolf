@@ -2,16 +2,17 @@
 
 This document contains a set of prompts to be used in a fresh chat session to implement specific features for DraftWolf. The features are ordered from easiest to hardest to integrate.
 
-## 1. Background File Monitoring & System Messages (Easy)
-**Context:** The application already uses `chokidar` for file watching. We need to move from potential immediate actions (or no actions) to a polling-based notification system.
+## 1. Background File Monitoring & System Notifications (Easy)
+**Context:** The application already uses `chokidar` for file watching. We need to move from potential immediate actions (or no actions) to a polling-based notification system. Notifications must be **native OS-level** (e.g., Windows toast notifications, macOS Notification Center), not in-app messages.
 **Prompt:**
 > I need to implement a background file monitoring system for the active project.
 > 1.  Utilize the existing `chokidar` integration to watch the open workspace.
 > 2.  Instead of triggering immediate actions, track changed, added, or updated files in a "Change Buffer".
 > 3.  Implement a user setting for "Change Notification Interval" (default: 30 minutes).
 > 4.  Create a background timer that triggers based on this interval.
-> 5.  When the timer fires, if there are changes in the buffer, send a system message/notification to the user: "The following files have changed [list top 3...]. Do you want to version them now?"
-> 6.  Ensure this runs unobtrusively in the background.
+> 5.  When the timer fires, if there are changes in the buffer, send a **native OS system notification** (using Electron's `Notification` API) to the user: "The following files have changed [list top 3...]. Do you want to version them now?"
+> 6.  Clicking the notification should bring the app window to the foreground and navigate to the relevant view.
+> 7.  Ensure this runs unobtrusively in the background, even when the app is minimized to the system tray.
 
 ## 2. Custom Version Storage Location (Medium)
 **Context:** Currently, `.draft` folders are likely created directly in the project root. Users need the ability to centralize or offload this storage to avoid cluttering the source directory.

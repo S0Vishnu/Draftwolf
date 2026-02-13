@@ -1,6 +1,7 @@
 import { FileEntry } from '../FileItem';
 
 export type InspectorTab = 'info' | 'tasks' | 'versions' | 'attachments' | 'snapshots';
+export type InspectorAction = 'createVersion' | 'compare' | null;
 
 export interface InspectorPanelProps {
     file: FileEntry | null;
@@ -10,6 +11,8 @@ export interface InspectorPanelProps {
     onDelete?: (e: React.MouseEvent) => void;
     onRefresh?: () => void;
     initialTab?: InspectorTab;
+    initialAction?: InspectorAction;
+    onActionHandled?: () => void;
     backupPath?: string;
 }
 

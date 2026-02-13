@@ -13,12 +13,13 @@ import VersionsTab from './inspector/VersionsTab';
 import SnapshotsTab from './inspector/SnapshotsTab';
 import AttachmentsTab from './inspector/AttachmentsTab';
 import { InspectorPanelProps, AttachmentItem, InspectorTab } from './inspector/types';
+import DiffViewer, { getCategory } from './diff/DiffViewer';
 
 // type Tab = 'info' | 'tasks' | 'versions' | 'attachments'; // Removed in favor of InspectorTab
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 800;
 
-const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onClose, onRefresh, initialTab, backupPath }) => {
+const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onClose, onRefresh, initialTab, initialAction, onActionHandled, backupPath }) => {
     const [activeTab, setActiveTab] = useState<InspectorTab>(initialTab || 'versions');
     const [width, setWidth] = useState(420);
     const [isResizing, setIsResizing] = useState(false);
@@ -40,6 +41,9 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     const [versionLabel, setVersionLabel] = useState('');
     const [loading, setLoading] = useState(false);
     const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+
+    // Diff Viewer State
+    const [diffState, setDiffState] = useState<{ oldPath: string; newPath: string; oldLabel: string; newLabel: string } | null>(null);
 
     // Reset active version when file changes
     useEffect(() => {
@@ -495,6 +499,88 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
         }
     };
 
+    // ── Visual Diff ──────────────────────────────────────────────
+    const handleCompare = async (versionId: string) => {
+        if (!file || !projectRoot) return;
+        const relativePath = getRelativePath();
+        if (relativePath === null) return;
+
+        // Check if this file type supports visual diff
+        const category = getCategory(file.path);
+        if (category === 'unsupported') {
+            toast.info('Visual diff is only supported for images and 3D models.');
+            return;
+        }
+
+        // Extract old version to a temp file
+        const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
+        const tempDir = `${projectRoot}/.draft/temp`;
+        const tempFile = `${tempDir}/${file.name.replace(ext, '')}_v${versionId}_${Date.now()}${ext}`;
+
+        try {
+            await window.api.draft.extract(projectRoot, versionId, relativePath, tempFile, backupPath);
+
+            // Find the version label
+            const ver = history.find(v => v.id === versionId);
+            const verLabel = ver?.label || `Version ${versionId.slice(0, 8)}`;
+
+            setDiffState({
+                oldPath: tempFile,
+                newPath: file.path,
+                oldLabel: verLabel,
+                newLabel: 'Current',
+            });
+        } catch (e: any) {
+            console.error('[DiffViewer] Failed to extract version for diff:', e);
+            toast.error(`Failed to load version for comparison: ${e.message || e}`);
+        }
+    };
+
+    // Handle initialAction (shortcuts)
+    useEffect(() => {
+        if (!initialAction) return;
+
+        if (initialAction === 'createVersion') {
+            if (activeTab !== 'versions' && activeTab !== 'snapshots') {
+                setActiveTab(file?.isDirectory ? 'snapshots' : 'versions');
+            }
+            // Use a small timeout to ensure the tab has rendered and state can settle
+            setTimeout(() => {
+                if (!isCreating) setIsCreating(true);
+            }, 0);
+        } else if (initialAction === 'compare') {
+            if (file?.isDirectory) return;
+            if (activeTab !== 'versions') setActiveTab('versions');
+
+            // Trigger compare with latest version if history exists
+            if (history.length > 0) {
+                // Determine latest version (assuming last in array based on index 0 being newest visually? 
+                // Wait, logic in VersionsTab: verNum = history.length - node.index. Node index 0 is top?
+                // In VersionsTab: history.forEach((v, i) -> ...
+                // Usually list is descending?
+                // Let's assume history[0] is most recent? 
+                // VersionsTab uses node.y = index * ROW_HEIGHT.
+                // Latest is usually top.
+                // If history is appended to, history[last] is newest?
+                // DraftControlSystem `getMetadata` usually returns chronological list?
+                // Let's try comparing with the one at index 0 or index length-1.
+                // If I pick the wrong one, user sees diff with old version.
+                // Safest to compare with the one that has the highest timestamp or ID?
+                // Let's assume history[history.length - 1] is the LATEST created version.
+                const latest = history[history.length - 1];
+                if (latest) {
+                    handleCompare(latest.id);
+                }
+            } else if (!loading) {
+                toast.info("No versions to compare.");
+            }
+        }
+
+        if (onActionHandled) {
+            onActionHandled();
+        }
+    }, [initialAction, file, history, isCreating, activeTab, loading, onActionHandled]);
+
     // Todo Logic
     const handleAddTodo = (text: string, priority: Priority, tags: string[]) => {
         const item: TodoItem = {
@@ -671,6 +757,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                         onDelete={handleDeleteVersion}
                         onRestore={handleRestore}
                         onRename={handleRenameVersion}
+                        onCompare={handleCompare}
                     />
                 );
             case 'snapshots':
@@ -844,6 +931,17 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                     </div>
                 )
             }
+
+            {/* Diff Viewer Overlay */}
+            {diffState && (
+                <DiffViewer
+                    oldPath={diffState.oldPath}
+                    newPath={diffState.newPath}
+                    oldLabel={diffState.oldLabel}
+                    newLabel={diffState.newLabel}
+                    onClose={() => setDiffState(null)}
+                />
+            )}
         </aside >
     );
 };

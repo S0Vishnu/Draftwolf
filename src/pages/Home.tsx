@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useShortcuts } from '../hooks/useShortcuts';
 import { useNavigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase';
 import { FileEntry } from '../components/FileItem';
-import { InspectorTab } from '../components/inspector/types';
+import { InspectorTab, InspectorAction } from '../components/inspector/types';
 
 // Components
 import Sidebar from '../components/Sidebar';
@@ -35,7 +36,8 @@ const Home = () => {
     // Layout
     const [isSidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
     const [isPreviewOpen, setPreviewOpen] = useState(false);
-    const [inspectorTab, setInspectorTab] = useState<InspectorTab | undefined>(undefined);
+    const [inspectorTab, setInspectorTab] = useState<InspectorTab>('info');
+    const [inspectorAction, setInspectorAction] = useState<InspectorAction>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
     // Data
@@ -1090,7 +1092,8 @@ const Home = () => {
 
     const handleInspectorClose = () => {
         setPreviewOpen(false);
-        setInspectorTab(undefined);
+        setInspectorTab('info'); // Reset to default tab
+        setInspectorAction(null); // Clear any pending action
     };
 
     // Handle version badge click - select file and open inspector
@@ -1129,112 +1132,137 @@ const Home = () => {
         ];
     };
 
-    // Keyboard Shortcuts
+    // ─── Arrow navigation helper (not in shortcuts registry — handled via raw listener) ───
+    const calculateGridNextIndex = useCallback((currentIndex: number, key: string) => {
+        if (key === 'ArrowLeft') return Math.max(0, currentIndex - 1);
+        if (key === 'ArrowRight') return Math.min(filteredFiles.length - 1, currentIndex + 1);
+        let cols = 1;
+        if (contentRef.current) {
+            const width = contentRef.current.clientWidth - 32;
+            cols = Math.floor(width / 116);
+            if (cols < 1) cols = 1;
+        }
+        if (key === 'ArrowUp') return Math.max(0, currentIndex - cols);
+        if (key === 'ArrowDown') return Math.min(filteredFiles.length - 1, currentIndex + cols);
+        return currentIndex;
+    }, [filteredFiles.length]);
+
+    const arrowNavigate = useCallback((e: KeyboardEvent) => {
+        e.preventDefault();
+        if (filteredFiles.length === 0) return;
+        let nextIndex = 0;
+        const currentIndex = lastSelectedPath ? filteredFiles.findIndex(f => f.path === lastSelectedPath) : -1;
+        if (currentIndex !== -1) {
+            if (viewMode === 'list') {
+                if (e.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - 1);
+                else if (e.key === 'ArrowDown') nextIndex = Math.min(filteredFiles.length - 1, currentIndex + 1);
+                else nextIndex = currentIndex;
+            } else {
+                nextIndex = calculateGridNextIndex(currentIndex, e.key);
+            }
+        }
+        if (nextIndex >= 0 && nextIndex < filteredFiles.length) {
+            const nextFile = filteredFiles[nextIndex];
+            setSelectedPaths(new Set([nextFile.path]));
+            setLastSelectedPath(nextFile.path);
+            const el = document.querySelector(`[data-path="${nextFile.path.replaceAll('\\', '\\\\')}"]`);
+            if (el) el.scrollIntoView({ block: 'nearest' });
+        }
+    }, [filteredFiles, lastSelectedPath, viewMode, calculateGridNextIndex]);
+
+    // Raw arrow key + escape-during-rename listener (these are not in the registry)
     useEffect(() => {
-        const handleBasicKeyAction = (e: KeyboardEvent) => {
-            if (e.key === 'Backspace') {
-                e.preventDefault();
-                navigateBack();
-                return true;
-            }
-            if (e.key === 'Enter' && selectedPaths.size === 1) {
-                const file = filteredFiles.find(f => f.path === lastSelectedPath);
-                if (file?.isDirectory) navigateTo(file.path);
-                else if (file) globalThis.api?.openPath(file.path);
-                return true;
-            }
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                setSelectedPaths(new Set());
-                return true;
-            }
-            return false;
-        };
-
-        const handleFileActionShortcuts = (e: KeyboardEvent) => {
-            if (e.key === 'F2') { e.preventDefault(); menuActions.rename(); }
-            else if (e.key === 'Delete') { e.preventDefault(); menuActions.delete(); }
-        };
-
-        const handleCtrlShortcuts = (e: KeyboardEvent, key: string) => {
-            if (key === 'c' && selectedPaths.size > 0) { e.preventDefault(); menuActions.copy(); }
-            else if (key === 'x' && selectedPaths.size > 0) { e.preventDefault(); menuActions.cut(); }
-            else if (key === 'v') { e.preventDefault(); menuActions.paste(); }
-            else if (key === 'a') { e.preventDefault(); setSelectedPaths(new Set(filteredFiles.map(f => f.path))); }
-            else if (e.shiftKey && key === 'n') { e.preventDefault(); initCreateFolder(); }
-            else if (key === 'n') { e.preventDefault(); initCreateFile(); }
-        };
-
-        const calculateGridNextIndex = (currentIndex: number, key: string) => {
-            if (key === 'ArrowLeft') return Math.max(0, currentIndex - 1);
-            if (key === 'ArrowRight') return Math.min(filteredFiles.length - 1, currentIndex + 1);
-
-            let cols = 1;
-            if (contentRef.current) {
-                const width = contentRef.current.clientWidth - 32;
-                cols = Math.floor(width / 116);
-                if (cols < 1) cols = 1;
-            }
-
-            if (key === 'ArrowUp') return Math.max(0, currentIndex - cols);
-            if (key === 'ArrowDown') return Math.min(filteredFiles.length - 1, currentIndex + cols);
-            return currentIndex;
-        };
-
-        const handleArrowNavigation = (e: KeyboardEvent) => {
-            e.preventDefault();
-            if (filteredFiles.length === 0) return;
-
-            let nextIndex = 0;
-            const currentIndex = lastSelectedPath
-                ? filteredFiles.findIndex(f => f.path === lastSelectedPath)
-                : -1;
-
-            if (currentIndex !== -1) {
-                if (viewMode === 'list') {
-                    if (e.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - 1);
-                    else if (e.key === 'ArrowDown') nextIndex = Math.min(filteredFiles.length - 1, currentIndex + 1);
-                    else nextIndex = currentIndex;
-                } else {
-                    nextIndex = calculateGridNextIndex(currentIndex, e.key);
-                }
-            }
-
-            if (nextIndex >= 0 && nextIndex < filteredFiles.length) {
-                const nextFile = filteredFiles[nextIndex];
-                setSelectedPaths(new Set([nextFile.path]));
-                setLastSelectedPath(nextFile.path);
-
-                const el = document.querySelector(`[data-path="${nextFile.path.replaceAll('\\', '\\\\')}"]`);
-                if (el) el.scrollIntoView({ block: 'nearest' });
-            }
-        };
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            const isCtrl = e.ctrlKey || e.metaKey;
-            const key = e.key.toLowerCase();
-
+        const handleRawKeys = (e: KeyboardEvent) => {
+            // During rename / create, only Escape matters
             if (renamingFile || isCreating) {
-                if (e.key === 'Escape') {
-                    e.preventDefault();
-                    cancelRenaming();
-                    cancelCreation();
-                }
+                if (e.key === 'Escape') { e.preventDefault(); cancelRenaming(); cancelCreation(); }
                 return;
             }
-
             const target = e.target as HTMLElement;
             if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
-
-            if (handleBasicKeyAction(e)) return;
-            if (isCtrl) { handleCtrlShortcuts(e, key); return; }
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) { handleArrowNavigation(e); return; }
-            if (selectedPaths.size > 0 || lastSelectedPath) handleFileActionShortcuts(e);
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) { arrowNavigate(e); }
         };
+        globalThis.addEventListener('keydown', handleRawKeys);
+        return () => globalThis.removeEventListener('keydown', handleRawKeys);
+    }, [renamingFile, isCreating, arrowNavigate]);
 
-        globalThis.addEventListener('keydown', handleKeyDown);
-        return () => globalThis.removeEventListener('keydown', handleKeyDown);
-    }, [selectedPaths, lastSelectedPath, renamingFile, isCreating, filteredFiles, appClipboard, currentPath, viewMode]);
+    // ─── Shortcut handlers (dispatched via the shortcuts registry) ───
+    useShortcuts(
+        {
+            // File
+            'file.newFile': (e) => { e.preventDefault(); initCreateFile(); },
+            'file.newFolder': (e) => { e.preventDefault(); initCreateFolder(); },
+            'file.rename': (e) => { e.preventDefault(); if (selectedPaths.size > 0) menuActions.rename(); },
+            'file.delete': (e) => { e.preventDefault(); if (selectedPaths.size > 0) menuActions.delete(); },
+            'file.openFile': (e) => {
+                if (selectedPaths.size === 1) {
+                    const file = filteredFiles.find(f => f.path === lastSelectedPath);
+                    if (file?.isDirectory) navigateTo(file.path);
+                    else if (file) globalThis.api?.openPath(file.path);
+                }
+            },
+            'file.showInExplorer': (e) => { e.preventDefault(); menuActions.showInExplorer(); },
+
+            // Edit
+            'edit.copy': (e) => { e.preventDefault(); if (selectedPaths.size > 0) menuActions.copy(); },
+            'edit.cut': (e) => { e.preventDefault(); if (selectedPaths.size > 0) menuActions.cut(); },
+            'edit.paste': (e) => { e.preventDefault(); menuActions.paste(); },
+            'edit.selectAll': (e) => { e.preventDefault(); setSelectedPaths(new Set(filteredFiles.map(f => f.path))); },
+            'edit.deselect': (e) => { e.preventDefault(); setSelectedPaths(new Set()); },
+
+            // Navigation
+            'nav.back': (e) => { e.preventDefault(); navigateBack(); },
+
+            // View
+            'view.toggleSidebar': (e) => {
+                e.preventDefault();
+                const newState = !isSidebarOpen;
+                setSidebarOpen(newState);
+                localStorage.setItem('isSidebarOpen', String(newState));
+            },
+            'view.toggleInspector': (e) => {
+                e.preventDefault();
+                setPreviewOpen(!isPreviewOpen);
+            },
+            'view.refresh': (e) => { e.preventDefault(); refreshDirectory(); },
+            'view.search': (e) => {
+                e.preventDefault();
+                const searchInput = document.querySelector('.header-search input, .search-input');
+                if (searchInput instanceof HTMLInputElement) searchInput.focus();
+            },
+
+            // Version Control
+            'version.create': (e) => {
+                e.preventDefault();
+                if (lastSelectedPath) {
+                    setPreviewOpen(true);
+                    setInspectorTab('versions');
+                    setInspectorAction('createVersion');
+                }
+            },
+            'version.compare': (e) => {
+                e.preventDefault();
+                if (lastSelectedPath) {
+                    setPreviewOpen(true);
+                    setInspectorTab('versions');
+                    setInspectorAction('compare');
+                }
+            },
+
+            // General
+            'general.help': (e) => {
+                e.preventDefault();
+                const helpBtn = document.querySelector('.footer-item[title="Help"]');
+                if (helpBtn instanceof HTMLButtonElement) helpBtn.click();
+            },
+            'general.settings': (e) => {
+                e.preventDefault();
+                if (rootDir) navigate(`/project-settings?path=${encodeURIComponent(rootDir)}`);
+                else navigate('/settings');
+            },
+        },
+        { enabled: !renamingFile && !isCreating }
+    );
 
     return (
         <div className="app-shell" style={{ flexDirection: 'column' }}>
@@ -1374,6 +1402,8 @@ const Home = () => {
                         onClose={handleInspectorClose}
                         onRefresh={refreshDirectory}
                         initialTab={inspectorTab}
+                        initialAction={inspectorAction}
+                        onActionHandled={() => setInspectorAction(null)}
                         backupPath={getBackupPath(rootDir)}
                     />
                 )}

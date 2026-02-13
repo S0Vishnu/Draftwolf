@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Trash2, RotateCcw, Download, GitCommit, Edit2 } from 'lucide-react';
+import { Trash2, RotateCcw, Download, GitCommit, Edit2, Eye } from 'lucide-react';
 import { FileEntry } from '../FileItem';
 
 interface VersionsTabProps {
@@ -16,6 +16,7 @@ interface VersionsTabProps {
     onDelete: (id: string) => void;
     onRestore: (id: string) => void;
     onRename: (id: string, newLabel: string) => void;
+    onCompare?: (versionId: string) => void;
 }
 
 const LANE_COLORS = [
@@ -47,7 +48,8 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
     onDownload,
     onDelete,
     onRestore,
-    onRename
+    onRename,
+    onCompare
 }) => {
     const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
     const [editingLabel, setEditingLabel] = useState<string>('');
@@ -297,6 +299,15 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                                 </div>
 
                                 <div className="commit-actions">
+                                    {onCompare && !file.isDirectory && (
+                                        <button
+                                            className="version-action-btn version-compare-btn"
+                                            onClick={(e) => { e.stopPropagation(); onCompare(node.id); }}
+                                            title="Compare with current"
+                                        >
+                                            <Eye size={13} />
+                                        </button>
+                                    )}
                                     <button
                                         className="version-action-btn"
                                         onClick={(e) => {

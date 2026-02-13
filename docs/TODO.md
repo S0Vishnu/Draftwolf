@@ -1,7 +1,7 @@
 # DraftWolf - Roadmap & TODO
 
 **Current Version:** 1.1.9  
-**Last Updated:** February 08, 2026
+**Last Updated:** February 13, 2026
 
 ---
 
@@ -25,8 +25,13 @@
 ---
 
 ## 🛠️ Refinement & Polish (v1.2.0 Prep)
+- [x] **Background File Monitoring**: Recursive chokidar watcher with change buffer, configurable interval (5m–2h), native OS notifications listing changed files, click-to-focus.
+- [ ] **Save Location for Versions**: Prompt user to pick a `.draft` storage location; changeable in Settings.
+- [ ] **Exclusive File Locking**: Implement file locking to prevent concurrent edits in team workflows.
+- [ ] **Partial Workspace**: Allow versioning a subset of the workspace instead of the full tree.
+- [ ] **Visual Diff for Binaries**: Side-by-side visual comparison for images, textures, and other binary assets.
 - [ ] **Large File Handling**: Optimize performance for >1GB files (chunking/streams).
-- [ ] **Onboarding**: create a "First Run" tour using `shepherd.js` or similar.
+- [ ] **Onboarding**: Create a "First Run" tour using `shepherd.js` or similar.
 - [ ] **Settings**: Add configuration for storage location and compression intensity.
 
 ---

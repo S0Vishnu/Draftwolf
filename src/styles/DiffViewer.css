@@ -1,0 +1,492 @@
+/* ═══════════════════════════════════════════════════════════════
+   DiffViewer — Visual Diff Styles
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Overlay / Modal ─────────────────────────────────────────── */
+
+.diff-viewer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    animation: diffFadeIn 0.2s ease;
+}
+
+.diff-viewer-modal {
+    width: 92vw;
+    height: 88vh;
+    max-width: 1400px;
+    background: #13141a;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
+}
+
+.diff-viewer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    flex-shrink: 0;
+}
+
+.diff-viewer-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    letter-spacing: 0.02em;
+}
+
+.diff-viewer-title-icon {
+    font-size: 1.1rem;
+}
+
+.diff-viewer-close {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.diff-viewer-close:hover {
+    background: rgba(255, 60, 60, 0.15);
+    border-color: rgba(255, 60, 60, 0.3);
+    color: #ff6b6b;
+}
+
+.diff-viewer-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ─── Loading ─────────────────────────────────────────────────── */
+
+.diff-loading {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.85rem;
+}
+
+.diff-loading-spinner {
+    width: 28px;
+    height: 28px;
+    border: 2.5px solid rgba(139, 92, 246, 0.15);
+    border-top-color: #8b5cf6;
+    border-radius: 50%;
+    animation: diffSpin 0.7s linear infinite;
+}
+
+/* ─── Unsupported ─────────────────────────────────────────────── */
+
+.diff-unsupported {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.3);
+    text-align: center;
+}
+
+.diff-unsupported h3 {
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0;
+    font-size: 1rem;
+}
+
+.diff-unsupported p {
+    max-width: 400px;
+    line-height: 1.5;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+/* ─── Mode Bar ────────────────────────────────────────────────── */
+
+.diff-mode-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 3px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    width: fit-content;
+}
+
+.diff-mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 0.02em;
+}
+
+.diff-mode-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.diff-mode-btn.active {
+    background: rgba(139, 92, 246, 0.15);
+    color: #c4b5fd;
+    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.3);
+}
+
+/* ─── Pane Labels ─────────────────────────────────────────────── */
+
+.diff-pane-label {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 5;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   IMAGE DIFF
+   ═══════════════════════════════════════════════════════════════ */
+
+.diff-image-root {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ─── Slider ──────────────────────────────────────────────────── */
+
+.diff-slider-container {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: #0d0e12;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.diff-slider-img {
+    display: block;
+}
+
+/* Base image (new) — sets the container size, constrained to fit */
+.diff-slider-img-base {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+/* Overlay image (old) — same size as container, on top, clipped by clip-path */
+.diff-slider-img-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    z-index: 2;
+}
+
+.diff-slider-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    z-index: 10;
+    transform: translateX(-50%);
+}
+
+.diff-slider-handle-line {
+    position: absolute;
+    inset: 0;
+    background: #8b5cf6;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+}
+
+.diff-slider-handle-grip {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px;
+    height: 36px;
+    background: #1a1b23;
+    border: 2px solid #8b5cf6;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: ew-resize;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.diff-slider-handle-grip span {
+    width: 10px;
+    height: 1.5px;
+    background: rgba(139, 92, 246, 0.6);
+    border-radius: 2px;
+}
+
+.diff-slider-label {
+    position: absolute;
+    bottom: 10px;
+    z-index: 5;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+.diff-slider-label-left {
+    left: 10px;
+}
+
+.diff-slider-label-right {
+    right: 10px;
+}
+
+/* ─── Side by Side ────────────────────────────────────────────── */
+
+.diff-sidebyside {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.diff-sidebyside-pane {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    background: #0d0e12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.diff-sidebyside-pane img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.diff-sidebyside-divider {
+    width: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+/* ─── Overlay (Onion Skin) ────────────────────────────────────── */
+
+.diff-overlay-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+}
+
+.diff-overlay-images {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: #0d0e12;
+}
+
+.diff-overlay-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.diff-overlay-img-top {
+    z-index: 2;
+}
+
+.diff-overlay-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+.diff-overlay-slider {
+    flex: 1;
+    accent-color: #8b5cf6;
+    height: 4px;
+}
+
+.diff-overlay-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODEL DIFF (3D)
+   ═══════════════════════════════════════════════════════════════ */
+
+.diff-model-root {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.diff-model-hint {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.35);
+    text-align: center;
+    padding: 4px 0;
+}
+
+.diff-model-split {
+    flex: 1;
+    display: flex;
+    gap: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    min-height: 400px;
+}
+
+.diff-model-pane {
+    flex: 1;
+    position: relative;
+    min-height: 400px;
+}
+
+.diff-model-pane canvas {
+    border-radius: 0 !important;
+}
+
+.diff-model-divider {
+    width: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+/* ─── Animations ──────────────────────────────────────────────── */
+
+@keyframes diffFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes diffSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ─── Compare Button (for VersionsTab integration) ────────────── */
+
+.version-compare-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 6px;
+    background: rgba(139, 92, 246, 0.08);
+    color: #a78bfa;
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.version-compare-btn:hover {
+    background: rgba(139, 92, 246, 0.18);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: #c4b5fd;
+}
+
+.version-compare-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}

@@ -38,6 +38,7 @@ const Header: React.FC<HeaderProps> = ({
                 <Search size={16} className="search-icon" />
                 <input
                     type="text"
+                    className="search-input"
                     placeholder="Search..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}

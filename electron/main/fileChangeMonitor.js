@@ -11,7 +11,6 @@
 
 import { Notification, BrowserWindow } from "electron";
 import path from "node:path";
-import appIcon from "../../public/icon.png?asset";
 
 /** @type {import('chokidar').FSWatcher | null} */
 let watcher = null;
@@ -246,16 +245,20 @@ function fireNotification() {
         const notification = new Notification({
             title,
             body,
-            icon: appIcon,
             silent: false,
+            actions: [
+                { type: 'button', text: 'Version Changes' },
+                { type: 'button', text: 'Snooze (5m)' },
+                { type: 'button', text: 'Dismiss' }
+            ]
         });
 
         notification.on("show", () => {
             console.log("[FileChangeMonitor] Notification SHOWN successfully");
         });
 
-        notification.on("click", () => {
-            console.log("[FileChangeMonitor] Notification CLICKED");
+        const showApp = () => {
+            console.log("[FileChangeMonitor] Notification Action/Click Triggered");
             // Bring the main window to the foreground
             const win = BrowserWindow.getAllWindows()[0];
             if (win) {
@@ -269,6 +272,35 @@ function fireNotification() {
                     total,
                     watchedDir,
                 });
+            }
+        };
+
+        notification.on("click", showApp);
+
+        notification.on("action", (event, index) => {
+            if (index === 0) {
+                // "Version Changes"
+                showApp();
+            } else if (index === 1) {
+                // "Snooze"
+                console.log("[FileChangeMonitor] Snooze clicked. Scheduling retry in 5m.");
+
+                // Restore entries to buffer if they haven't been superseded by newer events
+                entries.forEach(e => {
+                    if (!changeBuffer.has(e.path)) {
+                        changeBuffer.set(e.path, { type: e.type, timestamp: e.timestamp });
+                    }
+                });
+
+                // Schedule re-notification
+                setTimeout(() => {
+                    console.log("[FileChangeMonitor] Snooze timer fired.");
+                    fireNotification();
+                }, 5 * 60 * 1000);
+            } else if (index === 2) {
+                // "Dismiss"
+                console.log("[FileChangeMonitor] Dismiss clicked.");
+                notification.close();
             }
         });
 

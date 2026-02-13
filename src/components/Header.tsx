@@ -22,10 +22,10 @@ const Header: React.FC<HeaderProps> = ({
     isSidebarOpen,
     toggleSidebar,
     isPreviewOpen = false,
-    togglePreview = () => {},
+    togglePreview = () => { },
     searchQuery = '',
-    setSearchQuery = () => {},
-    refreshDirectory = () => {},
+    setSearchQuery = () => { },
+    refreshDirectory = () => { },
     isLoading = false,
     onSettings,
     onTogglePin,
@@ -34,9 +34,6 @@ const Header: React.FC<HeaderProps> = ({
 
     return (
         <header className="top-bar">
-            <div className="header-left">
-            </div>
-
             <div className="search-container">
                 <Search size={16} className="search-icon" />
                 <input
@@ -57,9 +54,9 @@ const Header: React.FC<HeaderProps> = ({
                     </button>
                 )}
                 {onTogglePin && (
-                    <button 
-                        className={`icon-btn-ghost ${isPinned ? 'active' : ''}`} 
-                        onClick={onTogglePin} 
+                    <button
+                        className={`icon-btn-ghost ${isPinned ? 'active' : ''}`}
+                        onClick={onTogglePin}
                         title={isPinned ? "Unpin Project" : "Pin Project"}
                     >
                         <Pin size={18} fill={isPinned ? "currentColor" : "none"} />

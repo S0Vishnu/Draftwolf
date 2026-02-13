@@ -99,7 +99,7 @@
     scrollbar-color: #333 transparent;
 
     .inspector-header {
-        height: 48px;
+        height: 52px;
         padding: 0 16px;
         display: flex;
         justify-content: space-between;
@@ -932,6 +932,7 @@
 .creation-form {
     margin: 0 16px 20px 16px;
 }
+
 /* Snapshot Stats */
 .snapshot-stats-container {
     padding: 12px;
@@ -975,4 +976,3 @@
     color: #50fa7b;
     font-weight: 600;
 }
-

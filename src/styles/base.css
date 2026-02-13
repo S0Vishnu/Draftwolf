@@ -43,6 +43,11 @@ ul {
   list-style: none;
 }
 
+* {
+  outline: none;
+  border: none;
+}
+
 body {
   min-height: 100vh;
   color: var(--color-text);

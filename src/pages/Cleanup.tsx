@@ -427,6 +427,8 @@ const Cleanup = () => {
     const renderFileInspection = () => {
         if (!inspectingFile) return null;
 
+        const isSnapshot = activeTab === 'snapshots';
+
         return (
             <div className="inspection-view fade-in">
                 <div className="inspection-header">
@@ -441,8 +443,8 @@ const Cleanup = () => {
                 </div>
 
                 <div className="inspection-content" style={{ display: 'flex', gap: '2rem', height: 'calc(100vh - 200px)' }}>
-                    <div className="version-list-wrapper" style={{ flex: 1, overflowY: 'auto' }}>
-                        <h3>Version History</h3>
+                    <div className="version-list-wrapper" style={{ flex: isSnapshot ? 1 : 'unset', width: isSnapshot ? 'auto' : '100%', overflowY: 'auto' }}>
+                        <h3>{isSnapshot ? 'Snapshot History' : 'Version History'}</h3>
                         <table className="version-table">
                             <thead>
                                 <tr>
@@ -487,91 +489,95 @@ const Cleanup = () => {
                         </table>
                     </div>
 
-                    <div className="snapshot-contents-wrapper" style={{ flex: 1, overflowY: 'auto', background: 'var(--ev-c-bg-soft)', padding: '1rem', borderRadius: '8px' }}>
-                        <h3>Snapshot Contents {selectedVersion && <span style={{ fontSize: '0.8em', opacity: 0.7 }}>({selectedVersion.versionNumber})</span>}</h3>
-                        {!selectedVersion ? (
-                            <div className="empty-state" style={{ height: '200px' }}>
-                                <p>Select a version to view files</p>
-                            </div>
-                        ) : (
-                            <div className="snapshot-file-list">
-                                {selectedVersion.files && Object.keys(selectedVersion.files).length > 0 ? (
-                                    Object.keys(selectedVersion.files).sort().map((filePath, i) => (
-                                        <div key={i} className="snapshot-file-item" style={{ padding: '0.5rem', borderBottom: '1px solid var(--ev-c-border)', display: 'flex', alignItems: 'center' }}>
-                                            <span style={{ marginRight: '0.5rem', opacity: 0.7 }}>📄</span>
-                                            <span style={{ wordBreak: 'break-all' }}>{filePath}</span>
+                    {isSnapshot && (
+                        <div className="snapshot-contents-wrapper" style={{ flex: 1, overflowY: 'auto', background: 'var(--ev-c-bg-soft)', padding: '1rem', borderRadius: '8px' }}>
+                            <h3>Snapshot Contents {selectedVersion && <span style={{ fontSize: '0.8em', opacity: 0.7 }}>({selectedVersion.versionNumber})</span>}</h3>
+                            {!selectedVersion ? (
+                                <div className="empty-state" style={{ height: '200px' }}>
+                                    <p>Select a version to view files</p>
+                                </div>
+                            ) : (
+                                <div className="snapshot-file-list">
+                                    {selectedVersion.files && Object.keys(selectedVersion.files).length > 0 ? (
+                                        Object.keys(selectedVersion.files).sort().map((filePath, i) => (
+                                            <div key={i} className="snapshot-file-item" style={{ padding: '0.5rem', borderBottom: '1px solid var(--ev-c-border)', display: 'flex', alignItems: 'center' }}>
+                                                <span style={{ marginRight: '0.5rem', opacity: 0.7 }}>📄</span>
+                                                <span style={{ wordBreak: 'break-all' }}>{filePath}</span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="empty-state">
+                                            <p>No files in this version.</p>
                                         </div>
-                                    ))
-                                ) : (
-                                    <div className="empty-state">
-                                        <p>No files in this version.</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         );
     };
 
     return (
-        <div style={{ display: 'flex', height: '100vh', width: '100vw', background: 'var(--ev-c-black)' }}>
-            <Sidebar
-                isOpen={isSidebarOpen}
-                toggleSidebar={() => {
-                    const newState = !isSidebarOpen;
-                    setIsSidebarOpen(newState);
-                    localStorage.setItem('isSidebarOpen', String(newState));
-                }}
-                user={user}
-                onGoHome={() => navigate('/home')}
-            />
-            <div className="cleanup-container">
-                <div className="cleanup-header">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%' }}>
-                        <div>
-                            {(inspectingFile) && (
-                                <button className="back-link" onClick={handleBack}>
-                                    <ArrowLeft size={18} /> Back to File List
-                                </button>
-                            )}
-                            <h1 className="cleanup-title">
-                                {inspectingFile ? 'File History' : 'Storage Optimization'}
-                            </h1>
+        <div className="cleanup-page" style={{ height: '100vh', width: '100vw', background: 'var(--ev-c-black)' }}>
+            <div className="app-inner" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', height: '100%' }}>
+                <Sidebar
+                    isOpen={isSidebarOpen}
+                    toggleSidebar={() => {
+                        const newState = !isSidebarOpen;
+                        setIsSidebarOpen(newState);
+                        localStorage.setItem('isSidebarOpen', String(newState));
+                    }}
+                    user={user}
+                    onGoHome={() => navigate('/home')}
+                />
+                <main className="cleanup-container" style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+                    <header className="cleanup-header">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%' }}>
+                            <div className="cleanup-header-text">
+                                {(inspectingFile) && (
+                                    <button className="back-link" onClick={handleBack}>
+                                        <ArrowLeft size={18} /> Back to File List
+                                    </button>
+                                )}
+                                <h1 className="cleanup-title">
+                                    {inspectingFile ? 'File History' : 'Storage Optimization'}
+                                </h1>
+                                {!inspectingFile && (
+                                    <p className="cleanup-subtitle">
+                                        Analyze and clean up old versions, unused assets, and temporary files to free up space.
+                                    </p>
+                                )}
+                            </div>
+
                             {!inspectingFile && (
-                                <p className="cleanup-subtitle">
-                                    Analyze and clean up old versions, unused assets, and temporary files to free up space.
-                                </p>
+                                <div className="search-bar-wrapper" style={{ marginBottom: 0, width: '300px' }}>
+                                    <Search size={18} className="search-icon" aria-hidden="true" />
+                                    <input
+                                        type="text"
+                                        placeholder="Filter files..."
+                                        className="cleanup-search"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
                             )}
                         </div>
+                    </header>
 
-                        {!inspectingFile && (
-                            <div className="search-bar-wrapper" style={{ marginBottom: 0, width: '300px' }}>
-                                <Filter size={18} className="search-icon" aria-hidden="true" />
-                                <input
-                                    type="text"
-                                    placeholder="Filter files..."
-                                    className="cleanup-search"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        )}
+                    <div className="module-content">
+                        {renderStorageDetail()}
+                        <ConfirmDialog
+                            isOpen={isConfirmOpen}
+                            title="Confirm Deletion"
+                            message={`Are you sure you want to delete ${versionsToDelete.size} version(s)? This action cannot be undone.`}
+                            onConfirm={handleConfirmDelete}
+                            onCancel={() => setIsConfirmOpen(false)}
+                            isDangerous={true}
+                        />
                     </div>
-                </div>
-
-                <div className="module-content">
-                    {renderStorageDetail()}
-                    <ConfirmDialog
-                        isOpen={isConfirmOpen}
-                        title="Confirm Deletion"
-                        message={`Are you sure you want to delete ${versionsToDelete.size} version(s)? This action cannot be undone.`}
-                        onConfirm={handleConfirmDelete}
-                        onCancel={() => setIsConfirmOpen(false)}
-                        isDangerous={true}
-                    />
-                </div>
+                </main>
             </div>
         </div>
     );

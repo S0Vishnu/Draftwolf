@@ -819,6 +819,7 @@
     color: #e0e0e0;
     font-weight: 500;
     overflow: hidden;
+    white-space: nowrap;
     text-overflow: ellipsis;
     margin-right: 8px;
     flex: 1;

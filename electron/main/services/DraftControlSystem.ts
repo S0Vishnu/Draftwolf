@@ -403,6 +403,7 @@ export class DraftControlSystem {
           const { hash, originalSize, compressedSize } = await this.addFileToCAS(fullPath);
 
           // Get or create ID
+          const relativePath = this.normalizePath(path.relative(this.projectRoot, fullPath));
           const id = await this.getOrCreateFileId(relativePath);
 
           fileHashes[relativePath] = hash;
@@ -880,8 +881,9 @@ export class DraftControlSystem {
         outer: for (const m of result) {
           if (!m.files) continue;
           for (const fPath of Object.keys(m.files)) {
+            const normFPath = this.normalizePath(fPath);
             for (const st of searchTargets) {
-              if (fPath.startsWith(st + '/')) {
+              if (normFPath.startsWith(st + '/')) {
                 isDirectory = true;
                 break outer;
               }

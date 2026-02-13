@@ -552,6 +552,12 @@
     border-radius: 8px;
     overflow: hidden;
     backdrop-filter: blur(20px);
+
+    h3 {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.86rem;
+        color: var(--ev-c-text-2);
+    }
 }
 
 .version-table {
@@ -675,9 +681,8 @@ input[type="checkbox"]:checked:hover {
 }
 
 .back-link:hover {
-    background: rgba(255, 255, 255, 0.05);
     color: var(--ev-c-text-1) !important;
-    transform: translateX(-4px);
+    transform: translateX(-2px);
 }
 
 .loading-spinner {

@@ -33,45 +33,54 @@ This case study compares Draftwolf’s current capabilities against these indust
 
 ## 3. Feature Comparison: What We Have vs. The Industry
 
+### Local & Core Features
 | Feature | Draftwolf (Current) | Perforce Helix Core | Unity Plastic SCM |
 | :--- | :--- | :--- | :--- |
-| **Core Architecture** | Local-Only (Folder .draft) | Centralized Server | Distributed or Centralized |
-| **Setup Difficulty** | Instant (Zero Config) | High (Requires Server Admin) | Medium (Cloud or Local Setup) |
-| **Asset Handling** | CAS + Compression (Brotli) | Git LFS Killer (Native Large File) | Strong Large File Support |
+| **Core Architecture** | Local-Only (Folder .draft) | Client-Server | Distributed / Centralized |
+| **Setup Difficulty** | Instant (Zero Config) | High (Requires Admin) | Medium (Cloud or Local) |
+| **Asset Handling** | CAS + Compression (Brotli) | Git LFS Killer (Native) | Strong Large File Support |
 | **Workflow Paradigm** | "Snapshots" (Folder State) | "Checkout & Submit" | "Checkin/Push" or Gluon |
 | **Visual Interface** | High-Fidelity (Glassmorphism) | Functional / Enterprise | Visual Branch Explorer |
-| **File Locking** | ❌ No | ✅ Yes (Checkout Locks) | ✅ Yes (Exclusive Checkout) |
-| **Cloud / Sync** | ❌ No (Local Only) | ✅ Yes (Perforce Streams) | ✅ Yes (Plastic Cloud) |
-| **Partial Workspace** | ❌ No (Loads full folder) | ✅ Yes (Mappings) | ✅ Yes (Gluon) |
-| **Engine Plugins** | ❌ No (External App only) | ✅ Yes (Unreal, Unity, etc.) | ✅ Yes (Deep Unity Integration) |
-| **Team/Permissions** | ❌ No | ✅ Yes (Granular ACLs) | ✅ Yes (User Groups) |
 | **Smart De-duplication**| ✅ Yes (SHA-256 CAS) | ✅ Yes (Server-side) | ✅ Yes |
 | **Change Detection** | ✅ Auto-Monitoring + Notification | Explicit Checkout / Reconcile | Automatic Detection |
 | **Visual Diffing** | ✅ Yes (Image + 3D) | ✅ Yes (P4V/Helix Swarm) | ✅ Yes (Image/Text) |
-| **Cost** | Free (Local) | Enterpise ($$$) / Free <5 users | Subscrption / Free <3 users |
+| **Engine Plugins** | ❌ No (External App only) | ✅ Yes (Unreal, Unity, etc.) | ✅ Yes (Deep Unity Integration) |
+
+### Cloud & Collaboration Features
+| Feature | Draftwolf (Planned) | Perforce Helix Core | Unity Plastic SCM |
+| :--- | :--- | :--- | :--- |
+| **Cloud / Sync** | ❌ No (Local Only) | ✅ Yes (Perforce Streams) | ✅ Yes (Plastic Cloud) |
+| **File Locking** | ❌ No | ✅ Yes (Checkout Locks) | ✅ Yes (Exclusive Checkout) |
+| **Partial Workspace** | ❌ No (Loads full folder) | ✅ Yes (Mappings) | ✅ Yes (Gluon) |
+| **Team/Permissions** | ❌ No | ✅ Yes (Granular ACLs) | ✅ Yes (User Groups) |
+| **Cost** | Free (Local) | Enterprise ($$$) / Free <5 users | Subscription / Free <3 users |
 
 ---
 
 ## 4. Competitive Roadmap: Features Needed to Compete
 
-To transition from a "local tool for freelancers" to a viable competitor against Perforce and Plastic SCM, Draftwolf needs to implement the following critical features:
+To transition from a "local tool for freelancers" to a viable competitor against Perforce and Plastic SCM, Draftwolf needs to implement the following critical features, categorized by scope.
 
-### 1. Cloud Synchronization & Collaboration (The "Wolf Pack")
+### Cloud Infrastructure (The "Wolf Pack")
+
+#### 1. Cloud Synchronization & Collaboration
 *   **Requirement:** Users must be able to push their local snapshots to a remote server (Firebase/AWS) to collaborate with others.
 *   **Why:** Collaboration is the primary reason teams use Perforce/Plastic. Without it, Draftwolf is limited to solo use.
 
-### 2. Exclusive File Locking (Binary Locking)
+#### 2. Exclusive File Locking (Binary Locking)
 *   **Requirement:** Implement a system to "lock" a file on the server so no one else can edit it while a user is working on it.
 *   **Why:** Binary files (images, 3D models) cannot be merged textually. Locking prevents merge conflicts, which is the #1 selling point of Perforce for game studios.
 
-### 3. Partial Workspaces (Virtual File System)
+#### 3. Team Permissions & ACLs
+*   **Requirement:** Admin controls to define who can read/write specifically folders or projects.
+*   **Why:** Studios need to protect IP and prevent contractors from accessing sensitive core code.
+
+### Local Experience & Enhancements
+
+#### 4. Partial Workspaces (Virtual File System)
 *   **Requirement:** Allow users to download/see only the files they need, or stream files on demand, rather than syncing the entire multi-gigabyte project.
 *   **Why:** Game projects can be 100GB+. Artists shouldn't need to download the entire engineer codebase to change one texture.
 
-### 4. Direct Engine Integrations (Plugins)
+#### 5. Direct Engine Integrations (Plugins)
 *   **Requirement:** Plugins for Unity, Unreal Engine, Blender, and Photoshop that allow users to Snapshot/Lock files directly inside their creative tools.
 *   **Why:** Context switching breaks flow. Perforce and Plastic live inside the game engine; Draftwolf currently lives in its own window.
-
-### 5. Team Permissions & ACLs
-*   **Requirement:** Admin controls to define who can read/write specifically folders or projects.
-*   **Why:** Studios need to protect IP and prevent contractors from accessing sensitive core code.

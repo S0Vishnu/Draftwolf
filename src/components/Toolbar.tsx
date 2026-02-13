@@ -2,7 +2,8 @@
 import React from 'react';
 import {
     ChevronLeft, ChevronRight, Home as HomeIcon, ChevronRight as ChevronRightIcon,
-    FolderPlus, FilePlus, List, LayoutGrid, Settings, Check, RotateCw
+    FolderPlus, FilePlus, List, LayoutGrid, Check, RotateCw,
+    FilterIcon
 } from 'lucide-react';
 import { FileEntry } from './FileItem';
 
@@ -55,7 +56,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
     onCreateFile,
     setViewMode,
     onNavigate,
-
 }) => {
     // Helper to rebuild path up to index
     const getPathAtIndex = (parts: string[], index: number) => {
@@ -108,14 +108,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     {/* Home/Root Icon */}
                     <HomeIcon
                         size={14}
-                        className={`crumb-home ${!currentPath ? '' : 'clickable'}`}
+                        className={`crumb-home ${currentPath ? 'clickable' : ''}`}
                         onClick={onOpenWorkspace}
                     />
 
                     {(() => {
                         // Normalize paths for comparison (handle Windows backslashes)
-                        const normCurrent = currentPath ? currentPath.replace(/\\/g, '/') : '';
-                        const normRoot = rootDir ? rootDir.replace(/\\/g, '/') : '';
+                        const normCurrent = currentPath ? currentPath.replaceAll('\\', '/') : '';
+                        const normRoot = rootDir ? rootDir.replaceAll('\\', '/') : '';
 
                         // Check if current path is inside root (case insensitive check for Windows could be added, but robust startswith is okay for now)
                         if (normCurrent && normRoot && normCurrent.startsWith(normRoot)) {
@@ -215,7 +215,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                                 onClick={() => setOptionsOpen(!isOptionsOpen)}
                                 title="View Options"
                             >
-                                <Settings size={18} />
+                                <FilterIcon size={18} />
                             </button>
 
                             {isOptionsOpen && (

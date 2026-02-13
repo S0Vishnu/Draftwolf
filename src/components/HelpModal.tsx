@@ -54,7 +54,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                             <img src={logo} alt="Draftwolf Logo" className="logo-image" />
                         </div>
                         <p className="version">Version {appVersion}</p>
-                        <p className="about-tagline">Local version control for your files—no git required. Organize drafts, versions, and metadata in one place.</p>
+                        <p className="about-tagline">Local version control for your files, no git required. Organize drafts, versions, and metadata in one place.</p>
                     </div>
 
                     <div className="help-section features">

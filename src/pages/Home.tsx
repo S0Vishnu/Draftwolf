@@ -59,12 +59,12 @@ const Home = () => {
     }, [recentWorkspaces]);
 
     // Pinned Folders
-    const [pinnedFolders, setPinnedFolders] = useState<{ 
-        path: string, 
-        name: string, 
+    const [pinnedFolders, setPinnedFolders] = useState<{
+        path: string,
+        name: string,
         color?: string,
         showHiddenFiles?: boolean,
-        showExtensions?: boolean 
+        showExtensions?: boolean
     }[]>(() => {
         try {
             const saved = localStorage.getItem('pinnedFolders');
@@ -122,7 +122,7 @@ const Home = () => {
             const normPath = path.toLowerCase().replaceAll('\\', '/');
             const existing = prev.find(w => w.path.toLowerCase().replaceAll('\\', '/') === normPath);
             const filtered = prev.filter(w => w.path.toLowerCase().replaceAll('\\', '/') !== normPath);
-            
+
             const newItem = {
                 ...existing,
                 path: existing?.path || path, // Prefer existing path casing if available
@@ -270,12 +270,10 @@ const Home = () => {
 
     // View Options
     const [showHiddenFiles, setShowHiddenFiles] = useState(() => localStorage.getItem('showHiddenFiles') === 'true');
-    const [showExtensions, setShowExtensions] = useState(() => localStorage.getItem('showExtensions') !== 'false'); // Default true
+    const [showExtensions, setShowExtensions] = useState(() => localStorage.getItem('showExtensions') === 'false');
 
     useEffect(() => { localStorage.setItem('showHiddenFiles', String(showHiddenFiles)); }, [showHiddenFiles]);
     useEffect(() => { localStorage.setItem('showExtensions', String(showExtensions)); }, [showExtensions]);
-
-
 
     // Computed
     const filteredFiles = files.filter(f => {
@@ -573,11 +571,11 @@ const Home = () => {
 
         const bPath = backupSetupPath;
         const projPath = backupSetupProject;
-        
+
         // Create .draft folder
         // Initialize the draft system structure at the confirmed backup path
         try {
-             // API will handle creating .draft/objects/versions/metadata etc.
+            // API will handle creating .draft/objects/versions/metadata etc.
             const success = await globalThis.api.draft.init(projPath, bPath);
             if (!success) {
                 toast.error("Failed to initialize backup system");

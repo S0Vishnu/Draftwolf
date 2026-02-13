@@ -61,7 +61,6 @@
 .sidebar.collapsed .sidebar-header {
     padding: 0;
     justify-content: center;
-    cursor: pointer;
     /* Header expands */
 }
 
@@ -138,15 +137,6 @@
     border-radius: 4px;
 }
 
-/* Cursor and width already handled in primary .sidebar.collapsed */
-
-/* Collapsed Sidebar Experience - Handled by consolidated sidebar logic */
-
-.sidebar.collapsed .side-btn,
-.sidebar.collapsed .sidebar-toggle-btn {
-    cursor: pointer !important;
-}
-
 .sidebar.collapsed *:not(.side-btn):not(.sidebar-header):not(.side-btn *) {
     cursor: e-resize;
 }
@@ -217,8 +207,9 @@
 
 /* Button Foundation */
 .side-btn {
-    width: 100%;
+    width: calc(100% - 12px);
     height: 44px;
+    margin: 0 6px;
     border-radius: 10px;
     border: none;
     background: transparent;
@@ -283,8 +274,8 @@
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.04);
     position: relative;
-    margin: 0 12px;
-    width: calc(100% - 24px);
+    margin: 0 6px;
+    width: calc(100% - 12px);
 }
 
 .sidebar.collapsed .project-btn {
@@ -388,8 +379,12 @@
     border-color: var(--accent);
 }
 
-.settings-btn {
+.sidebar.collapsed .settings-btn {
     border-radius: 50%;
+}
+
+.sidebar .settings-btn {
+    padding: 0 5px;
 }
 
 /* ============================================================
@@ -511,6 +506,9 @@
     padding: 4px;
     border-radius: 4px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .nav-btn:hover:not(:disabled) {

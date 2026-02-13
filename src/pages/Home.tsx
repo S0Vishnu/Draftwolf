@@ -236,9 +236,15 @@ const Home = () => {
     const selectionStart = useRef<{ x: number, y: number } | null>(null);
     const initialSelection = useRef<Set<string>>(new Set());
 
-    // History
-    const [history, setHistory] = useState<string[]>([]);
-    const [historyIndex, setHistoryIndex] = useState(-1);
+    // History — initialize from restored currentPath so back/forward works after reload
+    const [history, setHistory] = useState<string[]>(() => {
+        const saved = localStorage.getItem('lastPath');
+        return saved ? [saved] : [];
+    });
+    const [historyIndex, setHistoryIndex] = useState(() => {
+        const saved = localStorage.getItem('lastPath');
+        return saved ? 0 : -1;
+    });
 
     // Actions
     const [renamingFile, setRenamingFile] = useState<string | null>(null);
@@ -522,7 +528,11 @@ const Home = () => {
             setRootDir(path);
             setHistory([path]);
             setHistoryIndex(0);
-            loadDirectory(path);
+            if (path === currentPath) {
+                loadDirectory(path); // Already on this path, useEffect won't fire
+            } else {
+                setCurrentPath(path); // useEffect will call loadDirectory
+            }
             return;
         }
 
@@ -540,7 +550,11 @@ const Home = () => {
                 setRootDir(path);
                 setHistory([path]);
                 setHistoryIndex(0);
-                loadDirectory(path);
+                if (path === currentPath) {
+                    loadDirectory(path);
+                } else {
+                    setCurrentPath(path);
+                }
                 return;
             }
         } catch {
@@ -599,7 +613,7 @@ const Home = () => {
         setRootDir(projPath);
         setHistory([projPath]);
         setHistoryIndex(0);
-        loadDirectory(projPath);
+        setCurrentPath(projPath);
     };
 
     const cancelBackupSetup = () => {
@@ -620,14 +634,14 @@ const Home = () => {
         newHistory.push(path);
         setHistory(newHistory);
         setHistoryIndex(newHistory.length - 1);
-        loadDirectory(path);
+        setCurrentPath(path);
     };
 
     const navigateBack = () => {
         if (historyIndex > 0) {
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
-            loadDirectory(history[newIndex]);
+            setCurrentPath(history[newIndex]);
         }
     };
 
@@ -635,7 +649,7 @@ const Home = () => {
         if (historyIndex < history.length - 1) {
             const newIndex = historyIndex + 1;
             setHistoryIndex(newIndex);
-            loadDirectory(history[newIndex]);
+            setCurrentPath(history[newIndex]);
         }
     };
 

@@ -46,6 +46,8 @@ This case study compares Draftwolf’s current capabilities against these indust
 | **Engine Plugins** | ❌ No (External App only) | ✅ Yes (Unreal, Unity, etc.) | ✅ Yes (Deep Unity Integration) |
 | **Team/Permissions** | ❌ No | ✅ Yes (Granular ACLs) | ✅ Yes (User Groups) |
 | **Smart De-duplication**| ✅ Yes (SHA-256 CAS) | ✅ Yes (Server-side) | ✅ Yes |
+| **Change Detection** | ✅ Auto-Monitoring + Notification | Explicit Checkout / Reconcile | Automatic Detection |
+| **Visual Diffing** | ✅ Yes (Image + 3D) | ✅ Yes (P4V/Helix Swarm) | ✅ Yes (Image/Text) |
 | **Cost** | Free (Local) | Enterpise ($$$) / Free <5 users | Subscrption / Free <3 users |
 
 ---
@@ -70,10 +72,6 @@ To transition from a "local tool for freelancers" to a viable competitor against
 *   **Requirement:** Plugins for Unity, Unreal Engine, Blender, and Photoshop that allow users to Snapshot/Lock files directly inside their creative tools.
 *   **Why:** Context switching breaks flow. Perforce and Plastic live inside the game engine; Draftwolf currently lives in its own window.
 
-### 5. Visual "Diff" for Binaries
-*   **Requirement:** Tools to visually compare two versions of an image or 3D model (e.g., slider swipe, overlay).
-*   **Why:** "Text diff" is useless for artists. They need to *see* what changed between Version 1 and Version 2 of a character model.
-
-### 6. Team Permissions & ACLs
+### 5. Team Permissions & ACLs
 *   **Requirement:** Admin controls to define who can read/write specifically folders or projects.
 *   **Why:** Studios need to protect IP and prevent contractors from accessing sensitive core code.

@@ -2,7 +2,7 @@
 
 This document contains a set of prompts to be used in a fresh chat session to implement specific features for DraftWolf. The features are ordered from easiest to hardest to integrate.
 
-## 1. Background File Monitoring & System Notifications (Easy)
+## 1. Background File Monitoring & System Notifications (Easy) - [COMPLETED]
 **Context:** The application already uses `chokidar` for file watching. We need to move from potential immediate actions (or no actions) to a polling-based notification system. Notifications must be **native OS-level** (e.g., Windows toast notifications, macOS Notification Center), not in-app messages.
 **Prompt:**
 > I need to implement a background file monitoring system for the active project.
@@ -36,7 +36,7 @@ This document contains a set of prompts to be used in a fresh chat session to im
 >     *   If someone else (or another instance) holds the lock, disable the "Save Version" button for that file and show a tooltip: "Locked by [User]".
 > 5.  **Backend:** Since we are using Firebase (implied by dependencies), use a Firestore collection or Realtime Database path to sync locks across users in real-time.
 
-## 4. Visual Diff for Binaries (Hard)
+## 4. Visual Diff for Binaries (Hard) - [COMPLETED]
 **Context:** Text diffs are standard. Binary diffs (Images, 3D models) require specialized rendering. We have `three` and `@react-three/fiber` installed, enabling 3D diffs.
 **Prompt:**
 > I need to add "Visual Diffing" capabilities for binary files in the History view.

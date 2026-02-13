@@ -5,6 +5,8 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase';
 import { FileEntry } from '../components/FileItem';
 import { InspectorTab, InspectorAction } from '../components/inspector/types';
+import { LockService, Lock } from '../services/LockService';
+
 
 // Components
 import Sidebar from '../components/Sidebar';
@@ -16,7 +18,10 @@ import ContextMenu from '../components/ContextMenu';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CustomPopup from '../components/CustomPopup';
 import RecentWorkspaces from '../components/RecentWorkspaces';
+import AICommitModal from '../components/AICommitModal';
+import { ChangeInfo, CommitProposal } from '../services/AIService';
 import { toast } from 'react-toastify';
+
 import { FolderOpen } from 'lucide-react';
 import logo from '../assets/icons/logo.png';
 
@@ -44,6 +49,12 @@ const Home = () => {
     const [currentPath, setCurrentPath] = useState<string | null>(() => localStorage.getItem('lastPath') || null);
     const [rootDir, setRootDir] = useState<string | null>(() => localStorage.getItem('rootDir') || null);
     const [files, setFiles] = useState<FileEntry[]>([]);
+    const [locks, setLocks] = useState<Map<string, Lock>>(new Map());
+
+    // AI Modal State
+    const [aiModalOpen, setAiModalOpen] = useState(false);
+    const [aiChanges, setAiChanges] = useState<ChangeInfo[]>([]);
+
 
     // Recent Workspaces
     const [recentWorkspaces, setRecentWorkspaces] = useState<{ path: string, lastOpened: number, name: string }[]>(() => {
@@ -165,6 +176,76 @@ const Home = () => {
         else localStorage.removeItem('rootDir');
     }, [rootDir]);
 
+    // Locks Subscription
+    useEffect(() => {
+        const unsubscribe = LockService.subscribeToLocks((updatedLocks) => {
+            const map = new Map<string, Lock>();
+            updatedLocks.forEach(l => map.set(l.filePath, l));
+            setLocks(map);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleLockFile = async (path: string) => {
+        if (!user) {
+            toast.error("You must be logged in to lock files.");
+            return;
+        }
+        // Calculate relative path from project root if needed, 
+        // but for now we use the full path relative to projectRoot or simply the path as stored in files.
+        // Wait, LockService uses sanitized path as ID.
+        // If 'path' is absolute, sanitizing it works but sharing is issue.
+        // Let's try to make it relative if rootDir is set.
+        let relPath = path;
+        if (rootDir && path.startsWith(rootDir)) {
+            relPath = path.substring(rootDir.length);
+            if (relPath.startsWith('/') || relPath.startsWith('\\')) relPath = relPath.substring(1);
+        }
+
+        try {
+            await LockService.lockFile(relPath);
+            toast.success("File locked");
+        } catch (e: any) {
+            toast.error(e.message);
+        }
+    };
+
+    const handleUnlockFile = async (path: string) => {
+        let relPath = path;
+        if (rootDir && path.startsWith(rootDir)) {
+            relPath = path.substring(rootDir.length);
+            if (relPath.startsWith('/') || relPath.startsWith('\\')) relPath = relPath.substring(1);
+        }
+
+        try {
+            await LockService.unlockFile(relPath);
+            toast.success("File unlocked");
+        } catch (e: any) {
+            toast.error(e.message);
+        }
+    };
+
+    const isFileLocked = (path: string) => {
+        if (!rootDir) return false;
+        let relPath = path;
+        if (path.startsWith(rootDir)) {
+            relPath = path.substring(rootDir.length);
+            if (relPath.startsWith('/') || relPath.startsWith('\\')) relPath = relPath.substring(1);
+        }
+        return locks.has(relPath);
+    };
+
+    const getFileLock = (path: string) => {
+        if (!rootDir) return undefined;
+        let relPath = path;
+        if (path.startsWith(rootDir)) {
+            relPath = path.substring(rootDir.length);
+            if (relPath.startsWith('/') || relPath.startsWith('\\')) relPath = relPath.substring(1);
+        }
+        return locks.get(relPath);
+    };
+
+
     // ─── Background File Monitor ────────────────────────────────────
     useEffect(() => {
         if (!rootDir) return;
@@ -209,11 +290,21 @@ const Home = () => {
         const api = (globalThis as any).api;
         if (!api?.monitor?.onNotificationClicked) return;
 
-        const unsub = api.monitor.onNotificationClicked((_data: any) => {
+        const unsub = api.monitor.onNotificationClicked((data: any) => {
             // The main process already shows/focuses the window.
             // On the renderer side, refresh the current directory.
             if (currentPath) {
                 loadDirectory(currentPath);
+            }
+
+            // Trigger AI Modal if changes are present
+            if (data && data.changes && data.changes.length > 0) {
+                const mapped: ChangeInfo[] = data.changes.map((c: any) => ({
+                    path: c.path,
+                    type: c.type
+                }));
+                setAiChanges(mapped);
+                setAiModalOpen(true);
             }
         });
 
@@ -221,6 +312,52 @@ const Home = () => {
             if (typeof unsub === 'function') unsub();
         };
     }, [currentPath]);
+
+    const handleAICommit = async (proposal: CommitProposal) => {
+        setAiModalOpen(false);
+        if (!rootDir) return;
+
+        try {
+            // Retrieve backupPath
+            let backupPath = null;
+            try {
+                // Check if defined elsewhere or read from storage
+                // We use a local helper or direct read
+                const saved = localStorage.getItem(`project_settings_${rootDir}`);
+                if (saved) {
+                    const settings = JSON.parse(saved);
+                    backupPath = settings.backupPath;
+                }
+            } catch (e) { }
+
+            // Proposal files are relative. Convert to absolute.
+            // Note: The monitor sends paths relative to rootDir.
+            const absFiles = proposal.files.map(f => {
+                // simple join, assuming rootDir doesn't have trailing slash usually
+                // and taking care of separators
+                const sep = rootDir.includes('/') ? '/' : '\\';
+                return `${rootDir}${sep}${f}`;
+            });
+
+            const result = await (window as any).api.draft.commit(
+                rootDir,
+                proposal.message,
+                absFiles,
+                backupPath
+            );
+
+            if (result && result.success) {
+                toast.success(`Created version: ${proposal.message}`);
+                refreshDirectory();
+            } else {
+                toast.error(`Failed to commit: ${result?.error}`);
+            }
+
+        } catch (e: any) {
+            toast.error("Error creating version: " + e.message);
+        }
+    };
+
 
     // Support Notification
     useEffect(() => {
@@ -1113,16 +1250,54 @@ const Home = () => {
             const isMulti = selectedPaths.size > 1;
             const isPinnedFolder = contextMenu.target ? isPinned(contextMenu.target.path) : false;
 
-            return [
-                { label: 'Open', action: menuActions.open, disabled: isMulti },
-                { label: 'Open Details', action: menuActions.preview, disabled: isMulti },
-                { label: 'Show in Explorer', action: menuActions.showInExplorer, disabled: isMulti },
-                { label: isPinnedFolder ? 'Unpin from Sidebar' : 'Pin to Sidebar', action: menuActions.pin, disabled: isMulti || !contextMenu.target.isDirectory },
-                { label: 'Rename', action: menuActions.rename, shortcut: 'F2', disabled: isMulti },
-                { label: 'Cut', action: menuActions.cut, shortcut: 'Ctrl+X' },
-                { label: 'Copy', action: menuActions.copy, shortcut: 'Ctrl+C' },
-                { label: 'Delete', action: menuActions.delete, shortcut: 'Del', danger: true },
-            ];
+            const baseOptions: {
+                label: string;
+                action: () => void;
+                shortcut?: string;
+                danger?: boolean;
+                disabled?: boolean;
+            }[] = [
+                    { label: 'Open', action: menuActions.open, disabled: isMulti },
+                    { label: 'Open Details', action: menuActions.preview, disabled: isMulti },
+                    { label: 'Show in Explorer', action: menuActions.showInExplorer, disabled: isMulti },
+                    { label: isPinnedFolder ? 'Unpin from Sidebar' : 'Pin to Sidebar', action: menuActions.pin, disabled: isMulti || !contextMenu.target.isDirectory },
+                    { label: 'Rename', action: menuActions.rename, shortcut: 'F2', disabled: isMulti },
+                    { label: 'Cut', action: menuActions.cut, shortcut: 'Ctrl+X' },
+                    { label: 'Copy', action: menuActions.copy, shortcut: 'Ctrl+C' },
+                    { label: 'Delete', action: menuActions.delete, shortcut: 'Del', danger: true },
+                ];
+
+            // Lock Options
+            // Helper to get relative path
+            const getRel = (p: string) => {
+                if (rootDir && p.startsWith(rootDir)) {
+                    let r = p.substring(rootDir.length);
+                    if (r.startsWith('/') || r.startsWith('\\')) r = r.substring(1);
+                    return r;
+                }
+                return p;
+            };
+
+            const targetRel = getRel(contextMenu.target.path);
+            const lock = locks.get(targetRel);
+            const isLockedByMe = lock?.userId === user?.uid;
+
+            if (!contextMenu.target.isDirectory) {
+                if (lock) {
+                    if (isLockedByMe) {
+                        baseOptions.push({ label: 'Unlock File', action: () => { handleUnlockFile(contextMenu.target!.path); } });
+
+                    } else {
+                        baseOptions.push({ label: `Locked by ${lock.userEmail}`, action: () => { }, disabled: true });
+                    }
+                } else {
+                    baseOptions.push({ label: 'Lock File', action: () => { handleLockFile(contextMenu.target!.path); } });
+
+                }
+            }
+
+            return baseOptions;
+
         }
         return [
             { label: 'New Folder', action: menuActions.newFolder, shortcut: 'Ctrl+Shift+N' },
@@ -1365,7 +1540,11 @@ const Home = () => {
                                     onCreationChange={setCreationName}
                                     onCreationSubmit={submitCreation}
                                     onCreationCancel={cancelCreation}
+                                    locks={locks}
+                                    projectRoot={rootDir}
+                                    currentUserId={user?.uid}
                                 />
+
 
                                 {isSelecting && selectionBox && (
                                     <div
@@ -1405,7 +1584,10 @@ const Home = () => {
                         initialAction={inspectorAction}
                         onActionHandled={() => setInspectorAction(null)}
                         backupPath={getBackupPath(rootDir)}
+                        fileLock={getFileLock(activeFile?.path || '')}
+                        currentUserId={user?.uid}
                     />
+
                 )}
             </div>
             <Footer onShutDown={handleCloseApp} />
@@ -1466,9 +1648,17 @@ const Home = () => {
                     Browse...
                 </button>
             </CustomPopup>
+
+            <AICommitModal
+                isOpen={aiModalOpen}
+                onClose={() => setAiModalOpen(false)}
+                changes={aiChanges}
+                onCommit={handleAICommit}
+            />
         </div>
     );
 };
+
 
 
 export default Home;

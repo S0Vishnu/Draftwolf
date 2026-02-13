@@ -26,7 +26,7 @@
 
 ## 🛠️ Refinement & Polish (v1.2.0 Prep)
 - [x] **Background File Monitoring**: Recursive chokidar watcher with change buffer, configurable interval, native OS notifications with actions (Version, Snooze, Dismiss).
-- [ ] **Save Location for Versions**: Prompt user to pick a `.draft` storage location; changeable in Settings.
+- [x] **Save Location for Versions**: Prompt user to pick a `.draft` storage location; changeable in Settings.
 - [ ] **Exclusive File Locking**: Implement file locking to prevent concurrent edits in team workflows.
 - [ ] **Partial Workspace**: Allow versioning a subset of the workspace instead of the full tree.
 - [x] **Visual Diff for Binaries**: Side-by-side comparison for images (Slider, Overlay) and 3D models (Synced Camera).

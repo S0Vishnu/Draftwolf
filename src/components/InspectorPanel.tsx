@@ -19,7 +19,18 @@ import DiffViewer, { getCategory } from './diff/DiffViewer';
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 800;
 
-const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onClose, onRefresh, initialTab, initialAction, onActionHandled, backupPath }) => {
+const InspectorPanel: React.FC<InspectorPanelProps> = ({
+    file,
+    projectRoot,
+    onClose,
+    onRefresh,
+    initialTab,
+    initialAction,
+    onActionHandled,
+    backupPath,
+    fileLock,
+    currentUserId
+}) => {
     const [activeTab, setActiveTab] = useState<InspectorTab>(initialTab || 'versions');
     const [width, setWidth] = useState(420);
     const [isResizing, setIsResizing] = useState(false);
@@ -241,6 +252,10 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
     };
 
     const handleCreateVersion = async () => {
+        if (fileLock && fileLock.userId !== currentUserId) {
+            toast.error(`File is locked by ${fileLock.userEmail}`);
+            return;
+        }
         if (!versionLabel || !projectRoot || !file) return;
         setLoading(true);
         try {
@@ -878,12 +893,20 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({ file, projectRoot, onCl
                             )}
                             {file && (
                                 <button
-                                    className="upload-btn icon-only"
-                                    onClick={() => setIsCreating(true)}
-                                    title="Create New Version"
+                                    className={`upload-btn icon-only ${fileLock && fileLock.userId !== currentUserId ? 'disabled' : ''}`}
+                                    onClick={() => {
+                                        if (fileLock && fileLock.userId !== currentUserId) return;
+                                        setIsCreating(true);
+                                    }}
+                                    title={fileLock && fileLock.userId !== currentUserId
+                                        ? `Locked by ${fileLock.userEmail}`
+                                        : "Create New Version"}
+                                    disabled={!!(fileLock && fileLock.userId !== currentUserId)}
+                                    style={fileLock && fileLock.userId !== currentUserId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                 >
                                     <Plus size={16} />
                                 </button>
+
                             )}
                         </div>
                     )}

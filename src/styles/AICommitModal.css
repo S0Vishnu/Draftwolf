@@ -1,0 +1,43 @@
+.spinner {
+    font-size: 14px;
+    font-weight: bold;
+    color: #6e7bf2;
+    display: inline-block;
+    animation: spinner-spin 1.5s infinite linear;
+}
+
+@keyframes spinner-spin {
+    0% {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+
+    100% {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+}
+
+/* Scrollbar styling for the modal content */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

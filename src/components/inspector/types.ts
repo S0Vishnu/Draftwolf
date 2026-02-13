@@ -3,6 +3,8 @@ import { FileEntry } from '../FileItem';
 export type InspectorTab = 'info' | 'tasks' | 'versions' | 'attachments' | 'snapshots';
 export type InspectorAction = 'createVersion' | 'compare' | null;
 
+import { Lock } from '../../services/LockService';
+
 export interface InspectorPanelProps {
     file: FileEntry | null;
     projectRoot: string;
@@ -14,6 +16,8 @@ export interface InspectorPanelProps {
     initialAction?: InspectorAction;
     onActionHandled?: () => void;
     backupPath?: string;
+    fileLock?: Lock;
+    currentUserId?: string;
 }
 
 export interface AttachmentItem {

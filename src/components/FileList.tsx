@@ -1,6 +1,8 @@
 
 import React from 'react';
 import FileItem, { FileEntry } from './FileItem';
+import { Lock } from '../services/LockService';
+
 
 interface FileListProps {
     files: FileEntry[];
@@ -33,14 +35,22 @@ interface FileListProps {
     onCreationChange: (val: string) => void;
     onCreationSubmit: () => void;
     onCreationCancel: () => void;
+
+    // Lock support
+    locks?: Map<string, Lock>;
+    projectRoot?: string | null;
+    currentUserId?: string;
 }
+
 
 const FileList: React.FC<FileListProps> = ({
     files, viewMode, selectedPaths, renamingFile, renameValue, sortConfig,
     isCreating, creationName, showExtensions = true,
     onSort, onSelect, onNavigate, onRenameChange, onRenameSubmit, onRenameCancel, onContextMenu, onVersionClick,
-    onCreationChange, onCreationSubmit, onCreationCancel
+    onCreationChange, onCreationSubmit, onCreationCancel,
+    locks, projectRoot, currentUserId
 }) => {
+
 
     const creationItem: FileEntry | null = isCreating ? {
         name: creationName,
@@ -94,24 +104,51 @@ const FileList: React.FC<FileListProps> = ({
                     />
                 )}
 
-                {files.map((file) => (
-                    <FileItem
-                        key={file.path}
-                        file={file}
-                        viewMode={viewMode}
-                        selected={selectedPaths.has(file.path)}
-                        renaming={renamingFile === file.path}
-                        renameValue={renameValue}
-                        showExtensions={showExtensions}
-                        onSelect={(e) => onSelect(e, file)}
-                        onNavigate={() => onNavigate(file.path)}
-                        onRenameChange={onRenameChange}
-                        onRenameSubmit={onRenameSubmit}
-                        onRenameCancel={onRenameCancel}
-                        onContextMenu={(e) => onContextMenu(e, file)}
-                        onVersionClick={onVersionClick ? (e) => onVersionClick(e, file) : undefined}
-                    />
-                ))}
+                {files.map((file) => {
+                    // Calculate lock status
+                    let isLocked = false;
+                    let lockedBy = undefined;
+
+                    if (locks && projectRoot) {
+                        let rel = file.path;
+                        if (file.path.startsWith(projectRoot)) {
+                            rel = file.path.substring(projectRoot.length);
+                            if (rel.startsWith('/') || rel.startsWith('\\')) rel = rel.substring(1);
+                        }
+                        const lock = locks.get(rel);
+                        if (lock) {
+                            isLocked = true;
+                            if (currentUserId && lock.userId === currentUserId) {
+                                // Locked by me
+                                lockedBy = 'You';
+                            } else {
+                                lockedBy = lock.userEmail;
+                            }
+                        }
+                    }
+
+                    return (
+                        <FileItem
+                            key={file.path}
+                            file={file}
+                            viewMode={viewMode}
+                            selected={selectedPaths.has(file.path)}
+                            renaming={renamingFile === file.path}
+                            renameValue={renameValue}
+                            showExtensions={showExtensions}
+                            onSelect={(e) => onSelect(e, file)}
+                            onNavigate={() => onNavigate(file.path)}
+                            onRenameChange={onRenameChange}
+                            onRenameSubmit={onRenameSubmit}
+                            onRenameCancel={onRenameCancel}
+                            onContextMenu={(e) => onContextMenu(e, file)}
+                            onVersionClick={onVersionClick ? (e) => onVersionClick(e, file) : undefined}
+                            isLocked={isLocked}
+                            lockedBy={lockedBy}
+                        />
+                    )
+                })}
+
             </div>
 
             {files.length === 0 && !isCreating && (

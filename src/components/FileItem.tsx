@@ -1,6 +1,8 @@
 
 import React, { useRef, useEffect } from 'react';
 import FileIcon from './FileIcon';
+import { Lock } from 'lucide-react';
+
 
 export interface FileEntry {
     name: string;
@@ -27,6 +29,8 @@ interface FileItemProps {
     onContextMenu: (e: React.MouseEvent) => void;
     onVersionClick?: (e: React.MouseEvent) => void;
     showExtensions?: boolean;
+    isLocked?: boolean;
+    lockedBy?: string;
 }
 
 const FileItem: React.FC<FileItemProps> = ({
@@ -42,8 +46,11 @@ const FileItem: React.FC<FileItemProps> = ({
     onRenameCancel,
     onContextMenu,
     onVersionClick,
-    showExtensions = true
+    showExtensions = true,
+    isLocked,
+    lockedBy
 }) => {
+
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -107,8 +114,27 @@ const FileItem: React.FC<FileItemProps> = ({
                 onContextMenu={onContextMenu}
             >
                 <div className="col col-icon">
-                    <FileIcon name={file.name} path={file.path} isDirectory={file.isDirectory} size={18} />
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <FileIcon name={file.name} path={file.path} isDirectory={file.isDirectory} size={18} />
+                        {isLocked && (
+                            <div
+                                title={`Locked by ${lockedBy}`}
+                                style={{
+                                    position: 'absolute',
+                                    bottom: -2,
+                                    right: -2,
+                                    backgroundColor: '#2d2d2d', // dark background for contrast
+                                    borderRadius: '50%',
+                                    padding: 1,
+                                    display: 'flex'
+                                }}
+                            >
+                                <Lock size={10} color="#ff5555" />
+                            </div>
+                        )}
+                    </div>
                 </div>
+
 
                 <div className="col col-name">
                     {renaming ? (
@@ -163,7 +189,25 @@ const FileItem: React.FC<FileItemProps> = ({
                     </div>
                 )}
                 <FileIcon name={file.name} path={file.path} isDirectory={file.isDirectory} size={58} />
+                {isLocked && (
+                    <div
+                        title={`Locked by ${lockedBy}`}
+                        style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            right: 0,
+                            backgroundColor: '#27272a',
+                            borderRadius: '50%',
+                            padding: 4,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                            display: 'flex'
+                        }}
+                    >
+                        <Lock size={14} color="#ff5555" />
+                    </div>
+                )}
             </div>
+
 
             <div className="card-name">
                 {renaming ? (

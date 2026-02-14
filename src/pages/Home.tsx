@@ -6,6 +6,7 @@ import { auth } from '../firebase';
 import { FileEntry } from '../components/FileItem';
 import { InspectorTab, InspectorAction } from '../components/inspector/types';
 import { LockService, Lock } from '../services/LockService';
+import { shouldShowEntry } from '../utils/ignorePatterns';
 
 
 // Components
@@ -473,14 +474,53 @@ const Home = () => {
     // View Options
     const [showHiddenFiles, setShowHiddenFiles] = useState(() => localStorage.getItem('showHiddenFiles') === 'true');
     const [showExtensions, setShowExtensions] = useState(() => localStorage.getItem('showExtensions') === 'false');
+    const [projectIgnorePatterns, setProjectIgnorePatterns] = useState<string[]>([]);
 
     useEffect(() => { localStorage.setItem('showHiddenFiles', String(showHiddenFiles)); }, [showHiddenFiles]);
     useEffect(() => { localStorage.setItem('showExtensions', String(showExtensions)); }, [showExtensions]);
+
+    // Load ignore patterns from project metadata
+    useEffect(() => {
+        const loadIgnorePatterns = async () => {
+            if (!rootDir) {
+                setProjectIgnorePatterns([]);
+                return;
+            }
+            try {
+                // Derive backup path from pinned/recent data (same as ProjectSettings)
+                const normRoot = rootDir.toLowerCase().replaceAll('\\', '/');
+                const pinned = JSON.parse(localStorage.getItem('pinnedFolders') || '[]');
+                const recents = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
+                const pinnedFolder = pinned.find((f: any) => f.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
+                const recentFolder = recents.find((r: any) => r.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
+                const bp = pinnedFolder?.backupPath || recentFolder?.backupPath || '';
+
+                // @ts-ignore
+                const meta = await globalThis.api.draft.getProjectMetadata(rootDir, bp);
+                if (meta?.ignorePatterns && Array.isArray(meta.ignorePatterns)) {
+                    setProjectIgnorePatterns(meta.ignorePatterns);
+                } else {
+                    setProjectIgnorePatterns([]);
+                }
+            } catch (e) {
+                console.error('Failed to load ignore patterns:', e);
+                setProjectIgnorePatterns([]);
+            }
+        };
+        loadIgnorePatterns();
+    }, [rootDir]);
 
     // Computed
     const filteredFiles = files.filter(f => {
         // Hidden Files Filter
         if (!showHiddenFiles && f.name.startsWith('.') && f.name !== '..') return false;
+
+        // Ignore Patterns Filter
+        if (projectIgnorePatterns.length > 0 && rootDir && f.path.startsWith(rootDir)) {
+            let relPath = f.path.substring(rootDir.length);
+            if (relPath.startsWith('\\') || relPath.startsWith('/')) relPath = relPath.substring(1);
+            if (!shouldShowEntry(f.name, relPath, projectIgnorePatterns)) return false;
+        }
 
         const query = searchQuery.toLowerCase();
         const matchesName = f.name.toLowerCase().includes(query);

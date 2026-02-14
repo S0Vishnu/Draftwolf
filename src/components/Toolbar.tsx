@@ -181,13 +181,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
                         }) : <span className="crumb-part ml-2">No Workspace Open</span>;
                     })()}
                 </div>
-                <style>{`
-                    .clickable { cursor: pointer; transition: color 0.2s; }
-                    .clickable:hover { color: var(--accent); text-decoration: underline; }
-                    .sort-arrow { margin-left: auto; font-size: 10px; opacity: 0.7; }
-                    .option-header { font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 8px 8px 4px 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-                    .option-divider { height: 1px; background: var(--border); margin: 4px 0; }
-                `}</style>
             </div>
 
             <div className="actions-group">

@@ -6,7 +6,8 @@ import { auth } from '../firebase';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import CustomPopup from '../components/CustomPopup';
-import { Settings as SettingsIcon, ChevronLeft, FolderOpen, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, ChevronLeft, FolderOpen, EyeOff, X, RotateCcw } from 'lucide-react';
+import { IGNORE_PRESETS, mergePatterns } from '../utils/ignorePatterns';
 import '../styles/AppLayout.css';
 import '../styles/Settings.css';
 
@@ -16,12 +17,16 @@ const ProjectSettings: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const projectPath = searchParams.get('path');
-    
+
     // State for local storage data
     const [pinnedFolders, setPinnedFolders] = useState<{ path: string, name: string, color?: string }[]>([]);
     const [recentWorkspaces, setRecentWorkspaces] = useState<{ path: string, name: string }[]>([]);
     const [backupPath, setBackupPath] = useState<string>('');
     const [deletePopupOpen, setDeletePopupOpen] = useState(false);
+    const [ignorePatterns, setIgnorePatterns] = useState<string[]>([]);
+    const [ignorePatternsText, setIgnorePatternsText] = useState<string>('');
+    const [activePresets, setActivePresets] = useState<string[]>([]);
+
 
     useEffect(() => {
         const pinned = JSON.parse(localStorage.getItem('pinnedFolders') || '[]');
@@ -41,11 +46,11 @@ const ProjectSettings: React.FC = () => {
         // Fetch from metadata.json first, then fallback to localStorage
         const fetchProjectDetails = async () => {
             if (!projectPath) return;
-            
+
             try {
                 // @ts-ignore
                 const projectMeta = await globalThis.api.draft.getProjectMetadata(projectPath, foundBackupPath);
-                
+
                 if (projectMeta) {
                     setSettings({
                         projectName: projectMeta.name || projectMeta.projectName || 'Project',
@@ -54,6 +59,14 @@ const ProjectSettings: React.FC = () => {
                         showHiddenFiles: projectMeta.showHiddenFiles ?? (localStorage.getItem('showHiddenFiles') === 'true'),
                         showExtensions: projectMeta.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false')
                     });
+                    // Load ignore patterns from metadata
+                    if (projectMeta.ignorePatterns) {
+                        setIgnorePatterns(projectMeta.ignorePatterns);
+                        setIgnorePatternsText(projectMeta.ignorePatterns.join('\n'));
+                    }
+                    if (projectMeta.activePresets) {
+                        setActivePresets(projectMeta.activePresets);
+                    }
                 } else {
                     // Fallback to existing logic
                     const folder = pinnedFolder;
@@ -118,10 +131,10 @@ const ProjectSettings: React.FC = () => {
         const actualRoot = backupPath || projectPath;
         // Handle path joining safely for different platforms although we are mainly windows currently
         const separator = actualRoot.includes('\\') ? '\\' : '/';
-        const draftFolder = actualRoot.endsWith(separator) 
-            ? `${actualRoot}.draft` 
+        const draftFolder = actualRoot.endsWith(separator)
+            ? `${actualRoot}.draft`
             : `${actualRoot}${separator}.draft`;
-        
+
         // @ts-ignore
         globalThis.api.openPath(draftFolder).catch(err => {
             console.error("Failed to open .draft folder", err);
@@ -139,9 +152,9 @@ const ProjectSettings: React.FC = () => {
     const performSave = async () => {
         // Update Pinned Folders
         let updatedPinned = [...pinnedFolders];
-        const folderData = { 
-            path: projectPath || '', 
-            name: settings.projectName, 
+        const folderData = {
+            path: projectPath || '',
+            name: settings.projectName,
             color: settings.color,
             showHiddenFiles: settings.showHiddenFiles,
             showExtensions: settings.showExtensions,
@@ -162,7 +175,7 @@ const ProjectSettings: React.FC = () => {
         setPinnedFolders(updatedPinned); // Update state to reflect changes in sidebar
 
         // Update Recent Workspaces
-        const updatedRecents = recentWorkspaces.map(r => 
+        const updatedRecents = recentWorkspaces.map(r =>
             r.path === projectPath ? { ...r, name: settings.projectName, backupPath: backupPath } : r
         );
         localStorage.setItem('recentWorkspaces', JSON.stringify(updatedRecents));
@@ -177,6 +190,8 @@ const ProjectSettings: React.FC = () => {
                     color: settings.color,
                     showHiddenFiles: settings.showHiddenFiles,
                     showExtensions: settings.showExtensions,
+                    ignorePatterns: ignorePatterns,
+                    activePresets: activePresets,
                     lastUpdated: new Date().toISOString()
                 }, backupPath);
             } catch (err) {
@@ -197,7 +212,7 @@ const ProjectSettings: React.FC = () => {
         }, 800); // 800ms debounce
 
         return () => clearTimeout(timer);
-    }, [settings, backupPath, projectPath]);
+    }, [settings, backupPath, projectPath, ignorePatterns, activePresets]);
 
     const handleDelete = () => {
         setDeletePopupOpen(true);
@@ -214,18 +229,18 @@ const ProjectSettings: React.FC = () => {
 
     return (
         <div className="app-shell">
-            <Sidebar 
-                isOpen={isSidebarOpen} 
+            <Sidebar
+                isOpen={isSidebarOpen}
                 toggleSidebar={toggleSidebar}
-                user={user} 
+                user={user}
                 pinnedFolders={pinnedFolders}
                 activePath={projectPath}
                 onSelectProject={(path) => navigate(`/project-settings?path=${encodeURIComponent(path)}`)}
             />
-            
+
             <main className="main-content">
-                <Header 
-                    isSidebarOpen={isSidebarOpen} 
+                <Header
+                    isSidebarOpen={isSidebarOpen}
                     toggleSidebar={toggleSidebar}
                 />
 
@@ -236,15 +251,15 @@ const ProjectSettings: React.FC = () => {
                         </button>
                         <div className="divider-v" />
                         <div className="breadcrumbs-list">
-                            <span 
-                                className="crumb-home clickable" 
+                            <span
+                                className="crumb-home clickable"
                                 onClick={handleGoToProjects}
                                 style={{ cursor: 'pointer' }}
                             >
                                 Projects
                             </span>
                             <span className="crumb-sep">/</span>
-                            <span 
+                            <span
                                 className="crumb-part clickable"
                                 onClick={handleGoToProject}
                                 style={{ cursor: 'pointer' }}
@@ -260,13 +275,13 @@ const ProjectSettings: React.FC = () => {
                 <div className="content-area" style={{ padding: '40px' }}>
                     <div style={{ maxWidth: '720px', margin: '0 auto' }}>
                         <header style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                            <div style={{ 
-                                width: '56px', 
-                                height: '56px', 
-                                borderRadius: '16px', 
-                                background: `linear-gradient(135deg, ${settings.color}22, ${settings.color}11)`, 
-                                display: 'flex', 
-                                alignItems: 'center', 
+                            <div style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '16px',
+                                background: `linear-gradient(135deg, ${settings.color}22, ${settings.color}11)`,
+                                display: 'flex',
+                                alignItems: 'center',
                                 justifyContent: 'center',
                                 border: `1px solid ${settings.color}33`,
                                 boxShadow: `0 4px 12px ${settings.color}11`
@@ -295,13 +310,13 @@ const ProjectSettings: React.FC = () => {
                                             <label htmlFor="project-name-input" style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>Project Name</label>
                                             <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>How this project appears in your sidebar and recent list.</p>
                                         </div>
-                                        <input 
+                                        <input
                                             id="project-name-input"
-                                            type="text" 
-                                            className="input-styled" 
-                                            style={{ 
-                                                width: '100%', 
-                                                margin: 0, 
+                                            type="text"
+                                            className="input-styled"
+                                            style={{
+                                                width: '100%',
+                                                margin: 0,
                                                 background: 'rgba(0,0,0,0.3)',
                                                 border: '1px solid var(--border)',
                                                 height: '42px',
@@ -311,7 +326,7 @@ const ProjectSettings: React.FC = () => {
                                                 color: 'white'
                                             }}
                                             value={settings.projectName}
-                                            onChange={(e) => setSettings({...settings, projectName: e.target.value})}
+                                            onChange={(e) => setSettings({ ...settings, projectName: e.target.value })}
                                         />
                                     </div>
 
@@ -319,13 +334,13 @@ const ProjectSettings: React.FC = () => {
                                         <span style={{ fontWeight: 600, display: 'block', marginBottom: '12px' }}>Project Color</span>
                                         <div style={{ display: 'flex', gap: '12px' }}>
                                             {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#6366f1'].map(c => (
-                                                <button 
+                                                <button
                                                     key={c}
-                                                    onClick={() => setSettings({...settings, color: c})}
-                                                    style={{ 
-                                                        width: '32px', 
-                                                        height: '32px', 
-                                                        borderRadius: '8px', 
+                                                    onClick={() => setSettings({ ...settings, color: c })}
+                                                    style={{
+                                                        width: '32px',
+                                                        height: '32px',
+                                                        borderRadius: '8px',
                                                         background: c,
                                                         border: settings.color === c ? '2px solid white' : 'none',
                                                         cursor: 'pointer',
@@ -342,11 +357,11 @@ const ProjectSettings: React.FC = () => {
                                             <label htmlFor="pin-toggle" style={{ fontWeight: 600 }}>Pin to Sidebar</label>
                                             <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Keep this project accessible in the PROJECTS section.</p>
                                         </div>
-                                        <input 
+                                        <input
                                             id="pin-toggle"
-                                            type="checkbox" 
+                                            type="checkbox"
                                             checked={settings.isPinned}
-                                            onChange={(e) => setSettings({...settings, isPinned: e.target.checked})}
+                                            onChange={(e) => setSettings({ ...settings, isPinned: e.target.checked })}
                                             style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                                         />
                                     </div>
@@ -364,11 +379,11 @@ const ProjectSettings: React.FC = () => {
                                             <label htmlFor="pref-hidden" style={{ fontWeight: 600 }}>Show Hidden Files</label>
                                             <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Show files starting with a dot (e.g. .env, .git)</p>
                                         </div>
-                                        <input 
+                                        <input
                                             id="pref-hidden"
-                                            type="checkbox" 
+                                            type="checkbox"
                                             checked={settings.showHiddenFiles}
-                                            onChange={(e) => setSettings({...settings, showHiddenFiles: e.target.checked})}
+                                            onChange={(e) => setSettings({ ...settings, showHiddenFiles: e.target.checked })}
                                             style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                                         />
                                     </div>
@@ -377,11 +392,11 @@ const ProjectSettings: React.FC = () => {
                                             <label htmlFor="pref-ext" style={{ fontWeight: 600 }}>Show File Extensions</label>
                                             <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Always display full file extensions</p>
                                         </div>
-                                        <input 
+                                        <input
                                             id="pref-ext"
-                                            type="checkbox" 
+                                            type="checkbox"
                                             checked={settings.showExtensions}
-                                            onChange={(e) => setSettings({...settings, showExtensions: e.target.checked})}
+                                            onChange={(e) => setSettings({ ...settings, showExtensions: e.target.checked })}
                                             style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                                         />
                                     </div>
@@ -428,6 +443,175 @@ const ProjectSettings: React.FC = () => {
                                 </div>
                             </section>
 
+                            {/* Ignore Patterns Section */}
+                            <section className="settings-section">
+                                <div className="section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <h2 style={{ fontSize: '15px', fontWeight: '700', margin: 0, opacity: 0.9, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <EyeOff size={16} color="#a78bfa" />
+                                        Ignore Patterns
+                                    </h2>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', opacity: 0.7 }}>
+                                        .gitignore syntax
+                                    </span>
+                                </div>
+                                <div className="section-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    {/* Description */}
+                                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
+                                        Files and folders matching these patterns will be hidden from the file browser.
+                                        Uses <code style={{
+                                            background: 'rgba(168, 139, 250, 0.15)',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '12px',
+                                            color: '#c4b5fd'
+                                        }}>.gitignore</code> syntax. Great for large projects like Unreal Engine, Unity, etc.
+                                    </p>
+
+                                    {/* Presets */}
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                            <label style={{ fontWeight: 600, fontSize: '13px' }}>Quick Presets</label>
+                                            {activePresets.length > 0 && (
+                                                <button
+                                                    onClick={() => {
+                                                        setActivePresets([]);
+                                                        setIgnorePatterns([]);
+                                                        setIgnorePatternsText('');
+                                                    }}
+                                                    className="ignore-clear-btn"
+                                                    title="Clear all patterns"
+                                                >
+                                                    <RotateCcw size={12} />
+                                                    Clear All
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Active preset tags */}
+                                        {activePresets.length > 0 && (
+                                            <div className="ignore-active-presets">
+                                                {activePresets.map(presetId => {
+                                                    const preset = IGNORE_PRESETS.find(p => p.id === presetId);
+                                                    if (!preset) return null;
+                                                    return (
+                                                        <span key={presetId} className="ignore-preset-tag">
+                                                            <span>{preset.icon}</span>
+                                                            <span>{preset.name}</span>
+                                                            <button
+                                                                className="ignore-tag-remove"
+                                                                onClick={() => {
+                                                                    const newPresets = activePresets.filter(id => id !== presetId);
+                                                                    setActivePresets(newPresets);
+                                                                    // Rebuild patterns from remaining presets
+                                                                    let rebuilt: string[] = [];
+                                                                    for (const id of newPresets) {
+                                                                        const p = IGNORE_PRESETS.find(pr => pr.id === id);
+                                                                        if (p) rebuilt = mergePatterns(rebuilt, p.patterns);
+                                                                    }
+                                                                    // Add any custom patterns (lines not from presets)
+                                                                    const customLines = ignorePatternsText.split('\n').filter(line => {
+                                                                        const trimmed = line.trim();
+                                                                        if (!trimmed || trimmed.startsWith('#')) return false;
+                                                                        return !IGNORE_PRESETS.some(pr => pr.patterns.includes(trimmed));
+                                                                    });
+                                                                    rebuilt = mergePatterns(rebuilt, customLines);
+                                                                    setIgnorePatterns(rebuilt);
+                                                                    setIgnorePatternsText(rebuilt.join('\n'));
+                                                                }}
+                                                                title={`Remove ${preset.name} preset`}
+                                                            >
+                                                                <X size={10} />
+                                                            </button>
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* Preset picker grid */}
+                                        <div className="ignore-preset-grid">
+                                            {IGNORE_PRESETS.map(preset => {
+                                                const isActive = activePresets.includes(preset.id);
+                                                return (
+                                                    <button
+                                                        key={preset.id}
+                                                        className={`ignore-preset-card ${isActive ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            if (isActive) {
+                                                                // Remove preset
+                                                                const newPresets = activePresets.filter(id => id !== preset.id);
+                                                                setActivePresets(newPresets);
+                                                                // Rebuild patterns
+                                                                let rebuilt: string[] = [];
+                                                                for (const id of newPresets) {
+                                                                    const p = IGNORE_PRESETS.find(pr => pr.id === id);
+                                                                    if (p) rebuilt = mergePatterns(rebuilt, p.patterns);
+                                                                }
+                                                                setIgnorePatterns(rebuilt);
+                                                                setIgnorePatternsText(rebuilt.join('\n'));
+                                                            } else {
+                                                                // Add preset
+                                                                const newPresets = [...activePresets, preset.id];
+                                                                setActivePresets(newPresets);
+                                                                const merged = mergePatterns(ignorePatterns, preset.patterns);
+                                                                setIgnorePatterns(merged);
+                                                                setIgnorePatternsText(merged.join('\n'));
+                                                                toast.success(`Added ${preset.name} preset`);
+                                                            }
+                                                        }}
+                                                        title={preset.description}
+                                                    >
+                                                        <span className="ignore-preset-icon">{preset.icon}</span>
+                                                        <span className="ignore-preset-name">{preset.name}</span>
+                                                        {isActive && <span className="ignore-preset-check">✓</span>}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Patterns textarea */}
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <label htmlFor="ignore-patterns" style={{ fontWeight: 600, fontSize: '13px' }}>Custom Patterns</label>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                {ignorePatterns.filter(p => p.trim() && !p.startsWith('#')).length} active rules
+                                            </span>
+                                        </div>
+                                        <div className="ignore-editor-wrap">
+                                            <textarea
+                                                id="ignore-patterns"
+                                                className="ignore-textarea"
+                                                value={ignorePatternsText}
+                                                onChange={(e) => {
+                                                    const text = e.target.value;
+                                                    setIgnorePatternsText(text);
+                                                    const patterns = text.split('\n').filter(l => l.trim());
+                                                    setIgnorePatterns(patterns);
+                                                }}
+                                                placeholder={`# Add patterns to ignore\n# Example:\nnode_modules/\n*.log\nbuild/\n.cache/`}
+                                                rows={8}
+                                                spellCheck={false}
+                                            />
+                                            <div className="ignore-editor-hint">
+                                                <span>💡 <strong>*</strong> any file &nbsp;·&nbsp; <strong>**</strong> any depth &nbsp;·&nbsp; <strong>/</strong> directories &nbsp;·&nbsp; <strong>!</strong> negate &nbsp;·&nbsp; <strong>#</strong> comment</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Active pattern count summary */}
+                                    {ignorePatterns.length > 0 && (
+                                        <div className="ignore-summary">
+                                            <EyeOff size={14} />
+                                            <span>
+                                                {ignorePatterns.filter(p => p.trim() && !p.startsWith('#')).length} patterns active
+                                                {activePresets.length > 0 && ` from ${activePresets.length} preset${activePresets.length > 1 ? 's' : ''}`}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
+
                             {/* Danger Zone */}
                             <section style={{ border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', overflow: 'hidden' }}>
                                 <div style={{ padding: '16px 20px', background: 'rgba(239, 68, 68, 0.05)', borderBottom: '1px solid rgba(239, 68, 68, 0.1)' }}>
@@ -438,15 +622,15 @@ const ProjectSettings: React.FC = () => {
                                         <h3 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>Remove Project</h3>
                                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>This will remove the project from your lists. Files on disk will NOT be deleted.</p>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={handleDelete}
-                                        style={{ 
-                                            padding: '8px 16px', 
-                                            borderRadius: '8px', 
-                                            border: '1px solid #ef4444', 
-                                            background: 'transparent', 
-                                            color: '#ef4444', 
-                                            fontSize: '13px', 
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #ef4444',
+                                            background: 'transparent',
+                                            color: '#ef4444',
+                                            fontSize: '13px',
                                             fontWeight: '600',
                                             cursor: 'pointer'
                                         }}

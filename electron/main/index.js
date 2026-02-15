@@ -19,7 +19,15 @@ import { startApiServer } from "./api-server";
 // Start API Server
 let apiServer = startApiServer();
 
-// Helper: extract a folder path from command-line argv
+/**
+ * Finds a filesystem directory path among command-line arguments.
+ *
+ * Scans the provided argv array from end to start and ignores common Electron flags, protocol URLs,
+ * and typical dev entry filenames when searching for a real directory.
+ *
+ * @param {string[]} argv - The process argv array to inspect.
+ * @returns {string|null} The first valid directory path found, or `null` if none was present.
+ */
 function getFolderFromArgv(argv) {
   // argv typically looks like: [electron.exe, ...flags, possibleFolderPath]
   // Skip known Electron / deep-link args
@@ -128,6 +136,14 @@ authManager.on("logout", () => {
   }
 });
 
+/**
+ * Create and initialize the main application window and its related integrations.
+ *
+ * Creates the primary BrowserWindow, configures web-request header handling (CORS and Origin normalization),
+ * wires ready-to-show behavior (authentication init, cold-start deep links, and "open with folder" handling),
+ * implements close-to-tray behavior, builds and attaches the system tray menu (including pinned folders),
+ * routes external links to the system browser, and loads the renderer (dev URL or packaged index).
+ */
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({

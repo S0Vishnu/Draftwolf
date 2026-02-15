@@ -171,7 +171,7 @@ For a folder with 50 large assets, a snapshot could take **5–15 minutes**. Thi
 
 | Gap | Impact | Priority |
 | :--- | :--- | :--- |
-| **No `.draftignore`** | Will snapshot generated caches (10–100GB). Completely blocks real usage. | 🔴 Critical |
+| **~~No `.draftignore`~~** | ✅ **Implemented** — `.draftignore` file in `.draft/` with .gitignore syntax, 7 presets (Unreal, Unity, Godot, Node.js, Python, Blender, OS). Patterns are enforced during `createSnapshot` and `commit`. | ✅ Done |
 | **No partial workspace** | Cannot version just `Content/Characters/` without including all of `Content/` | 🟡 High |
 | **No engine plugins** | Users must alt-tab to DraftWolf to snapshot. Kills flow. | 🟡 High |
 | **No cloud sync** | Solo-only. Teams can't share snapshots. | 🟡 High |

@@ -1,6 +1,6 @@
 import { FileEntry } from '../FileItem';
 
-export type InspectorTab = 'info' | 'tasks' | 'versions' | 'attachments' | 'snapshots';
+export type InspectorTab = 'info' | 'tasks' | 'versions' | 'attachments' | 'snapshots' | 'changes';
 export type InspectorAction = 'createVersion' | 'compare' | null;
 
 import { Lock } from '../../services/LockService';
@@ -38,4 +38,5 @@ export interface Version {
     parent?: string;
     parents?: string[];
     parentId?: string;
+    ignoredCount?: number;
 }

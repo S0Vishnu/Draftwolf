@@ -30,9 +30,15 @@ function TrayListener() {
     const unsubNav = api.onTrayNavigate((route: string) => {
       navigate(route);
     });
+    // Listen for "Open with DraftWolf" from Windows context menu
+    const unsubContextMenu = api.onOpenWithFolder?.((path: string) => {
+      sessionStorage.setItem('trayOpenPath', path);
+      navigate('/home');
+    });
     return () => {
       unsubFolder();
       unsubNav();
+      unsubContextMenu?.();
     };
   }, [navigate]);
   return null;

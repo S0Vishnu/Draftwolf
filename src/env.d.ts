@@ -41,6 +41,7 @@ interface Window {
     setPinnedFoldersForTray: (folders: { path: string; name: string }[]) => void;
     onTrayOpenFolder: (callback: (path: string) => void) => () => void;
     onTrayNavigate: (callback: (path: string) => void) => () => void;
+    onOpenWithFolder: (callback: (path: string) => void) => () => void;
     draft: {
       init: (projectRoot: string, backupPath?: string) => Promise<boolean>;
       commit: (projectRoot: string, label: string, files: string[], backupPath?: string) => Promise<{ success: boolean; versionId?: string; error?: string }>;
@@ -72,6 +73,12 @@ interface Window {
       onDownloaded: (callback: (info: any) => void) => () => void;
       onProgress: (callback: (info: any) => void) => () => void;
       onError: (callback: (error: string) => void) => () => void;
+      writeDraftignore: (projectRoot: string, patterns: string[], backupPath?: string) => Promise<void>;
+      getWorkingChanges: (projectRoot: string, backupPath?: string) => Promise<{
+        modified: { path: string; timestamp: number }[];
+        added: { path: string; timestamp: number }[];
+        deleted: { path: string; timestamp: number }[];
+      }>;
     };
     monitor: {
       start: (dirPath: string, intervalMinutes?: number, enabled?: boolean) => Promise<boolean>;

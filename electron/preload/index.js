@@ -53,7 +53,10 @@ const api = {
     getProjectMetadata: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:getProjectMetadata', { projectRoot, backupPath }),
     getFileVersion: (projectRoot, relativePath, backupPath) => electronAPI.ipcRenderer.invoke('draft:getFileVersion', { projectRoot, relativePath, backupPath }),
     getCurrentHead: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:getCurrentHead', { projectRoot, backupPath }),
-    getStorageReport: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:storageReport', { projectRoot, backupPath })
+    getStorageReport: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:storageReport', { projectRoot, backupPath }),
+    readDraftignore: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:readDraftignore', { projectRoot, backupPath }),
+    writeDraftignore: (projectRoot, patterns, backupPath) => electronAPI.ipcRenderer.invoke('draft:writeDraftignore', { projectRoot, patterns, backupPath }),
+    getWorkingChanges: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:getWorkingChanges', { projectRoot, backupPath })
   },
   auth: {
     login: () => electronAPI.ipcRenderer.invoke('auth:login'),
@@ -101,6 +104,11 @@ const api = {
       electronAPI.ipcRenderer.on('monitor:notification-clicked', sub);
       return () => electronAPI.ipcRenderer.removeListener('monitor:notification-clicked', sub);
     }
+  },
+  onOpenWithFolder: (callback) => {
+    const sub = (_event, folderPath) => callback(folderPath);
+    electronAPI.ipcRenderer.on('open-with-folder', sub);
+    return () => electronAPI.ipcRenderer.removeListener('open-with-folder', sub);
   },
 
 }

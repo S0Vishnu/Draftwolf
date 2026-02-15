@@ -34,7 +34,7 @@ Working in a team? Don't stepping on each other's toes. Lock a file to let every
 Let's be honest, you're not going to write a detailed commit message. Our AI analyzes your changes and writes a witty, descriptive message for you. You're welcome.
 
 ### 🚫 Ignore Files (The ".draftignore")
-Got junk files? Temporary renders? Secrets? Tell DraftWolf to ignore them with our built-in ignore patterns. Keep your workspace clean and your repository light.
+Got junk files? Temporary renders? Secrets? Tell DraftWolf to ignore them with our built-in ignore patterns. Configure via **Project Settings** or edit `.draft/.draftignore` directly using `.gitignore` syntax. Choose from **7 presets** (Unreal, Unity, Godot, Node.js, Python, Blender, OS files) or add custom patterns. Ignored files are excluded from snapshots and commits automatically.
 
 ### 🕵️ Inspector Gadget... Panel
 Click a file. Boom. History. Metadata. File size trends. It's an X-Ray for your documents. See every iteration of your genius (or lack thereof).

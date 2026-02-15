@@ -3,7 +3,7 @@ import React from 'react';
 import {
     ChevronLeft, ChevronRight, Home as HomeIcon, ChevronRight as ChevronRightIcon,
     FolderPlus, FilePlus, List, LayoutGrid, Check, RotateCw,
-    FilterIcon
+    FilterIcon, History
 } from 'lucide-react';
 import { FileEntry } from './FileItem';
 
@@ -24,6 +24,7 @@ interface ToolbarProps {
     onToggleExtensions: () => void;
     onSort: (key: keyof FileEntry) => void;
     onRefresh: () => void;
+    onOpenChanges?: () => void;
 
     onNavigateBack: () => void;
     onNavigateForward: () => void;
@@ -49,6 +50,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     onToggleExtensions,
     onSort,
     onRefresh,
+    onOpenChanges,
     onNavigateBack,
     onNavigateForward,
     onOpenWorkspace,
@@ -194,6 +196,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
                         <button className="action-btn" onClick={onCreateFile} title="New File">
                             <FilePlus size={16} /> <span className="btn-text">New File</span>
                         </button>
+
+                        {onOpenChanges && (
+                            <button className="action-btn" onClick={onOpenChanges} title="Show Changes">
+                                <History size={16} /> <span className="btn-text">Changes</span>
+                            </button>
+                        )}
 
                         <div className="divider-v"></div>
 

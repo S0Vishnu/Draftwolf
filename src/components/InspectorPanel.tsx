@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     X, Info, Layers, Paperclip,
-    CheckCircle, Plus, HardDrive
+    CheckCircle, Plus, HardDrive, FileWarning
 } from 'lucide-react';
 import '../styles/InspectorPanel.css';
 import { toast } from 'react-toastify';
@@ -12,7 +12,9 @@ import InfoTab from './inspector/InfoTab';
 import VersionsTab from './inspector/VersionsTab';
 import SnapshotsTab from './inspector/SnapshotsTab';
 import AttachmentsTab from './inspector/AttachmentsTab';
+import ChangesTab from './inspector/ChangesTab';
 import { InspectorPanelProps, AttachmentItem, InspectorTab } from './inspector/types';
+import { shouldIgnore } from '../utils/ignorePatterns';
 import DiffViewer, { getCategory } from './diff/DiffViewer';
 
 // type Tab = 'info' | 'tasks' | 'versions' | 'attachments'; // Removed in favor of InspectorTab
@@ -55,6 +57,47 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
     // Diff Viewer State
     const [diffState, setDiffState] = useState<{ oldPath: string; newPath: string; oldLabel: string; newLabel: string } | null>(null);
+
+    // Changed Files State
+    const [changedFiles, setChangedFiles] = useState<{ path: string; type: 'add' | 'change' | 'unlink'; timestamp: number }[]>([]);
+    const [ignorePatterns, setIgnorePatterns] = useState<string[]>([]);
+
+    // Load draftignore patterns
+    useEffect(() => {
+        const loadPatterns = async () => {
+            try {
+                const patterns = await globalThis.api.draft.readDraftignore(projectRoot, backupPath);
+                setIgnorePatterns(patterns || []);
+            } catch {
+                setIgnorePatterns([]);
+            }
+        };
+        if (projectRoot) loadPatterns();
+    }, [projectRoot, backupPath]);
+
+    const fetchChanges = useCallback(async () => {
+        try {
+            // Use persistent changes from backend (diff against HEAD)
+            const result = await globalThis.api.draft.getWorkingChanges(projectRoot, backupPath);
+            
+            // Map to unified format
+            const all = [
+                ...result.modified.map(f => ({ ...f, type: 'change' as const })),
+                ...result.added.map(f => ({ ...f, type: 'add' as const })),
+                ...result.deleted.map(f => ({ ...f, type: 'unlink' as const })),
+            ];
+
+            setChangedFiles(all);
+        } catch (e) {
+            console.error('Failed to fetch changes:', e);
+        }
+    }, [projectRoot, backupPath, ignorePatterns]);
+
+    useEffect(() => {
+        fetchChanges();
+        const interval = setInterval(fetchChanges, 10000);
+        return () => clearInterval(interval);
+    }, [fetchChanges]);
 
     // Reset active version when file changes
     useEffect(() => {
@@ -727,7 +770,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
     };
 
     const renderContent = () => {
-        if (!file) {
+        if (!file && activeTab !== 'changes') {
             return (
                 <div className="empty-state" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                     <Info size={48} className="text-muted" style={{ opacity: 0.3, marginBottom: 12 }} />
@@ -773,6 +816,10 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         onRestore={handleRestore}
                         onRename={handleRenameVersion}
                         onCompare={handleCompare}
+                        projectRoot={projectRoot}
+                        currentRelativePath={getRelativePath()}
+                        changedFiles={changedFiles}
+                        onNavigateToChanges={() => setActiveTab('changes')}
                     />
                 );
             case 'snapshots':
@@ -792,6 +839,15 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         onRestore={handleRestore}
                         onRename={handleRenameVersion}
                         projectRoot={projectRoot}
+                        changedFiles={changedFiles}
+                        onNavigateToChanges={() => setActiveTab('changes')}
+                    />
+                );
+            case 'changes':
+                return (
+                    <ChangesTab
+                        changedFiles={changedFiles}
+                        onRefreshChanges={fetchChanges}
                     />
                 );
             case 'attachments':
@@ -859,6 +915,16 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 >
                     <Paperclip size={18} />
                 </button>
+                <button
+                    className={`sidebar-icon-btn ${activeTab === 'changes' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('changes')}
+                    title="Changes"
+                >
+                    <FileWarning size={18} />
+                    {changedFiles.length > 0 && (
+                        <span className="changes-badge" />
+                    )}
+                </button>
 
                 <div className="sidebar-spacer"></div>
 
@@ -877,7 +943,8 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         {activeTab === 'versions' ? 'Versions' :
                             activeTab === 'tasks' ? 'Tasks' :
                                 activeTab === 'attachments' ? 'Attachments' :
-                                    activeTab === 'snapshots' ? 'Snapshots' : 'Details'}
+                                    activeTab === 'snapshots' ? 'Snapshots' :
+                                        activeTab === 'changes' ? 'Changes' : 'Details'}
                     </h3>
                     {(activeTab === 'versions' || activeTab === 'snapshots') && (
                         <div style={{ display: 'flex', gap: 8 }}>

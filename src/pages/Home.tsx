@@ -815,8 +815,36 @@ const Home = () => {
     const confirmBackupSetup = async () => {
         if (!backupSetupProject || !backupSetupPath) return;
 
-        const bPath = backupSetupPath;
+        let bPath = backupSetupPath;
         const projPath = backupSetupProject;
+
+        // --- NEW: Auto-append project folder name if user selected a DIFFERENT folder ---
+        // When the backup path is different from the project path, the user chose an external
+        // folder (e.g. "D:\MyBackups"). We append the project's folder name to create isolation:
+        //   "D:\MyBackups" → "D:\MyBackups\MyProject"
+        // This prevents two projects from sharing the same .draft folder.
+        //
+        // When the backup path EQUALS the project path, the user wants .draft inside the project
+        // itself (default behavior) — no appending needed.
+        //
+        // BACKWARD COMPATIBILITY: This logic only runs for NEW project setups.
+        // Existing projects already have their backupPath saved in localStorage and skip this
+        // function entirely (they go through the `hasBackup` early-return in openWorkspace).
+
+        const normBPath = bPath.toLowerCase().replace(/[\\/]+$/, '').replaceAll('\\', '/');
+        const normProjPath = projPath.toLowerCase().replace(/[\\/]+$/, '').replaceAll('\\', '/');
+
+        if (normBPath !== normProjPath) {
+            // User selected an external backup folder — append project folder name
+            const projectFolderName = projPath.split(/[\\/]/).filter(Boolean).pop() || 'project';
+            const separator = bPath.includes('/') ? '/' : '\\';
+            const candidatePath = bPath.endsWith(separator)
+                ? `${bPath}${projectFolderName}`
+                : `${bPath}${separator}${projectFolderName}`;
+
+            bPath = candidatePath;
+        }
+        // --- END NEW ---
 
         // Create .draft folder
         // Initialize the draft system structure at the confirmed backup path
@@ -1663,7 +1691,23 @@ const Home = () => {
             >
                 <div className="backup-path-display">
                     <img src={logo} alt="" />
-                    <span>{backupSetupPath || 'No folder selected'}</span>
+                    <span>{(() => {
+                        if (!backupSetupPath) return 'No folder selected';
+                        if (!backupSetupProject) return backupSetupPath;
+
+                        const normBP = backupSetupPath.toLowerCase().replace(/[\\/]+$/, '').replaceAll('\\', '/');
+                        const normPP = backupSetupProject.toLowerCase().replace(/[\\/]+$/, '').replaceAll('\\', '/');
+
+                        let effectivePath = backupSetupPath;
+                        if (normBP !== normPP) {
+                            const projectFolderName = backupSetupProject.split(/[\\/]/).filter(Boolean).pop() || 'project';
+                            const separator = backupSetupPath.includes('/') ? '/' : '\\';
+                            effectivePath = backupSetupPath.endsWith(separator)
+                                ? `${backupSetupPath}${projectFolderName}`
+                                : `${backupSetupPath}${separator}${projectFolderName}`;
+                        }
+                        return effectivePath;
+                    })()}</span>
                 </div>
                 <button
                     style={{

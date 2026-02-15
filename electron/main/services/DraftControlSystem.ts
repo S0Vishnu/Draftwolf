@@ -34,6 +34,7 @@ export interface VersionManifest {
   totalSize?: number;
   totalCompressedSize?: number;
   scope?: string; // The relative folder path this snapshot was created for
+  ignoredCount?: number; // Number of files skipped due to .draftignore
 }
 
 export interface FileMetadataStore {
@@ -53,6 +54,7 @@ const DRAFT_DIR = '.draft';
 const OBJECTS_DIR = 'objects';
 const VERSIONS_DIR = 'versions';
 const INDEX_FILE = 'index.json';
+const DRAFTIGNORE_FILE = '.draftignore';
 
 // --- Core System ---
 
@@ -92,6 +94,21 @@ export class DraftControlSystem {
         currentHead: null
       };
       await this.writeIndex(initialIndex);
+
+      // Create default .draftignore file
+      const draftignorePath = path.join(this.draftPath, DRAFTIGNORE_FILE);
+      if (!existsSync(draftignorePath)) {
+        const defaultContent = [
+          '# DraftWolf Ignore File',
+          '# Files matching these patterns will be excluded from snapshots.',
+          '# Uses .gitignore syntax: * (any), ** (any depth), / (dirs), ! (negate), # (comment)',
+          '',
+          '# Always ignored',
+          '.draft',
+          '',
+        ].join('\n');
+        await fs.writeFile(draftignorePath, defaultContent, 'utf-8');
+      }
     } else {
       // Ensure subdirs exist even if root exists
       if (!existsSync(this.objectsPath)) await fs.mkdir(this.objectsPath, { recursive: true });
@@ -367,6 +384,119 @@ export class DraftControlSystem {
     return crypto.createHash('sha256').update(content).digest('hex');
   }
 
+  // --- .draftignore Support ---
+
+  /**
+   * Convert a .gitignore-style pattern into a RegExp.
+   * Supports: *, **, ?, directory-only trailing /, negation !, comments #
+   */
+  private patternToRegex(pattern: string): RegExp | null {
+    let p = pattern.trim();
+    if (!p || p.startsWith('#')) return null;
+    if (p.startsWith('!')) return null;
+
+    const dirOnly = p.endsWith('/');
+    if (dirOnly) p = p.slice(0, -1);
+
+    const hasSlash = p.includes('/');
+    if (p.startsWith('/')) p = p.substring(1);
+
+    // Escape regex special chars except * and ?
+    let regex = p.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    regex = regex.replace(/\*\*/g, '{{GLOBSTAR}}');
+    regex = regex.replace(/\*/g, '[^/]*');
+    regex = regex.replace(/\?/g, '[^/]');
+    regex = regex.replace(/\{\{GLOBSTAR\}\}/g, '.*');
+
+    if (hasSlash) {
+      regex = '^' + regex + '(/.*)?$';
+    } else {
+      regex = '(^|.*/)' + regex + '(/.*)?$';
+    }
+
+    try {
+      return new RegExp(regex, 'i');
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Check if a relative path should be ignored based on .draftignore patterns.
+   */
+  private shouldIgnorePath(relativePath: string, patterns: string[]): boolean {
+    const normalized = this.normalizePath(relativePath);
+    let ignored = false;
+
+    for (const pattern of patterns) {
+      const trimmed = pattern.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      if (trimmed.startsWith('!')) {
+        const negRegex = this.patternToRegex(trimmed.substring(1));
+        if (negRegex?.test(normalized)) {
+          ignored = false;
+        }
+      } else {
+        const regex = this.patternToRegex(trimmed);
+        if (regex?.test(normalized)) {
+          ignored = true;
+        }
+      }
+    }
+
+    return ignored;
+  }
+
+  /**
+   * Read the .draftignore file from the .draft/ folder.
+   * Returns an array of pattern strings (excluding comments and empty lines for matching,
+   * but the raw lines are returned for preserving the file format).
+   */
+  async readDraftIgnore(): Promise<string[]> {
+    const draftignorePath = path.join(this.draftPath, DRAFTIGNORE_FILE);
+    if (!existsSync(draftignorePath)) {
+      return ['.draft']; // Always ignore .draft as a minimum
+    }
+    try {
+      const content = await fs.readFile(draftignorePath, 'utf-8');
+      const patterns = content
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'));
+
+      // Always ensure .draft is ignored
+      if (!patterns.includes('.draft')) {
+        patterns.unshift('.draft');
+      }
+      return patterns;
+    } catch (e) {
+      console.error('Failed to read .draftignore:', e);
+      return ['.draft'];
+    }
+  }
+
+  /**
+   * Write patterns to the .draftignore file in the .draft/ folder.
+   */
+  async writeDraftIgnore(patterns: string[]): Promise<void> {
+    await this.init();
+    const draftignorePath = path.join(this.draftPath, DRAFTIGNORE_FILE);
+    const content = [
+      '# DraftWolf Ignore File',
+      '# Files matching these patterns will be excluded from snapshots.',
+      '# Uses .gitignore syntax: * (any), ** (any depth), / (dirs), ! (negate), # (comment)',
+      '',
+      '# Always ignored',
+      '.draft',
+      '',
+      '# Project patterns',
+      ...patterns.filter(p => p.trim() && p.trim() !== '.draft'),
+      '',
+    ].join('\n');
+    await fs.writeFile(draftignorePath, content, 'utf-8');
+  }
+
   /**
    * Create a new version snapshot.
    */
@@ -379,6 +509,10 @@ export class DraftControlSystem {
     const fileHashes: Record<string, Hash> = {};
     const fileIds: Record<string, string> = {};
     const newObjects: Record<Hash, FileMetadata> = {};
+    let ignoredCount = 0;
+
+    // Load ignore patterns once before scanning
+    const ignorePatterns = await this.readDraftIgnore();
 
     // Normalize folderPath to be relative and use forward slashes
     let scope = this.normalizePath(folderPath);
@@ -392,13 +526,24 @@ export class DraftControlSystem {
       const entries = await fs.readdir(dir, { withFileTypes: true });
       await Promise.all(entries.map(async (entry) => {
         const fullPath = path.join(dir, entry.name);
-        const relativePath = path.relative(this.projectRoot, fullPath);
+        const normRelPath = this.normalizePath(path.relative(this.projectRoot, fullPath));
 
         if (entry.isDirectory()) {
-          if (entry.name !== '.draft') { // Skip .draft folder
-            await scanDir(fullPath);
+          // Skip .draft folder (always) and any directory matching ignore patterns
+          if (entry.name === '.draft' || this.shouldIgnorePath(normRelPath, ignorePatterns)) {
+            if (entry.name !== '.draft') {
+              console.log(`[Snapshot] Ignoring directory: ${normRelPath}`);
+            }
+            return;
           }
+          await scanDir(fullPath);
         } else if (entry.isFile()) {
+          // Check if file should be ignored
+          if (this.shouldIgnorePath(normRelPath, ignorePatterns)) {
+            ignoredCount++;
+            return;
+          }
+
           // Process file
           const { hash, originalSize, compressedSize } = await this.addFileToCAS(fullPath);
 
@@ -424,10 +569,13 @@ export class DraftControlSystem {
 
     const absoluteScanPath = path.resolve(this.projectRoot, scope);
     if (!existsSync(absoluteScanPath)) {
-      // If it was meant to be ".", and doesn't exist? (unlikely)
       throw new Error(`Path not found: ${absoluteScanPath}`);
     }
     await scanDir(absoluteScanPath);
+
+    if (ignoredCount > 0) {
+      console.log(`[Snapshot] Ignored ${ignoredCount} file(s) due to .draftignore patterns`);
+    }
 
     // 2. Determine Version Number (Same logic as commit)
     let nextVerNum = "1.0";
@@ -470,7 +618,8 @@ export class DraftControlSystem {
       files: fileHashes,
       fileIds: fileIds,
       parentId: parentId || null,
-      scope: scope
+      scope: scope,
+      ignoredCount: ignoredCount > 0 ? ignoredCount : undefined
     };
 
     await this.writeJson(path.join(this.versionsPath, `${versionId}.json`), manifest);
@@ -501,11 +650,24 @@ export class DraftControlSystem {
     const fileHashes: Record<string, Hash> = {};
     const fileIds: Record<string, string> = {};
     const newObjects: Record<Hash, FileMetadata> = {};
+    let ignoredCount = 0;
+
+    // Load ignore patterns
+    const ignorePatterns = await this.readDraftIgnore();
 
     await Promise.all(filesToTrack.map(async (filePath) => {
       const relativePath = path.isAbsolute(filePath)
         ? path.relative(this.projectRoot, filePath)
         : filePath;
+
+      const normRelPath = this.normalizePath(relativePath);
+
+      // Check if file should be ignored
+      if (this.shouldIgnorePath(normRelPath, ignorePatterns)) {
+        console.log(`[Commit] Ignoring file: ${normRelPath}`);
+        ignoredCount++;
+        return;
+      }
 
       const fullPath = path.join(this.projectRoot, relativePath);
 
@@ -561,6 +723,10 @@ export class DraftControlSystem {
       }
     }
 
+    if (ignoredCount > 0) {
+      console.log(`[Commit] Ignored ${ignoredCount} file(s) due to .draftignore patterns`);
+    }
+
     const versionId = `v${Date.now()}`;
     const manifest: VersionManifest = {
       id: versionId,
@@ -569,7 +735,8 @@ export class DraftControlSystem {
       timestamp: new Date().toISOString(),
       files: fileHashes,
       fileIds: fileIds,
-      parentId: parentId || null
+      parentId: parentId || null,
+      ignoredCount: ignoredCount > 0 ? ignoredCount : undefined
     };
 
     await this.writeJson(path.join(this.versionsPath, `${versionId}.json`), manifest);

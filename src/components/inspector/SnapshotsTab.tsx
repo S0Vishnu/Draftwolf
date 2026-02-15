@@ -271,6 +271,14 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
                                             </span>
                                         )}
                                     </span>
+                                    {node.ignoredCount > 0 && (
+                                        <>
+                                            <span style={{ margin: '0 6px', opacity: 0.3 }}>|</span>
+                                            <span style={{ color: '#a78bfa', fontSize: '10px' }} title={`${node.ignoredCount} file(s) excluded by .draftignore`}>
+                                                🚫 {node.ignoredCount} ignored
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div className="commit-actions">

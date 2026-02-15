@@ -41,6 +41,7 @@ interface Window {
     setPinnedFoldersForTray: (folders: { path: string; name: string }[]) => void;
     onTrayOpenFolder: (callback: (path: string) => void) => () => void;
     onTrayNavigate: (callback: (path: string) => void) => () => void;
+    onOpenWithFolder: (callback: (path: string) => void) => () => void;
     draft: {
       init: (projectRoot: string, backupPath?: string) => Promise<boolean>;
       commit: (projectRoot: string, label: string, files: string[], backupPath?: string) => Promise<{ success: boolean; versionId?: string; error?: string }>;

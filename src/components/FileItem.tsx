@@ -31,6 +31,7 @@ interface FileItemProps {
     showExtensions?: boolean;
     isLocked?: boolean;
     lockedBy?: string;
+    isIgnored?: boolean;
 }
 
 const FileItem: React.FC<FileItemProps> = ({
@@ -48,7 +49,8 @@ const FileItem: React.FC<FileItemProps> = ({
     onVersionClick,
     showExtensions = true,
     isLocked,
-    lockedBy
+    lockedBy,
+    isIgnored
 }) => {
 
     const inputRef = useRef<HTMLInputElement>(null);
@@ -112,6 +114,7 @@ const FileItem: React.FC<FileItemProps> = ({
                 onMouseDown={onSelect}
                 onDoubleClick={onNavigate}
                 onContextMenu={onContextMenu}
+                style={isIgnored ? { opacity: 0.5 } : undefined}
             >
                 <div className="col col-icon">
                     <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -174,6 +177,7 @@ const FileItem: React.FC<FileItemProps> = ({
             onMouseDown={onSelect}
             onDoubleClick={onNavigate}
             onContextMenu={onContextMenu}
+            style={isIgnored ? { opacity: 0.5 } : undefined}
         >
             <div className="card-icon">
                 {file.latestVersion && (

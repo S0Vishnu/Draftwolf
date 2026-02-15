@@ -38,4 +38,5 @@ export interface Version {
     parent?: string;
     parents?: string[];
     parentId?: string;
+    ignoredCount?: number;
 }

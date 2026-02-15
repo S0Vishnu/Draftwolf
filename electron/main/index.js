@@ -1,5 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from "electron";
 import { join, resolve } from "node:path";
+import { existsSync, statSync } from "node:fs";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { DraftControlSystem } from "./services/DraftControlSystem";
 import { startMonitoring, stopMonitoring, updateSettings as updateMonitorSettings, getBufferState, clearBuffer, testNotification } from "./fileChangeMonitor";
@@ -17,6 +18,28 @@ import { startApiServer } from "./api-server";
 
 // Start API Server
 let apiServer = startApiServer();
+
+// Helper: extract a folder path from command-line argv
+function getFolderFromArgv(argv) {
+  // argv typically looks like: [electron.exe, ...flags, possibleFolderPath]
+  // Skip known Electron / deep-link args
+  for (let i = argv.length - 1; i >= 1; i--) {
+    const arg = argv[i];
+    // Skip flags, protocol URLs, and the app path itself
+    if (arg.startsWith('--') || arg.startsWith('-') || arg.startsWith('myapp://')) continue;
+    // Skip the main entry file path used in dev mode
+    if (arg.endsWith('.js') || arg.endsWith('.ts') || arg.endsWith('.json')) continue;
+    // Check if it's a real directory
+    try {
+      if (existsSync(arg) && statSync(arg).isDirectory()) {
+        return arg;
+      }
+    } catch (_) {
+      // ignore stat errors
+    }
+  }
+  return null;
+}
 
 // Register custom protocol
 const isDev = !app.isPackaged;
@@ -43,6 +66,18 @@ if (gotTheLock) {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
+    }
+
+    // Check if a folder path was passed (e.g. from "Open with DraftWolf" context menu)
+    const folderPath = getFolderFromArgv(argv);
+    if (folderPath) {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.webContents.send("open-with-folder", folderPath);
+      }
+      return;
     }
 
     // Extract URL from argv
@@ -161,6 +196,16 @@ function createWindow() {
         // Add a small delay/log to ensure window is ready? valid for ready-to-show.
         console.log("Processing Cold Start Deep Link:", url);
         authManager.handleDeepLink(url);
+      }
+
+      // Handle Cold Start "Open with DraftWolf" from context menu
+      const folderPath = getFolderFromArgv(process.argv);
+      if (folderPath) {
+        console.log("Opening folder from context menu (cold start):", folderPath);
+        // Small delay to let the renderer fully initialize
+        setTimeout(() => {
+          mainWindow.webContents.send("open-with-folder", folderPath);
+        }, 500);
       }
     }
   });
@@ -965,6 +1010,27 @@ ipcMain.handle("draft:validate", async (_, { projectRoot, backupPath }) => {
   } catch (e) {
     console.error("Draft Validate Failed:", e);
     return { valid: false, errors: [e.message] };
+  }
+});
+
+ipcMain.handle("draft:readDraftignore", async (_, { projectRoot, backupPath }) => {
+  try {
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
+    return await dcs.readDraftIgnore();
+  } catch (e) {
+    console.error("Draft Read Draftignore Failed:", e);
+    return ['.draft'];
+  }
+});
+
+ipcMain.handle("draft:writeDraftignore", async (_, { projectRoot, patterns, backupPath }) => {
+  try {
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
+    await dcs.writeDraftIgnore(patterns);
+    return { success: true };
+  } catch (e) {
+    console.error("Draft Write Draftignore Failed:", e);
+    return { success: false, error: e.message };
   }
 });
 

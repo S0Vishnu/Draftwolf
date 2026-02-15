@@ -47,7 +47,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DraftWolf",
-      "artifactName": "${productName}.${version}.${ext}"
+      "artifactName": "${productName}.${version}.${ext}",
+      "include": "build/installer.nsh"
     },
     "protocols": [
       {

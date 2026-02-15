@@ -2,6 +2,7 @@
 import React from 'react';
 import FileItem, { FileEntry } from './FileItem';
 import { Lock } from '../services/LockService';
+import { shouldShowEntry } from '../utils/ignorePatterns';
 
 
 interface FileListProps {
@@ -40,6 +41,9 @@ interface FileListProps {
     locks?: Map<string, Lock>;
     projectRoot?: string | null;
     currentUserId?: string;
+
+    // Ignore pattern support
+    ignorePatterns?: string[];
 }
 
 
@@ -48,7 +52,8 @@ const FileList: React.FC<FileListProps> = ({
     isCreating, creationName, showExtensions = true,
     onSort, onSelect, onNavigate, onRenameChange, onRenameSubmit, onRenameCancel, onContextMenu, onVersionClick,
     onCreationChange, onCreationSubmit, onCreationCancel,
-    locks, projectRoot, currentUserId
+    locks, projectRoot, currentUserId,
+    ignorePatterns
 }) => {
 
 
@@ -127,6 +132,14 @@ const FileList: React.FC<FileListProps> = ({
                         }
                     }
 
+                    // Compute ignored status
+                    let isIgnored = false;
+                    if (ignorePatterns && ignorePatterns.length > 0 && projectRoot && file.path.startsWith(projectRoot)) {
+                        let relPath = file.path.substring(projectRoot.length);
+                        if (relPath.startsWith('\\') || relPath.startsWith('/')) relPath = relPath.substring(1);
+                        isIgnored = !shouldShowEntry(file.name, relPath, ignorePatterns);
+                    }
+
                     return (
                         <FileItem
                             key={file.path}
@@ -145,6 +158,7 @@ const FileList: React.FC<FileListProps> = ({
                             onVersionClick={onVersionClick ? (e) => onVersionClick(e, file) : undefined}
                             isLocked={isLocked}
                             lockedBy={lockedBy}
+                            isIgnored={isIgnored}
                         />
                     )
                 })}

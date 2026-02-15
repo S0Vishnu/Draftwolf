@@ -59,10 +59,29 @@ const ProjectSettings: React.FC = () => {
                         showHiddenFiles: projectMeta.showHiddenFiles ?? (localStorage.getItem('showHiddenFiles') === 'true'),
                         showExtensions: projectMeta.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false')
                     });
-                    // Load ignore patterns from metadata
-                    if (projectMeta.ignorePatterns) {
-                        setIgnorePatterns(projectMeta.ignorePatterns);
-                        setIgnorePatternsText(projectMeta.ignorePatterns.join('\n'));
+                    // Load ignore patterns from .draftignore file first, then fallback to metadata
+                    try {
+                        // @ts-ignore
+                        const draftignorePatterns = await globalThis.api.draft.readDraftignore(projectPath, foundBackupPath);
+                        if (draftignorePatterns && draftignorePatterns.length > 0) {
+                            const filtered = draftignorePatterns.filter((p: string) => p.trim() && p.trim() !== '.draft');
+                            if (filtered.length > 0) {
+                                setIgnorePatterns(draftignorePatterns);
+                                setIgnorePatternsText(filtered.join('\n'));
+                            } else if (projectMeta.ignorePatterns) {
+                                setIgnorePatterns(projectMeta.ignorePatterns);
+                                setIgnorePatternsText(projectMeta.ignorePatterns.join('\n'));
+                            }
+                        } else if (projectMeta.ignorePatterns) {
+                            setIgnorePatterns(projectMeta.ignorePatterns);
+                            setIgnorePatternsText(projectMeta.ignorePatterns.join('\n'));
+                        }
+                    } catch {
+                        // Fallback to metadata
+                        if (projectMeta.ignorePatterns) {
+                            setIgnorePatterns(projectMeta.ignorePatterns);
+                            setIgnorePatternsText(projectMeta.ignorePatterns.join('\n'));
+                        }
                     }
                     if (projectMeta.activePresets) {
                         setActivePresets(projectMeta.activePresets);
@@ -194,6 +213,10 @@ const ProjectSettings: React.FC = () => {
                     activePresets: activePresets,
                     lastUpdated: new Date().toISOString()
                 }, backupPath);
+
+                // Also write to .draftignore file for the backend snapshot engine
+                // @ts-ignore
+                await globalThis.api.draft.writeDraftignore(projectPath, ignorePatterns, backupPath);
             } catch (err) {
                 console.error("Failed to save project metadata to file:", err);
             }
@@ -457,7 +480,7 @@ const ProjectSettings: React.FC = () => {
                                 <div className="section-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                     {/* Description */}
                                     <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
-                                        Files and folders matching these patterns will be hidden from the file browser.
+                                        Files and folders matching these patterns will be <strong style={{ color: '#c4b5fd' }}>excluded from snapshots</strong> and hidden from the file browser.
                                         Uses <code style={{
                                             background: 'rgba(168, 139, 250, 0.15)',
                                             padding: '2px 6px',

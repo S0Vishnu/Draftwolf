@@ -6,7 +6,7 @@ import { auth } from '../firebase';
 import { FileEntry } from '../components/FileItem';
 import { InspectorTab, InspectorAction } from '../components/inspector/types';
 import { LockService, Lock } from '../services/LockService';
-import { shouldShowEntry } from '../utils/ignorePatterns';
+
 
 
 // Components
@@ -515,12 +515,8 @@ const Home = () => {
         // Hidden Files Filter
         if (!showHiddenFiles && f.name.startsWith('.') && f.name !== '..') return false;
 
-        // Ignore Patterns Filter
-        if (projectIgnorePatterns.length > 0 && rootDir && f.path.startsWith(rootDir)) {
-            let relPath = f.path.substring(rootDir.length);
-            if (relPath.startsWith('\\') || relPath.startsWith('/')) relPath = relPath.substring(1);
-            if (!shouldShowEntry(f.name, relPath, projectIgnorePatterns)) return false;
-        }
+        // Note: Ignore patterns no longer hide files — they are shown with a red badge indicator instead.
+        // The isIgnored flag is computed in FileList and passed to FileItem.
 
         const query = searchQuery.toLowerCase();
         const matchesName = f.name.toLowerCase().includes(query);
@@ -1583,6 +1579,7 @@ const Home = () => {
                                     locks={locks}
                                     projectRoot={rootDir}
                                     currentUserId={user?.uid}
+                                    ignorePatterns={projectIgnorePatterns}
                                 />
 
 

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Trash2, RotateCcw, Edit2, Archive, HardDrive } from 'lucide-react';
+import { Trash2, RotateCcw, Edit2, Archive, HardDrive, FilePlus, FileText, FileX, ArrowRight } from 'lucide-react';
 import { FileEntry } from '../FileItem';
 import { Version } from './types';
 
@@ -19,6 +19,8 @@ interface SnapshotsTabProps {
     onRename: (id: string, newLabel: string) => void;
     projectRoot: string;
     backupPath?: string;
+    changedFiles?: { path: string; type: 'add' | 'change' | 'unlink'; timestamp: number }[];
+    onNavigateToChanges?: () => void;
 }
 
 const LANE_COLORS = [
@@ -55,7 +57,9 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
     onRestore,
     onRename,
     projectRoot,
-    backupPath
+    backupPath,
+    changedFiles,
+    onNavigateToChanges
 }) => {
     const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
     const [editingLabel, setEditingLabel] = useState<string>('');
@@ -140,8 +144,40 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
     const { nodes, links, maxLane } = graphData;
     const contentLeftMargin = LEFT_PADDING + (maxLane * LANE_WIDTH) + 12;
 
+    const previewFiles = (changedFiles || []).slice(0, 2);
+    const extraCount = (changedFiles || []).length - previewFiles.length;
+
     return (
         <div className="versions-list">
+            {(changedFiles && changedFiles.length > 0) && (
+                <div className="changes-preview-card">
+                    <div className="changes-preview-header">
+                        <span className="changes-preview-title">Pending Changes</span>
+                        <span className="changes-preview-count">{changedFiles.length}</span>
+                    </div>
+                    <div className="changes-preview-items">
+                        {previewFiles.map((f, i) => {
+                            const Icon = f.type === 'add' ? FilePlus : f.type === 'unlink' ? FileX : FileText;
+                            const color = f.type === 'add' ? '#50fa7b' : f.type === 'unlink' ? '#ff5555' : '#ffb86c';
+                            const name = f.path.replace(/\\/g, '/').split('/').pop() || f.path;
+                            return (
+                                <div key={f.path + i} className="changes-preview-item">
+                                    <Icon size={12} style={{ color, flexShrink: 0 }} />
+                                    <span className="changes-preview-name" title={f.path}>{name}</span>
+                                </div>
+                            );
+                        })}
+                        {extraCount > 0 && (
+                            <span className="changes-preview-more">+{extraCount} more</span>
+                        )}
+                    </div>
+                    {onNavigateToChanges && (
+                        <button className="changes-preview-btn" onClick={onNavigateToChanges}>
+                            View Changes <ArrowRight size={12} />
+                        </button>
+                    )}
+                </div>
+            )}
             {/* Stats Header */}
             {stats && (
                 <div className="snapshot-stats-container">

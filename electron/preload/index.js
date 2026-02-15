@@ -55,7 +55,8 @@ const api = {
     getCurrentHead: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:getCurrentHead', { projectRoot, backupPath }),
     getStorageReport: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:storageReport', { projectRoot, backupPath }),
     readDraftignore: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:readDraftignore', { projectRoot, backupPath }),
-    writeDraftignore: (projectRoot, patterns, backupPath) => electronAPI.ipcRenderer.invoke('draft:writeDraftignore', { projectRoot, patterns, backupPath })
+    writeDraftignore: (projectRoot, patterns, backupPath) => electronAPI.ipcRenderer.invoke('draft:writeDraftignore', { projectRoot, patterns, backupPath }),
+    getWorkingChanges: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:getWorkingChanges', { projectRoot, backupPath })
   },
   auth: {
     login: () => electronAPI.ipcRenderer.invoke('auth:login'),

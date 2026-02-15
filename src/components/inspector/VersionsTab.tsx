@@ -17,6 +17,9 @@ interface VersionsTabProps {
     onRestore: (id: string) => void;
     onRename: (id: string, newLabel: string) => void;
     onCompare?: (versionId: string) => void;
+    projectRoot?: string;
+    changedFiles?: { path: string; type: 'add' | 'change' | 'unlink'; timestamp: number }[];
+    currentRelativePath?: string | null;
 }
 
 const LANE_COLORS = [
@@ -49,7 +52,10 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
     onDelete,
     onRestore,
     onRename,
-    onCompare
+    onCompare,
+    projectRoot,
+    changedFiles,
+    currentRelativePath
 }) => {
     const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
     const [editingLabel, setEditingLabel] = useState<string>('');
@@ -69,11 +75,35 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
         const links: any[] = [];
         const lanes: (string | null)[] = []; // Stores the 'next expected parent ID' for each lane
 
+        // Check for unsaved changes
+        // let effectiveHistory = [...history]; // Removed as per request to not modify graph
+        let isDirty = false;
+        
+        if (projectRoot && file && changedFiles) {
+            // Use the relative path passed from parent if available, otherwise try file.path
+            const normalize = (p: string) => p.replace(/\\/g, '/').toLowerCase();
+            const target = currentRelativePath ? normalize(currentRelativePath) : normalize(file.path);
+
+            // 2. Compare against changedFiles
+            // The backend sends paths relative to project root
+            let change = changedFiles.find(c => {
+                const cPath = normalize(c.path);
+                return cPath === target;
+            });
+
+            if (change) {
+                isDirty = true;
+            }
+        }
+
+        // Use standard history (no unsaved node)
+        const workingHistory = history;
+
         // Map ID to Index for quick lookup
         const idToIndex = new Map<string, number>();
-        history.forEach((v, i) => idToIndex.set(v.id, i));
+        workingHistory.forEach((v, i) => idToIndex.set(v.id, i));
 
-        history.forEach((ver, index) => {
+        workingHistory.forEach((ver: any, index: number) => {
             // Determine Parent ID
             // Logic: ver.parentId is the primary source.
             // Check validity: Does the parent exist in our current list?
@@ -83,8 +113,8 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
 
             // Fallback: If no explicit parent OR parent not found (orphan reference), 
             // assume linear history and connect to the chronologically previous version (next in list).
-            if (!parentExists && index < history.length - 1) {
-                parentId = history[index + 1].id;
+            if (!parentExists && index < workingHistory.length - 1) {
+                parentId = workingHistory[index + 1].id;
             }
 
             // Find a lane
@@ -94,7 +124,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
             if (laneIndex === -1) {
                 // If it's the very last node (oldest), always snap to Lane 0 to anchor the graph
                 // This prevents the "genesis" commit from floating off to the side if links are broken
-                if (index === history.length - 1) {
+                if (index === workingHistory.length - 1) {
                     laneIndex = 0;
                 } else {
                     // Start a new lane or find empty
@@ -162,8 +192,8 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
             }
         });
 
-        return { nodes, links, maxLane: lanes.length };
-    }, [history]);
+        return { nodes, links, maxLane: lanes.length, isDirty };
+    }, [history, file, projectRoot, changedFiles]);
 
     const { nodes, links, maxLane } = graphData;
 
@@ -173,6 +203,23 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
 
     return (
         <div className="versions-list">
+            {graphData.isDirty && (
+                <div style={{
+                    padding: '8px 12px',
+                    margin: '8px 12px 12px 12px',
+                    backgroundColor: 'rgba(255, 184, 108, 0.1)',
+                    border: '1px solid rgba(255, 184, 108, 0.2)',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '12px',
+                    color: '#ffb86c'
+                }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffb86c' }} />
+                    <span>This file has unsaved changes</span>
+                </div>
+            )}
             {isCreating && (
                 <div className="creation-form">
                     <textarea
@@ -340,7 +387,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                     );
                 })}
 
-                {history.length === 0 && !isCreating && (
+                {history.length === 0 && !graphData.isDirty && !isCreating && (
                     <div className="empty-state">
                         <GitCommit size={32} style={{ opacity: 0.2, marginBottom: 8 }} />
                         <div>No versions created yet</div>

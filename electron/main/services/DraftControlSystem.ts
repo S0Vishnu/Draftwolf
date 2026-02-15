@@ -1480,4 +1480,105 @@ export class DraftControlSystem {
     return { valid: errors.length === 0, errors };
   }
 
+  /**
+   * Get list of changed files in the working directory compared to the current HEAD version.
+   * Returns persistent changes (like git status) rather than volatile events.
+   */
+  async getWorkingChanges(): Promise<{
+    modified: { path: string; timestamp: number }[];
+    added: { path: string; timestamp: number }[];
+    deleted: { path: string; timestamp: number }[];
+  }> {
+    await this.init();
+    const index = await this.readIndex();
+    const currentHeadId = index.currentHead;
+
+    const modified: { path: string; timestamp: number }[] = [];
+    const added: { path: string; timestamp: number }[] = [];
+    const deleted: { path: string; timestamp: number }[] = [];
+
+    // Load HEAD manifest if it exists
+    let headFiles: Record<string, Hash> = {};
+    if (currentHeadId) {
+      try {
+        const manifest = await this.readJson(path.join(this.versionsPath, `${currentHeadId}.json`));
+        headFiles = { ...(manifest.files || {}) }; // Clone to track deletions
+      } catch (e) {
+        console.error(`Failed to read HEAD manifest ${currentHeadId}:`, e);
+      }
+    }
+
+    // Load ignore patterns
+    const ignorePatterns = await this.readDraftIgnore();
+
+    // Helper to scan directory
+    const scanDir = async (dir: string) => {
+      let entries;
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch (e) {
+        if ((e as any).code === 'ENOENT') return; // Directory gone
+        throw e;
+      }
+
+      await Promise.all(entries.map(async (entry) => {
+        const fullPath = path.join(dir, entry.name);
+        // Calculate relative path for matching
+        const relativePath = path.relative(this.projectRoot, fullPath); 
+        const normRelPath = this.normalizePath(relativePath);
+
+        if (entry.isDirectory()) {
+          // Skip .draft folder (always) and ignore patterns
+          if (entry.name === '.draft' || this.shouldIgnorePath(normRelPath, ignorePatterns)) {
+            return;
+          }
+          await scanDir(fullPath);
+        } else if (entry.isFile()) {
+          // Check ignore patterns
+          if (this.shouldIgnorePath(normRelPath, ignorePatterns)) {
+            return;
+          }
+
+          // Check against HEAD
+          const headHash = headFiles[normRelPath];
+          
+          if (!headHash) {
+            // New file (Added)
+            added.push({ path: normRelPath, timestamp: Date.now() });
+          } else {
+            // Existing file - check content hash
+            // (Optimization: could check size/mtime first, but hash is safest)
+            try {
+               const currentHash = await this.hashFile(fullPath);
+               if (currentHash !== headHash) {
+                 modified.push({ path: normRelPath, timestamp: Date.now() });
+               }
+               
+               // Mark as seen so we can track deletions later
+               delete headFiles[normRelPath];
+            } catch (e) {
+               console.error(`Error hashing ${normRelPath}:`, e);
+            }
+          }
+        }
+      }));
+    };
+
+    // 1. Scan working directory for Added and Modified files
+    await scanDir(this.projectRoot);
+
+    // 2. Any remaining files in headFiles were not found in working directory -> Deleted
+    for (const [relPath, _] of Object.entries(headFiles)) {
+        // We need to double check if it was ignored? 
+        // No, if it was in HEAD, it wasn't ignored then. 
+        // If ignore rules changed to include it now, it effectively "disappears" 
+        // from tracking, which looks like a delete or ignore. 
+        // Git treats ignored files as untracked, but if they were tracked, they show as deleted?
+        // Let's count them as deleted for now if they are missing.
+        deleted.push({ path: relPath, timestamp: Date.now() });
+    }
+
+    return { modified, added, deleted };
+  }
+
 }

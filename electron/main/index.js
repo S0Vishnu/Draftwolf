@@ -1034,6 +1034,16 @@ ipcMain.handle("draft:writeDraftignore", async (_, { projectRoot, patterns, back
   }
 });
 
+ipcMain.handle("draft:getWorkingChanges", async (_, { projectRoot, backupPath }) => {
+  try {
+    const dcs = new DraftControlSystem(projectRoot, backupPath || undefined);
+    return await dcs.getWorkingChanges();
+  } catch (e) {
+    console.error("Draft Get Working Changes Failed:", e);
+    return { modified: [], added: [], deleted: [] };
+  }
+});
+
 // ─── File Change Monitor ────────────────────────────────────────
 
 ipcMain.handle("monitor:start", async (_, { dirPath, intervalMinutes, enabled }) => {

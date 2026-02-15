@@ -73,6 +73,12 @@ interface Window {
       onDownloaded: (callback: (info: any) => void) => () => void;
       onProgress: (callback: (info: any) => void) => () => void;
       onError: (callback: (error: string) => void) => () => void;
+      writeDraftignore: (projectRoot: string, patterns: string[], backupPath?: string) => Promise<void>;
+      getWorkingChanges: (projectRoot: string, backupPath?: string) => Promise<{
+        modified: { path: string; timestamp: number }[];
+        added: { path: string; timestamp: number }[];
+        deleted: { path: string; timestamp: number }[];
+      }>;
     };
     monitor: {
       start: (dirPath: string, intervalMinutes?: number, enabled?: boolean) => Promise<boolean>;

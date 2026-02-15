@@ -1570,7 +1570,12 @@ const Home = () => {
                                 onCreateFolder={initCreateFolder}
                                 onCreateFile={initCreateFile}
                                 setViewMode={setViewMode}
+                                onOpenChanges={() => {
+                                    setInspectorTab('changes');
+                                    setPreviewOpen(true);
+                                }}
                                 onNavigate={navigateTo}
+
                             />
 
                             <div

@@ -18,6 +18,12 @@ const TYPE_CONFIG = {
     unlink: { label: 'Deleted', color: '#ff5555', bg: 'rgba(255, 85, 85, 0.12)', icon: FileX },
 };
 
+/**
+ * Format a millisecond-precision epoch timestamp into a short human-readable relative time.
+ *
+ * @param ts - Timestamp in milliseconds since the UNIX epoch
+ * @returns `'just now'` if less than 60 seconds, `'<Nm ago'` for minutes, `'<Xh ago'` for hours, or `'<Xd ago'` for days
+ */
 function timeAgo(ts: number): string {
     const diff = Date.now() - ts;
     const seconds = Math.floor(diff / 1000);
@@ -30,6 +36,14 @@ function timeAgo(ts: number): string {
     return `${days}d ago`;
 }
 
+/**
+ * Extracts the final path segment (the file or directory name) from a file path.
+ *
+ * Accepts paths using either forward slashes (`/`) or backslashes (`\`). If the path contains no final segment (for example an empty trailing segment), the original `filePath` is returned.
+ *
+ * @param filePath - The file system path to extract the basename from
+ * @returns The last segment of `filePath` (the file or directory name)
+ */
 function basename(filePath: string): string {
     const parts = filePath.replaceAll('\\', '/').split('/');
     return parts.at(-1) || filePath;

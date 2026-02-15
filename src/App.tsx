@@ -18,6 +18,15 @@ import ProjectSettings from './pages/ProjectSettings';
 
 import UpdateModal from './components/UpdateModal';
 
+/**
+ * Subscribes to native tray and context-menu events and navigates the app when they occur.
+ *
+ * Registers handlers (if available on `globalThis.api`) to:
+ * - open a folder from the tray or "Open with DraftWolf" context menu by storing the path in `sessionStorage` under `trayOpenPath` and navigating to `/home`, and
+ * - navigate to an arbitrary route provided by the tray.
+ *
+ * All registered handlers are unsubscribed when the component unmounts.
+ */
 function TrayListener() {
   const navigate = useNavigate();
   useEffect(() => {

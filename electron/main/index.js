@@ -34,8 +34,8 @@ function getFolderFromArgv(argv) {
       if (existsSync(arg) && statSync(arg).isDirectory()) {
         return arg;
       }
-    } catch (_) {
-      // ignore stat errors
+    } catch (error) {
+      console.error("Failed to check directory:", error);
     }
   }
   return null;
@@ -65,6 +65,7 @@ if (gotTheLock) {
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
       mainWindow.focus();
     }
 
@@ -809,17 +810,23 @@ if (is.dev) {
 
   ipcMain.handle("update:install", () => {
     log.info("Installing update...");
-    // Close all windows first
-    BrowserWindow.getAllWindows().forEach((window) => {
-      window.close();
-    });
+    app.isQuitting = true;
+    
+    // Destroy tray icon if it exists
+    if (tray) {
+      tray.destroy();
+      tray = null;
+    }
 
-    setTimeout(() => {
-      autoUpdater.quitAndInstall(true, true);
-    }, 500);
+    autoUpdater.quitAndInstall(true, true);
     return true;
   });
 }
+
+// Ensure isQuitting is set when the app is quitting via other means (Cmd+Q etc)
+app.on("before-quit", () => {
+  app.isQuitting = true;
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

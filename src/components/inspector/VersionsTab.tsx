@@ -11,7 +11,7 @@ interface VersionsTabProps {
     onCreateVersion: () => void;
     loading: boolean;
     activeVersionId: string | null;
-    file: FileEntry;
+    file?: FileEntry | null;
     onDownload: (ver: any, verNum: number) => void;
     onDelete: (id: string) => void;
     onRestore: (id: string) => void;
@@ -20,6 +20,7 @@ interface VersionsTabProps {
     projectRoot?: string;
     changedFiles?: { path: string; type: 'add' | 'change' | 'unlink'; timestamp: number }[];
     currentRelativePath?: string | null;
+    onNavigateToChanges?: () => void;
 }
 
 const LANE_COLORS = [
@@ -55,7 +56,8 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
     onCompare,
     projectRoot,
     changedFiles,
-    currentRelativePath
+    currentRelativePath,
+    onNavigateToChanges
 }) => {
     const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
     const [editingLabel, setEditingLabel] = useState<string>('');
@@ -78,21 +80,23 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
         // Check for unsaved changes
         // let effectiveHistory = [...history]; // Removed as per request to not modify graph
         let isDirty = false;
-        
-        if (projectRoot && file && changedFiles) {
+
+        if (projectRoot && changedFiles) {
             // Use the relative path passed from parent if available, otherwise try file.path
             const normalize = (p: string) => p.replace(/\\/g, '/').toLowerCase();
-            const target = currentRelativePath ? normalize(currentRelativePath) : normalize(file.path);
+            const target = currentRelativePath ? normalize(currentRelativePath) : (file ? normalize(file.path) : null);
 
-            // 2. Compare against changedFiles
-            // The backend sends paths relative to project root
-            let change = changedFiles.find(c => {
-                const cPath = normalize(c.path);
-                return cPath === target;
-            });
+            if (target) {
+                // 2. Compare against changedFiles
+                // The backend sends paths relative to project root
+                let change = changedFiles.find(c => {
+                    const cPath = normalize(c.path);
+                    return cPath === target;
+                });
 
-            if (change) {
-                isDirty = true;
+                if (change) {
+                    isDirty = true;
+                }
             }
         }
 
@@ -214,8 +218,12 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                     alignItems: 'center',
                     gap: '8px',
                     fontSize: '12px',
-                    color: '#ffb86c'
-                }}>
+                    color: '#ffb86c',
+                    cursor: onNavigateToChanges ? 'pointer' : 'default'
+                }}
+                    onClick={() => onNavigateToChanges?.()}
+                    title="Click to view changes"
+                >
                     <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffb86c' }} />
                     <span>This file has unsaved changes</span>
                 </div>
@@ -346,7 +354,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                                 </div>
 
                                 <div className="commit-actions">
-                                    {onCompare && !file.isDirectory && (
+                                    {onCompare && (!file || !file.isDirectory) && (
                                         <button
                                             className="version-action-btn version-compare-btn"
                                             onClick={(e) => { e.stopPropagation(); onCompare(node.id); }}
@@ -369,9 +377,9 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                                     <button
                                         className="version-action-btn"
                                         onClick={(e) => { e.stopPropagation(); onDownload(node, verNum); }}
-                                        title={file.isDirectory ? "Cannot download directory" : "Download"}
-                                        disabled={file.isDirectory}
-                                        style={file.isDirectory ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                                        title={(!file || file.isDirectory) ? "Cannot download directory" : "Download"}
+                                        disabled={!file || file.isDirectory}
+                                        style={(!file || file.isDirectory) ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                     >
                                         <Download size={13} />
                                     </button>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
     ChevronLeft, ChevronRight, Home as HomeIcon, ChevronRight as ChevronRightIcon,
@@ -153,6 +152,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                                                 <span
                                                     className={`crumb-part ${!isLast ? 'clickable' : ''}`}
                                                     onClick={() => !isLast && onNavigate(partPath)}
+                                                    title={partPath}
                                                 >
                                                     {part}
                                                 </span>
@@ -164,9 +164,32 @@ const Toolbar: React.FC<ToolbarProps> = ({
                         }
 
                         // Fallback / Absolute Path Mode
-                        return currentPath ? currentPath.split(/[/\\]/).map((part, i, arr) => {
-                            if (!part && i === 0) return null;
-                            const fullPath = getPathAtIndex(arr, i);
+                        return currentPath ? currentPath.split(/[/\\]/).filter(p => p).map((part, i, arr) => {
+                            // Reconstruct the path from the beginning up to the current part
+                            // We construct it using the original parts to maintain separator consistency if possible, 
+                            // but simply joining with '/' is safer for cross-platform logic in JS
+
+                            // Handling Windows Drive letters: if first part has ':', treat it as root
+
+                            // Logic:
+                            // i=0 ('D:') -> 'D:/'
+                            // i=1 ('Projects') -> 'D:/Projects'
+
+                            const slice = arr.slice(0, i + 1);
+                            let fullPath = slice.join('/');
+
+                            // Ensure Windows drive path has trailing slash if it's just the drive
+                            if (slice.length === 1 && slice[0].includes(':')) {
+                                fullPath += '/';
+                            } else if (currentPath.startsWith('/') && i === 0) {
+                                // Unix absolute root handling if split removed leading slash
+                                // actually filter(p=>p) removes empty leading string for /usr...
+                                // so 'usr' is index 0. We need to prepend /
+                                fullPath = '/' + fullPath;
+                            } else if (currentPath.startsWith('/') && !fullPath.startsWith('/')) {
+                                fullPath = '/' + fullPath;
+                            }
+
                             const isLast = i === arr.length - 1;
 
                             return (
@@ -175,8 +198,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
                                     <span
                                         className={`crumb-part ${!isLast ? 'clickable' : ''}`}
                                         onClick={() => !isLast && onNavigate(fullPath)}
+                                        title={fullPath}
                                     >
-                                        {part || '/'}
+                                        {part}
                                     </span>
                                 </React.Fragment>
                             );

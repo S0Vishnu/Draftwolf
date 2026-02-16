@@ -1,13 +1,11 @@
-import fs from 'fs/promises';
-import { createReadStream, createWriteStream, existsSync } from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import { pipeline } from 'stream/promises';
-import { createBrotliCompress, createBrotliDecompress } from 'zlib';
+import fs from 'node:fs/promises';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
+import { createBrotliCompress, createBrotliDecompress } from 'node:zlib';
 
 // --- Types ---
-
-export type Hash = string;
 
 export interface FileMetadata {
   size: number; // Original size
@@ -18,9 +16,10 @@ export interface FileMetadata {
 }
 
 export interface VersionIndex {
-  objects: Record<Hash, FileMetadata>;
+  objects: Record<string, FileMetadata>;
   latestVersion: string | null;
-  currentHead: string | null; // Track the currently checked-out version
+  currentHead: string | null;
+  fileCache?: Record<string, { mtime: number, size: number, hash: string }>;
 }
 
 export interface VersionManifest {
@@ -28,7 +27,7 @@ export interface VersionManifest {
   versionNumber: string; // "1.0", "1.1", "2.0"
   label: string;
   timestamp: string;
-  files: Record<string, Hash>;
+  files: Record<string, string>;
   fileIds?: Record<string, string>; // Mapping of relativePath -> unique file ID
   parentId: string | null;
   totalSize?: number;
@@ -79,7 +78,18 @@ export class DraftControlSystem {
    * Initialize the .draft directory structure if it doesn't exist.
    */
   async init(): Promise<void> {
-    if (!existsSync(this.draftPath)) {
+    if (existsSync(this.draftPath)) {
+      if (!existsSync(this.objectsPath)) await fs.mkdir(this.objectsPath, { recursive: true });
+      if (!existsSync(this.versionsPath)) await fs.mkdir(this.versionsPath, { recursive: true });
+      if (!existsSync(path.join(this.draftPath, 'metadata'))) await fs.mkdir(path.join(this.draftPath, 'metadata'), { recursive: true });
+      if (!existsSync(path.join(this.draftPath, 'attachments'))) await fs.mkdir(path.join(this.draftPath, 'attachments'), { recursive: true });
+
+      // Ensure hidden state is enforced (idempotent-ish)
+      if (!this.isHiddenChecked) {
+        this.hideDraftFolder();
+      }
+    } else {
+
       await fs.mkdir(this.draftPath, { recursive: true });
       await fs.mkdir(this.objectsPath, { recursive: true });
       await fs.mkdir(this.versionsPath, { recursive: true });
@@ -109,17 +119,6 @@ export class DraftControlSystem {
         ].join('\n');
         await fs.writeFile(draftignorePath, defaultContent, 'utf-8');
       }
-    } else {
-      // Ensure subdirs exist even if root exists
-      if (!existsSync(this.objectsPath)) await fs.mkdir(this.objectsPath, { recursive: true });
-      if (!existsSync(this.versionsPath)) await fs.mkdir(this.versionsPath, { recursive: true });
-      if (!existsSync(path.join(this.draftPath, 'metadata'))) await fs.mkdir(path.join(this.draftPath, 'metadata'), { recursive: true });
-      if (!existsSync(path.join(this.draftPath, 'attachments'))) await fs.mkdir(path.join(this.draftPath, 'attachments'), { recursive: true });
-
-      // Ensure hidden state is enforced (idempotent-ish)
-      if (!this.isHiddenChecked) {
-        this.hideDraftFolder();
-      }
     }
   }
 
@@ -128,10 +127,10 @@ export class DraftControlSystem {
   private hideDraftFolder() {
     if (process.platform === 'win32') {
       // Use attrib +h +s +r to make it a hidden system folder (effectively read-only/protected in Explorer UI)
-      const { exec } = require('child_process');
+      const { exec } = require('node:child_process');
       exec(`attrib +h +s +r "${this.draftPath}"`, (error: any) => {
         if (error) {
-          // console.error("Failed to secure .draft folder:", error);
+          console.error("Failed to secure .draft folder:", error);
         } else {
           this.isHiddenChecked = true;
         }
@@ -147,7 +146,7 @@ export class DraftControlSystem {
    */
   async saveAttachment(filePath: string): Promise<string> {
     await this.init();
-    // 1. Hash the content
+    // 1. string the content
     const hash = await this.hashFile(filePath);
     const ext = path.extname(filePath);
     const filename = `${hash}${ext}`;
@@ -506,9 +505,11 @@ export class DraftControlSystem {
   async createSnapshot(folderPath: string, label: string): Promise<string> {
     await this.init();
     const index = await this.readIndex();
-    const fileHashes: Record<string, Hash> = {};
+    if (!index.fileCache) index.fileCache = {};
+
+    const fileHashes: Record<string, string> = {};
     const fileIds: Record<string, string> = {};
-    const newObjects: Record<Hash, FileMetadata> = {};
+    const newObjects: Record<string, FileMetadata> = {};
     let ignoredCount = 0;
 
     // Load ignore patterns once before scanning
@@ -544,11 +545,48 @@ export class DraftControlSystem {
             return;
           }
 
-          // Process file
-          const { hash, originalSize, compressedSize } = await this.addFileToCAS(fullPath);
+          const relativePath = this.normalizePath(path.relative(this.projectRoot, fullPath));
+          let hash = '';
+          let originalSize = 0;
+          let compressedSize = 0;
+
+          // Check Cache
+          const stats = await fs.stat(fullPath);
+          const cached = index.fileCache?.[relativePath];
+
+          let useCache = false;
+          if (cached && cached.mtime === stats.mtimeMs && cached.size === stats.size) {
+            // Cache hit - potentially valid
+            // Verify blob existence to be safe (in case user deleted .draft/objects manually)
+            if (index.objects[cached.hash]) {
+              const blobPath = path.join(this.objectsPath, cached.hash);
+              if (existsSync(blobPath)) {
+                hash = cached.hash;
+                originalSize = cached.size; // stored size
+                compressedSize = index.objects[hash].compressedSize;
+                useCache = true;
+              }
+            }
+          }
+
+          if (!useCache) {
+            // Process file (string & Compress)
+            const result = await this.addFileToCAS(fullPath);
+            hash = result.hash;
+            originalSize = result.originalSize;
+            compressedSize = result.compressedSize;
+
+            // Update Cache
+            if (index.fileCache) {
+              index.fileCache[relativePath] = {
+                mtime: stats.mtimeMs,
+                size: stats.size,
+                hash: hash
+              };
+            }
+          }
 
           // Get or create ID
-          const relativePath = this.normalizePath(path.relative(this.projectRoot, fullPath));
           const id = await this.getOrCreateFileId(relativePath);
 
           fileHashes[relativePath] = hash;
@@ -647,9 +685,9 @@ export class DraftControlSystem {
     // Re-implemented to reuse addFileToCAS logic for consistency
     await this.init();
     const index = await this.readIndex();
-    const fileHashes: Record<string, Hash> = {};
+    const fileHashes: Record<string, string> = {};
     const fileIds: Record<string, string> = {};
-    const newObjects: Record<Hash, FileMetadata> = {};
+    const newObjects: Record<string, FileMetadata> = {};
     let ignoredCount = 0;
 
     // Load ignore patterns
@@ -884,7 +922,7 @@ export class DraftControlSystem {
       const blobPath = path.join(this.objectsPath, hash);
 
       if (!existsSync(blobPath)) {
-        console.error(`Missing blob for ${relativePath} (Hash: ${hash})`);
+        console.error(`Missing blob for ${relativePath} (string: ${hash})`);
         continue;
       }
 
@@ -1207,7 +1245,7 @@ export class DraftControlSystem {
 
     const blobPath = path.join(this.objectsPath, hash);
     if (!existsSync(blobPath)) {
-      throw new Error(`Blob missing for ${relativeFilePath} (Hash: ${hash})`);
+      throw new Error(`Blob missing for ${relativeFilePath} (string: ${hash})`);
     }
 
     await fs.mkdir(path.dirname(destPath), { recursive: true });
@@ -1498,7 +1536,7 @@ export class DraftControlSystem {
     const deleted: { path: string; timestamp: number }[] = [];
 
     // Load HEAD manifest if it exists
-    let headFiles: Record<string, Hash> = {};
+    let headFiles: Record<string, string> = {};
     if (currentHeadId) {
       try {
         const manifest = await this.readJson(path.join(this.versionsPath, `${currentHeadId}.json`));
@@ -1524,7 +1562,7 @@ export class DraftControlSystem {
       await Promise.all(entries.map(async (entry) => {
         const fullPath = path.join(dir, entry.name);
         // Calculate relative path for matching
-        const relativePath = path.relative(this.projectRoot, fullPath); 
+        const relativePath = path.relative(this.projectRoot, fullPath);
         const normRelPath = this.normalizePath(relativePath);
 
         if (entry.isDirectory()) {
@@ -1541,24 +1579,23 @@ export class DraftControlSystem {
 
           // Check against HEAD
           const headHash = headFiles[normRelPath];
-          
-          if (!headHash) {
-            // New file (Added)
-            added.push({ path: normRelPath, timestamp: Date.now() });
-          } else {
+
+          if (headHash) {
             // Existing file - check content hash
             // (Optimization: could check size/mtime first, but hash is safest)
             try {
-               const currentHash = await this.hashFile(fullPath);
-               if (currentHash !== headHash) {
-                 modified.push({ path: normRelPath, timestamp: Date.now() });
-               }
-               
-               // Mark as seen so we can track deletions later
-               delete headFiles[normRelPath];
+              const currentHash = await this.hashFile(fullPath);
+              if (currentHash !== headHash) {
+                modified.push({ path: normRelPath, timestamp: Date.now() });
+              }
+              // Mark as seen so we can track deletions later
+              delete headFiles[normRelPath];
             } catch (e) {
-               console.error(`Error hashing ${normRelPath}:`, e);
+              console.error(`Error hashing ${normRelPath}:`, e);
             }
+          } else {
+            // New file (Added)
+            added.push({ path: normRelPath, timestamp: Date.now() });
           }
         }
       }));
@@ -1569,13 +1606,13 @@ export class DraftControlSystem {
 
     // 2. Any remaining files in headFiles were not found in working directory -> Deleted
     for (const [relPath, _] of Object.entries(headFiles)) {
-        // We need to double check if it was ignored? 
-        // No, if it was in HEAD, it wasn't ignored then. 
-        // If ignore rules changed to include it now, it effectively "disappears" 
-        // from tracking, which looks like a delete or ignore. 
-        // Git treats ignored files as untracked, but if they were tracked, they show as deleted?
-        // Let's count them as deleted for now if they are missing.
-        deleted.push({ path: relPath, timestamp: Date.now() });
+      // We need to double check if it was ignored? 
+      // No, if it was in HEAD, it wasn't ignored then. 
+      // If ignore rules changed to include it now, it effectively "disappears" 
+      // from tracking, which looks like a delete or ignore. 
+      // Git treats ignored files as untracked, but if they were tracked, they show as deleted?
+      // Let's count them as deleted for now if they are missing.
+      deleted.push({ path: relPath, timestamp: Date.now() });
     }
 
     return { modified, added, deleted };

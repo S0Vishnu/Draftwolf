@@ -4,7 +4,7 @@ import { FileEntry } from '../FileItem';
 import FileIcon from '../FileIcon';
 
 interface InfoTabProps {
-    file: FileEntry;
+    file?: FileEntry | null;
     tags: string[];
     onAddTag: (tag: string) => void;
     onRemoveTag: (tag: string) => void;
@@ -47,28 +47,32 @@ const InfoTab: React.FC<InfoTabProps> = ({ file, tags, onAddTag, onRemoveTag }) 
     return (
         <>
             <div className="preview-large">
-                <FileIcon name={file.name} isDirectory={file.isDirectory} size={90} />
+                <FileIcon name={file ? file.name : "root"} isDirectory={file ? file.isDirectory : true} size={90} />
             </div>
             <div className="inspector-props">
                 <div className="prop-row">
                     <label>Name</label>
-                    <div className="val">{file.name}</div>
+                    <div className="val">{file ? file.name : "Project Root"}</div>
                 </div>
                 <div className="prop-row">
                     <label>Type</label>
-                    <div className="val">{file.type}</div>
+                    <div className="val">{file ? file.type : "Directory"}</div>
                 </div>
-                <div className="prop-row">
-                    <label>Size</label>
-                    <div className="val">{formatSize(file.size)}</div>
-                </div>
-                <div className="prop-row">
-                    <label>Modified</label>
-                    <div className="val">{formatDate(file.mtime)}</div>
-                </div>
+                {file && (
+                    <>
+                        <div className="prop-row">
+                            <label>Size</label>
+                            <div className="val">{formatSize(file.size)}</div>
+                        </div>
+                        <div className="prop-row">
+                            <label>Modified</label>
+                            <div className="val">{formatDate(file.mtime)}</div>
+                        </div>
+                    </>
+                )}
                 <div className="prop-row">
                     <label>Full Path</label>
-                    <div className="val path-val">{file.path}</div>
+                    <div className="val path-val">{file ? file.path : "Root"}</div>
                 </div>
 
                 <div className="prop-row">

@@ -14,7 +14,6 @@ import SnapshotsTab from './inspector/SnapshotsTab';
 import AttachmentsTab from './inspector/AttachmentsTab';
 import ChangesTab from './inspector/ChangesTab';
 import { InspectorPanelProps, AttachmentItem, InspectorTab } from './inspector/types';
-import { shouldIgnore } from '../utils/ignorePatterns';
 import DiffViewer, { getCategory } from './diff/DiffViewer';
 
 // type Tab = 'info' | 'tasks' | 'versions' | 'attachments'; // Removed in favor of InspectorTab
@@ -79,7 +78,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         try {
             // Use persistent changes from backend (diff against HEAD)
             const result = await globalThis.api.draft.getWorkingChanges(projectRoot, backupPath);
-            
+
             // Map to unified format
             const all = [
                 ...result.modified.map(f => ({ ...f, type: 'change' as const })),
@@ -132,13 +131,15 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
     // Helper to get relative path
     const getRelativePath = useCallback(() => {
-        if (!file || !projectRoot) return null;
+        if (!projectRoot) return null;
+        if (!file) return '.'; // Return root if no file selected
+
+        let rel = file.path;
         if (file.path.startsWith(projectRoot)) {
-            let rel = file.path.substring(projectRoot.length);
-            if (rel.startsWith('\\') || rel.startsWith('/')) rel = rel.substring(1);
-            return rel;
+            rel = file.path.substring(projectRoot.length);
+            if (rel.startsWith('/') || rel.startsWith('\\')) rel = rel.substring(1);
         }
-        return file.path;
+        return rel || '.';
     }, [file, projectRoot]);
 
     // Load Metadata
@@ -244,7 +245,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
     // Versions & Snapshots
     useEffect(() => {
-        if ((activeTab === 'versions' || activeTab === 'tasks' || activeTab === 'snapshots') && projectRoot && file) {
+        if ((activeTab === 'versions' || activeTab === 'tasks' || activeTab === 'snapshots') && projectRoot) {
             const loadVersions = async () => {
                 let relPath = getRelativePath();
                 if (relPath === null) {
@@ -355,6 +356,38 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             const refreshScope = getRelativePath();
             if (refreshScope !== null) {
                 const p = refreshScope === '' ? '.' : refreshScope;
+                const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
+                setHistory(filtered);
+                onRefresh?.();
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Error creating snapshot");
+        }
+        setLoading(false);
+    };
+
+    const handleCreateSnapshotAtRoot = async (label: string) => {
+        if (!label || !projectRoot) return;
+        setLoading(true);
+        try {
+            // Force root path '.'
+            const result = await window.api.draft.createSnapshot(projectRoot, '.', label, backupPath);
+
+            if (result && result.success && result.versionId) {
+                setActiveVersionId(result.versionId);
+                toast.success("Root snapshot created successfully");
+
+                // Refresh changes too
+                fetchChanges();
+            } else {
+                toast.error("Failed to create snapshot");
+            }
+
+            // Refresh history if current view is relevant
+            const relPath = getRelativePath();
+            if (relPath !== null) {
+                const p = relPath === '' ? '.' : relPath;
                 const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
                 setHistory(filtered);
                 onRefresh?.();
@@ -770,11 +803,13 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
     };
 
     const renderContent = () => {
-        if (!file && activeTab !== 'changes') {
+        // If no file, we default to showing project-level tabs (Info, Versions, etc.)
+        // We only show empty state if we genuinely can't show anything (e.g. no project root)
+        if (!projectRoot && !file && activeTab !== 'changes') {
             return (
                 <div className="empty-state" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                     <Info size={48} className="text-muted" style={{ opacity: 0.3, marginBottom: 12 }} />
-                    <span className="text-muted" style={{ opacity: 0.5, fontSize: '14px' }}>No file or folder selected</span>
+                    <span className="text-muted" style={{ opacity: 0.5, fontSize: '14px' }}>No project open</span>
                 </div>
             );
         }
@@ -783,7 +818,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             case 'info':
                 return (
                     <InfoTab
-                        file={file}
+                        file={file || undefined}
                         tags={tags}
                         onAddTag={addTag}
                         onRemoveTag={removeTag}
@@ -848,6 +883,8 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     <ChangesTab
                         changedFiles={changedFiles}
                         onRefreshChanges={fetchChanges}
+                        onCreateVersion={(label) => handleCreateSnapshotAtRoot(label)}
+                        isCreating={isCreating}
                     />
                 );
             case 'attachments':

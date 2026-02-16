@@ -722,9 +722,7 @@
 /* Graph Visualization */
 .versions-list {
     padding: 20px 0;
-    /* Remove horizontal padding to allow full width for graph */
     position: relative;
-    /* min-height: 200px; */
 }
 
 .graph-container {
@@ -982,14 +980,13 @@
     padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
     flex: 1;
 }
 
 .changes-toolbar {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .changes-total-badge {
@@ -1040,6 +1037,7 @@
     color: #666;
     font-weight: 600;
     padding: 0 2px;
+    margin-top: 12px;
 }
 
 .changes-section-count {
@@ -1233,6 +1231,99 @@
 }
 
 @keyframes badgePulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.changes-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 6px;
+}
+
+.refresh-btn {
+    background: transparent;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.refresh-btn:hover {
+    color: #fff;
+    background: #1f2128;
+}
+
+.commit-box {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.commit-input {
+    flex: 1;
+    background: #1a1b20;
+    border: 1px solid #2a2b36;
+    border-radius: 6px;
+    padding: 0 12px;
+    color: #fff;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    height: 32px;
+}
+
+.commit-input:focus {
+    border-color: #6e7bf2;
+}
+
+.commit-input::placeholder {
+    color: #555;
+}
+
+.commit-btn {
+    background: #4a5db5;
+    border: none;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0 12px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.commit-btn:hover:not(:disabled) {
+    background: #5a6dc5;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(74, 93, 181, 0.4);
+}
+
+.commit-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.commit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #2a2b36;
+    color: #a8a8a8;
 }

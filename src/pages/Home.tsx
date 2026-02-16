@@ -57,6 +57,11 @@ const Home = () => {
     const [aiChanges, setAiChanges] = useState<ChangeInfo[]>([]);
 
 
+
+    // Project Init State
+    const [initModalOpen, setInitModalOpen] = useState(false);
+    const [initTrackProject, setInitTrackProject] = useState(true);
+
     // Recent Workspaces
     const [recentWorkspaces, setRecentWorkspaces] = useState<{ path: string, lastOpened: number, name: string }[]>(() => {
         try {
@@ -119,10 +124,15 @@ const Home = () => {
     }, []);
 
     const addToPinned = (path: string) => {
+        if (pinnedFolders.length >= 3) {
+            toast.error("Maximum 3 pinned projects allowed");
+            return false;
+        }
         setPinnedFolders(prev => {
             if (prev.some(f => f.path === path)) return prev;
             return [...prev, { path, name: path.split(/[/\\]/).pop() || path, color: '#3b82f6' }];
         });
+        return true;
     };
 
     const removeFromPinned = (path: string) => {
@@ -248,16 +258,16 @@ const Home = () => {
 
 
     // ─── Auto-Snapshot on Open ──────────────────────────────────────
+    // ─── Project Initialization & Auto-Snapshot ─────────────────────
     useEffect(() => {
-        const checkAutoSnapshot = async () => {
+        const checkProjectStatus = async () => {
             if (!rootDir) return;
 
-            // Check if we already did it for this session/root to avoid loops/duplicates on refresh
             const sessionKey = `autosnapshot_${rootDir}`;
             if (sessionStorage.getItem(sessionKey)) return;
 
             try {
-                // Get backup path
+                // Get Backup Path Logic
                 const normRoot = rootDir.toLowerCase().replaceAll('\\', '/');
                 const pinned = JSON.parse(localStorage.getItem('pinnedFolders') || '[]');
                 const recents = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
@@ -265,47 +275,85 @@ const Home = () => {
                 const recentFolder = recents.find((r: any) => r.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
                 const bp = pinnedFolder?.backupPath || recentFolder?.backupPath || '';
 
-                // Get Metadata
+                // Check Metadata
                 // @ts-ignore
                 const meta = await globalThis.api.draft.getProjectMetadata(rootDir, bp);
 
-                // Default to true if undefined (legacy/new projects)
-                if (meta && meta.createSnapshotOnOpen !== false) {
-                    // Check for changes first
-                    // @ts-ignore
-                    const changes = await globalThis.api.draft.getWorkingChanges(rootDir, bp);
-
-                    const hasChanges = changes && (
-                        changes.modified.length > 0 ||
-                        changes.added.length > 0 ||
-                        changes.deleted.length > 0
-                    );
-
-                    if (hasChanges) {
-                        const label = `Auto-Snapshot: Project Open`;
-                        toast.info("Creating auto-snapshot (changes detected)...", { autoClose: 2000 });
-
+                if (!meta) {
+                    // New Project / Uninitialized - Show Modal
+                    setInitModalOpen(true);
+                    // Do NOT set sessionKey yet, wait for user action
+                } else {
+                    // Existing Project - Auto Snapshot Logic
+                    if (meta.createSnapshotOnOpen !== false) {
                         // @ts-ignore
-                        const result = await globalThis.api.draft.createSnapshot(rootDir, '.', label, bp);
+                        const changes = await globalThis.api.draft.getWorkingChanges(rootDir, bp);
+                        const hasChanges = changes && (changes.modified.length > 0 || changes.added.length > 0 || changes.deleted.length > 0);
 
-                        if (result && result.success) {
+                        if (hasChanges) {
+                            const label = `Auto-Snapshot: Project Open`;
+                            toast.info("Creating auto-snapshot (changes detected)...", { autoClose: 2000 });
+                            // @ts-ignore
+                            await globalThis.api.draft.createSnapshot(rootDir, '.', label, bp);
                             toast.success("Auto-snapshot created");
                         } else {
-                            console.error("Auto-snapshot failed:", result);
+                            console.log("Auto-snapshot skipped: No changes detected");
                         }
-                    } else {
-                        console.log("Auto-snapshot skipped: No changes detected");
                     }
+                    sessionStorage.setItem(sessionKey, 'true');
                 }
             } catch (e) {
-                console.error("Auto-snapshot error", e);
-            } finally {
-                sessionStorage.setItem(sessionKey, 'true');
+                console.error("Project Check Failed:", e);
+                sessionStorage.setItem(sessionKey, 'true'); // avoid infinite retry loop on error
             }
         };
 
-        checkAutoSnapshot();
+        checkProjectStatus();
     }, [rootDir]);
+
+    const handleInitConfirm = async () => {
+        if (!rootDir) return;
+        setInitModalOpen(false);
+        const sessionKey = `autosnapshot_${rootDir}`;
+        sessionStorage.setItem(sessionKey, 'true');
+
+        try {
+            const normRoot = rootDir.toLowerCase().replaceAll('\\', '/');
+            const pinned = JSON.parse(localStorage.getItem('pinnedFolders') || '[]');
+            const recents = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
+            const pinnedFolder = pinned.find((f: any) => f.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
+            const recentFolder = recents.find((r: any) => r.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
+            const bp = pinnedFolder?.backupPath || recentFolder?.backupPath || '';
+
+            // Init Draft Control System (Create .draft folder)
+            // @ts-ignore
+            await globalThis.api.draft.init(rootDir, bp);
+
+            // Save Initial Metadata
+            // include createSnapshotOnOpen preference
+            // @ts-ignore
+            await globalThis.api.draft.saveProjectMetadata(rootDir, {
+                createSnapshotOnOpen: initTrackProject,
+                lastUpdated: new Date().toISOString()
+            }, bp);
+
+            if (initTrackProject) {
+                const label = "Initial Snapshot";
+                toast.info("Creating initial snapshot...", { autoClose: 2000 });
+                // @ts-ignore
+                await globalThis.api.draft.createSnapshot(rootDir, '.', label, bp);
+                toast.success("Project initialized");
+            } else {
+                toast.success("Project initialized (Tracking disabled)");
+            }
+
+            refreshDirectory();
+
+        } catch (e) {
+            console.error("Initialization Failed:", e);
+            toast.error("Failed to initialize project");
+        }
+    };
 
 
     // ─── Background File Monitor ────────────────────────────────────
@@ -1268,6 +1316,61 @@ const Home = () => {
         }
     };
 
+    const processExternalFiles = async (fileList: FileList) => {
+        // Fallback to project root if currentPath is somehow empty but rootDir exists
+        const targetDir = currentPath || rootDir;
+
+        if (!targetDir || fileList.length === 0) return;
+
+        let successCount = 0;
+        const toastId = toast.loading("Copying files...");
+
+        try {
+            for (let i = 0; i < fileList.length; i++) {
+                const file = fileList[i];
+                // @ts-ignore - 'path' property exists on File object in Electron environment
+                const sourcePath = file.path;
+
+                if (sourcePath) {
+                    const fileName = sourcePath.split(/[/\\]/).pop();
+                    const destPath = joinPath(targetDir, fileName);
+
+                    // Use existing copy API
+                    // @ts-ignore
+                    const result = await globalThis.api.copyEntry({ sourcePath, destPath });
+                    if (result) successCount++;
+                }
+            }
+
+            if (successCount > 0) {
+                toast.update(toastId, { render: `Copied ${successCount} items`, type: "success", isLoading: false, autoClose: 2000 });
+                refreshDirectory();
+            } else {
+                toast.update(toastId, { render: "Failed to copy items", type: "error", isLoading: false, autoClose: 2000 });
+            }
+        } catch (err) {
+            console.error("Paste error:", err);
+            toast.update(toastId, { render: "Error copying files", type: "error", isLoading: false, autoClose: 2000 });
+        }
+    };
+
+    // System Paste Listener (for files from Explorer)
+    useEffect(() => {
+        const handleNativePaste = (e: ClipboardEvent) => {
+            const target = e.target as HTMLElement;
+            // Ignore paste in inputs
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+            if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+                e.preventDefault();
+                processExternalFiles(e.clipboardData.files);
+            }
+        };
+
+        window.addEventListener('paste', handleNativePaste);
+        return () => window.removeEventListener('paste', handleNativePaste);
+    }, [currentPath]);
+
 
     const menuActions = {
         open: () => {
@@ -1345,8 +1448,9 @@ const Home = () => {
                     removeFromPinned(path);
                     toast.success("Unpinned from sidebar");
                 } else {
-                    addToPinned(path);
-                    toast.success("Pinned to sidebar");
+                    if (addToPinned(path)) {
+                        toast.success("Pinned to sidebar");
+                    }
                 }
             }
         }
@@ -1506,7 +1610,13 @@ const Home = () => {
             // Edit
             'edit.copy': (e) => { e.preventDefault(); if (selectedPaths.size > 0) menuActions.copy(); },
             'edit.cut': (e) => { e.preventDefault(); if (selectedPaths.size > 0) menuActions.cut(); },
-            'edit.paste': (e) => { e.preventDefault(); menuActions.paste(); },
+            'edit.paste': (e) => {
+                if (appClipboard) {
+                    e.preventDefault();
+                    menuActions.paste();
+                }
+                // If no app clipboard item, allow default (which triggers native paste event handled above)
+            },
             'edit.selectAll': (e) => { e.preventDefault(); setSelectedPaths(new Set(filteredFiles.map(f => f.path))); },
             'edit.deselect': (e) => { e.preventDefault(); setSelectedPaths(new Set()); },
 
@@ -1603,8 +1713,9 @@ const Home = () => {
                                 removeFromPinned(rootDir);
                                 toast.success("Unpinned project");
                             } else {
-                                addToPinned(rootDir);
-                                toast.success("Pinned project");
+                                if (addToPinned(rootDir)) {
+                                    toast.success("Pinned project");
+                                }
                             }
                         } : undefined}
                         isPinned={rootDir ? pinnedFolders.some(f => f.path === rootDir) : false}
@@ -1644,6 +1755,18 @@ const Home = () => {
                                 ref={contentRef}
                                 onMouseDown={handleMouseDown}
                                 onContextMenu={(e) => handleContextMenu(e)}
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}
+                                onDrop={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                        processExternalFiles(e.dataTransfer.files);
+                                    }
+                                }}
                                 role="grid"
                                 aria-label="File explorer content area"
                                 tabIndex={0}
@@ -1802,10 +1925,35 @@ const Home = () => {
                 changes={aiChanges}
                 onCommit={handleAICommit}
             />
+
+            {/* Project Initialization Popup */}
+            <CustomPopup
+                isOpen={initModalOpen}
+                title="Initialize Project"
+                message="This folder is not yet tracked by DraftWolf. Would you like to initialize it?"
+                confirmText="Initialize"
+                cancelText="Skip"
+                onConfirm={handleInitConfirm}
+                onCancel={() => {
+                    setInitModalOpen(false);
+                    if (rootDir) sessionStorage.setItem(`autosnapshot_${rootDir}`, 'true');
+                }}
+            >
+                <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                            type="checkbox"
+                            checked={initTrackProject}
+                            onChange={e => setInitTrackProject(e.target.checked)}
+                            style={{ width: 16, height: 16 }}
+                        />
+                        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Track entire project & create initial snapshot</span>
+                    </label>
+                </div>
+            </CustomPopup>
         </div>
     );
 };
-
 
 
 export default Home;

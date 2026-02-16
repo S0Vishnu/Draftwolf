@@ -247,6 +247,67 @@ const Home = () => {
     };
 
 
+    // ─── Auto-Snapshot on Open ──────────────────────────────────────
+    useEffect(() => {
+        const checkAutoSnapshot = async () => {
+            if (!rootDir) return;
+
+            // Check if we already did it for this session/root to avoid loops/duplicates on refresh
+            const sessionKey = `autosnapshot_${rootDir}`;
+            if (sessionStorage.getItem(sessionKey)) return;
+
+            try {
+                // Get backup path
+                const normRoot = rootDir.toLowerCase().replaceAll('\\', '/');
+                const pinned = JSON.parse(localStorage.getItem('pinnedFolders') || '[]');
+                const recents = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
+                const pinnedFolder = pinned.find((f: any) => f.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
+                const recentFolder = recents.find((r: any) => r.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
+                const bp = pinnedFolder?.backupPath || recentFolder?.backupPath || '';
+
+                // Get Metadata
+                // @ts-ignore
+                const meta = await globalThis.api.draft.getProjectMetadata(rootDir, bp);
+
+                // Default to true if undefined (legacy/new projects)
+                if (meta && meta.createSnapshotOnOpen !== false) {
+                    // Check for changes first
+                    // @ts-ignore
+                    const changes = await globalThis.api.draft.getWorkingChanges(rootDir, bp);
+
+                    const hasChanges = changes && (
+                        changes.modified.length > 0 ||
+                        changes.added.length > 0 ||
+                        changes.deleted.length > 0
+                    );
+
+                    if (hasChanges) {
+                        const label = `Auto-Snapshot: Project Open`;
+                        toast.info("Creating auto-snapshot (changes detected)...", { autoClose: 2000 });
+
+                        // @ts-ignore
+                        const result = await globalThis.api.draft.createSnapshot(rootDir, '.', label, bp);
+
+                        if (result && result.success) {
+                            toast.success("Auto-snapshot created");
+                        } else {
+                            console.error("Auto-snapshot failed:", result);
+                        }
+                    } else {
+                        console.log("Auto-snapshot skipped: No changes detected");
+                    }
+                }
+            } catch (e) {
+                console.error("Auto-snapshot error", e);
+            } finally {
+                sessionStorage.setItem(sessionKey, 'true');
+            }
+        };
+
+        checkAutoSnapshot();
+    }, [rootDir]);
+
+
     // ─── Background File Monitor ────────────────────────────────────
     useEffect(() => {
         if (!rootDir) return;

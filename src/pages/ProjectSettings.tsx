@@ -55,9 +55,10 @@ const ProjectSettings: React.FC = () => {
                     setSettings({
                         projectName: projectMeta.name || projectMeta.projectName || 'Project',
                         color: projectMeta.color || '#3b82f6',
-                        isPinned: pinnedFolder ? true : false,
+                        isPinned: pinnedFolder,
                         showHiddenFiles: projectMeta.showHiddenFiles ?? (localStorage.getItem('showHiddenFiles') === 'true'),
-                        showExtensions: projectMeta.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false')
+                        showExtensions: projectMeta.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false'),
+                        createSnapshotOnOpen: projectMeta.createSnapshotOnOpen ?? true
                     });
                     // Load ignore patterns from .draftignore file first, then fallback to metadata
                     try {
@@ -95,7 +96,8 @@ const ProjectSettings: React.FC = () => {
                             color: folder.color || '#3b82f6',
                             isPinned: true,
                             showHiddenFiles: folder.showHiddenFiles ?? (localStorage.getItem('showHiddenFiles') === 'true'),
-                            showExtensions: folder.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false')
+                            showExtensions: folder.showExtensions ?? (localStorage.getItem('showExtensions') !== 'false'),
+                            createSnapshotOnOpen: folder.createSnapshotOnOpen ?? true
                         });
                     } else {
                         setSettings({
@@ -103,7 +105,8 @@ const ProjectSettings: React.FC = () => {
                             color: '#3b82f6',
                             isPinned: false,
                             showHiddenFiles: localStorage.getItem('showHiddenFiles') === 'true',
-                            showExtensions: localStorage.getItem('showExtensions') !== 'false'
+                            showExtensions: localStorage.getItem('showExtensions') !== 'false',
+                            createSnapshotOnOpen: true
                         });
                     }
                 }
@@ -120,7 +123,8 @@ const ProjectSettings: React.FC = () => {
         color: '#3b82f6',
         isPinned: false,
         showHiddenFiles: false,
-        showExtensions: true
+        showExtensions: true,
+        createSnapshotOnOpen: true
     });
 
     const toggleSidebar = () => {
@@ -144,27 +148,6 @@ const ProjectSettings: React.FC = () => {
 
     const handleBack = () => navigate('/home');
 
-
-    const handleOpenDraftFolder = () => {
-        if (!projectPath) return;
-        const actualRoot = backupPath || projectPath;
-        // Handle path joining safely for different platforms although we are mainly windows currently
-        const separator = actualRoot.includes('\\') ? '\\' : '/';
-        const draftFolder = actualRoot.endsWith(separator)
-            ? `${actualRoot}.draft`
-            : `${actualRoot}${separator}.draft`;
-
-        // @ts-ignore
-        globalThis.api.openPath(draftFolder).catch(err => {
-            console.error("Failed to open .draft folder", err);
-            toast.error("Could not open .draft folder");
-        });
-    };
-
-    const handleClearBackupPath = () => {
-        setBackupPath('');
-    };
-
     // Use a ref to prevent saving on initial mount
     const isInitialMount = React.useRef(true);
 
@@ -177,6 +160,7 @@ const ProjectSettings: React.FC = () => {
             color: settings.color,
             showHiddenFiles: settings.showHiddenFiles,
             showExtensions: settings.showExtensions,
+            createSnapshotOnOpen: settings.createSnapshotOnOpen,
             backupPath: backupPath
         };
 
@@ -209,6 +193,7 @@ const ProjectSettings: React.FC = () => {
                     color: settings.color,
                     showHiddenFiles: settings.showHiddenFiles,
                     showExtensions: settings.showExtensions,
+                    createSnapshotOnOpen: settings.createSnapshotOnOpen,
                     ignorePatterns: ignorePatterns,
                     activePresets: activePresets,
                     lastUpdated: new Date().toISOString()
@@ -274,21 +259,21 @@ const ProjectSettings: React.FC = () => {
                         </button>
                         <div className="divider-v" />
                         <div className="breadcrumbs-list">
-                            <span
+                            <button
                                 className="crumb-home clickable"
                                 onClick={handleGoToProjects}
                                 style={{ cursor: 'pointer' }}
                             >
                                 Projects
-                            </span>
+                            </button>
                             <span className="crumb-sep">/</span>
-                            <span
+                            <button
                                 className="crumb-part clickable"
                                 onClick={handleGoToProject}
                                 style={{ cursor: 'pointer' }}
                             >
                                 {settings.projectName}
-                            </span>
+                            </button>
                             <span className="crumb-sep">/</span>
                             <span className="crumb-part" style={{ color: 'var(--accent)' }}>Settings</span>
                         </div>
@@ -398,6 +383,19 @@ const ProjectSettings: React.FC = () => {
                                 </div>
                                 <div className="section-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                     <div className="setting-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div>
+                                            <label htmlFor="pref-snapshot" style={{ fontWeight: 600 }}>Snapshot on Open</label>
+                                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Automatically create a snapshot when project opens</p>
+                                        </div>
+                                        <input
+                                            id="pref-snapshot"
+                                            type="checkbox"
+                                            checked={settings.createSnapshotOnOpen}
+                                            onChange={(e) => setSettings({ ...settings, createSnapshotOnOpen: e.target.checked })}
+                                            style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                        />
+                                    </div>
+                                    <div className="setting-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
                                         <div>
                                             <label htmlFor="pref-hidden" style={{ fontWeight: 600 }}>Show Hidden Files</label>
                                             <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Show files starting with a dot (e.g. .env, .git)</p>

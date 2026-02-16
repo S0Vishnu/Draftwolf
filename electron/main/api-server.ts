@@ -30,7 +30,6 @@ interface PostBody {
     versionId?: string;
     relativePath?: string;
     newLabel?: string;
-    newLabel?: string;
     targetFile?: string;
     backupPath?: string;
 }

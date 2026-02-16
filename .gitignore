@@ -7,3 +7,4 @@ dist-web
 .env.local
 .draft
 *.log
+electron.vite.config.*.mjs

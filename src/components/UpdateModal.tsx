@@ -1,5 +1,4 @@
 import React from 'react';
-import { Rocket } from 'lucide-react';
 import '../styles/UpdateModal.css';
 
 interface UpdateModalProps {
@@ -20,7 +19,6 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
     return (
         <div className="update-modal-overlay">
             <div className="update-modal">
-                <Rocket size={24} className="update-modal-icon" />
                 <div className="update-modal-body">
                     <span className="update-modal-title">Update ready</span>
                     <span className="update-modal-text">Restart to install v{version}?</span>

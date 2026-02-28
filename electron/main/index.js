@@ -22,21 +22,27 @@ let apiServer = startApiServer();
 
 // Helper: extract a folder path from command-line argv
 function getFolderFromArgv(argv) {
-  // argv typically looks like: [electron.exe, ...flags, possibleFolderPath]
-  // Skip known Electron / deep-link args
+  const isDev = !app.isPackaged;
+  const cwd = resolve(process.cwd()).toLowerCase().replace(/[\\/]+$/, '');
+  const appPath = resolve(app.getAppPath()).toLowerCase().replace(/[\\/]+$/, '');
+  
   for (let i = argv.length - 1; i >= 1; i--) {
-    const arg = argv[i];
-    // Skip flags, protocol URLs, and the app path itself
+    let arg = argv[i];
     if (arg.startsWith('--') || arg.startsWith('-') || arg.startsWith('myapp://')) continue;
-    // Skip the main entry file path used in dev mode
+    if (arg.toLowerCase().includes('electron.exe') || arg.toLowerCase().includes('node_modules')) continue;
     if (arg.endsWith('.js') || arg.endsWith('.ts') || arg.endsWith('.json')) continue;
-    // Check if it's a real directory
+
     try {
       if (existsSync(arg) && statSync(arg).isDirectory()) {
-        return arg;
+        const fullPath = resolve(arg).toLowerCase().replace(/[\\/]+$/, '');
+        // In dev mode, don't auto-open current project or root '.'
+        if (isDev && (arg === '.' || fullPath === cwd || fullPath === appPath)) {
+          continue;
+        }
+        return resolve(arg);
       }
     } catch (error) {
-      console.error("Failed to check directory:", error);
+      // Ignored
     }
   }
   return null;
@@ -181,14 +187,12 @@ function createWindow() {
       const url = process.argv.find((arg) => arg.toLowerCase().includes("myapp://"));
       if (url) {
         const cleanUrl = url.replace(/^"|"$/g, '').trim();
-        console.log("Processing Cold Start Deep Link:", cleanUrl);
         authManager.handleDeepLink(cleanUrl);
       }
 
       // Handle Cold Start "Open with DraftWolf" from context menu
       const folderPath = getFolderFromArgv(process.argv);
       if (folderPath && folderPath !== '.') {
-        console.log("Opening folder from context menu (cold start):", folderPath);
         // Small delay to let the renderer fully initialize
         setTimeout(() => {
           if (mainWindow) mainWindow.webContents.send("open-with-folder", folderPath);

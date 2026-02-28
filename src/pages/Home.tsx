@@ -47,8 +47,8 @@ const Home = () => {
     const contentRef = useRef<HTMLDivElement>(null);
 
     // Data
-    const [currentPath, setCurrentPath] = useState<string | null>(() => localStorage.getItem('lastPath') || null);
-    const [rootDir, setRootDir] = useState<string | null>(() => localStorage.getItem('rootDir') || null);
+    const [currentPath, setCurrentPath] = useState<string | null>(null);
+    const [rootDir, setRootDir] = useState<string | null>(null);
     const [files, setFiles] = useState<FileEntry[]>([]);
     const [locks, setLocks] = useState<Map<string, Lock>>(new Map());
 
@@ -104,12 +104,30 @@ const Home = () => {
         }
     }, [pinnedFolders]);
 
+    // Initial Path Loading Logic
     useEffect(() => {
-        const path = sessionStorage.getItem('trayOpenPath');
-        if (path) {
+        // Priority 1: Tray/Context Menu Instruction
+        const trayPath = sessionStorage.getItem('trayOpenPath');
+        if (trayPath) {
             sessionStorage.removeItem('trayOpenPath');
-            setRootDir(path);
-            setCurrentPath(path);
+            setRootDir(trayPath);
+            setCurrentPath(trayPath);
+            return;
+        }
+
+        // Priority 2: Session persistence (Refresh)
+        // If this is a refresh (not a fresh app opening), we restore lastPath
+        const isRefresh = sessionStorage.getItem('app_has_mounted');
+        if (isRefresh) {
+            const savedRootDir = localStorage.getItem('rootDir');
+            const savedLastPath = localStorage.getItem('lastPath');
+            if (savedRootDir) {
+                setRootDir(savedRootDir);
+                setCurrentPath(savedLastPath || savedRootDir);
+            }
+        } else {
+            // Fresh launch: Always show Workspace (rootDir = null)
+            sessionStorage.setItem('app_has_mounted', 'true');
         }
     }, []);
 

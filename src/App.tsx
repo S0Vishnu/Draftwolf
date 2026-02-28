@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/Toastify.css';
 import './styles/AppLayout.css';
 import Login from './pages/Login';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from './firebase';
+import { supabase } from './supabase';
+import { Session } from '@supabase/supabase-js';
 
 import OTPVerification from './pages/OTPVerification';
 import Home from './pages/Home';
 import Settings from './pages/Settings';
 import Cleanup from './pages/Cleanup';
-import Community from './pages/Community';
+// import Community from './pages/Community'; // Hiding for Supabase migration
 import Extensions from './pages/Extensions';
 import ProjectSettings from './pages/ProjectSettings';
 
@@ -45,7 +45,25 @@ function TrayListener() {
 }
 
 function App() {
-  const [user, loading] = useAuthState(auth);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const user = session?.user;
 
   const [updateState, setUpdateState] = useState({
     isOpen: false,
@@ -184,7 +202,7 @@ function App() {
           <Route path="/home" element={user ? <Home /> : <Navigate to="/" replace />} />
           <Route path="/settings" element={user ? <Settings /> : <Navigate to="/" replace />} />
           <Route path="/cleanup" element={user ? <Cleanup /> : <Navigate to="/" replace />} />
-          <Route path="/community" element={user ? <Community /> : <Navigate to="/" replace />} />
+          {/* <Route path="/community" element={user ? <Community /> : <Navigate to="/" replace />} /> */}
           <Route path="/extensions" element={user ? <Extensions /> : <Navigate to="/" replace />} />
           <Route path="/project-settings" element={user ? <ProjectSettings /> : <Navigate to="/" replace />} />
         </Routes>

@@ -68,6 +68,11 @@ const api = {
       electronAPI.ipcRenderer.on('auth:success', subscription);
       return () => electronAPI.ipcRenderer.removeListener('auth:success', subscription);
     },
+    onAuthError: (callback) => {
+      const subscription = (_event, error) => callback(error);
+      electronAPI.ipcRenderer.on('auth:error', subscription);
+      return () => electronAPI.ipcRenderer.removeListener('auth:error', subscription);
+    },
     onLogout: (callback) => {
       const subscription = () => callback();
       electronAPI.ipcRenderer.on('auth:logout', subscription);

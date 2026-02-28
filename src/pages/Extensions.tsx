@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
+import { Session } from '@supabase/supabase-js';
 import Sidebar from '../components/Sidebar';
 import { Download, DownloadCloud, Palette, LayoutGrid, ExternalLink, Search } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -14,7 +14,20 @@ function KindIcon({ kind }: Readonly<{ kind: Extension['kind'] }>) {
 }
 
 const Extensions = () => {
-  const [user] = useAuthState(auth);
+    const [session, setSession] = React.useState<Session | null>(null);
+    const user = session?.user;
+
+    React.useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredExtensions = useMemo(() => {

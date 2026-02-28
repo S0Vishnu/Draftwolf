@@ -1,13 +1,12 @@
 import React from 'react';
-import { Home as HomeIcon, Folder, Settings as SettingsIcon, Database, Users, Package, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { User } from 'firebase/auth';
+import { Home as HomeIcon, Folder, Settings as SettingsIcon, Package, PanelLeftClose, PanelLeftOpen, Database } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import logo from '../assets/icons/logo.png';
 
 interface SidebarProps {
     isOpen: boolean;
     toggleSidebar?: () => void;
-    user: User | null | undefined;
+    user: any;
     onOpenFolder?: () => void;
     onGoHome?: () => void;
     hasActiveWorkspace?: boolean;
@@ -132,17 +131,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </button>
                     )}
 
-                    <button
-                        className={`side-btn ${isActive('/community') ? 'active' : ''}`}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            navigate('/community');
-                        }}
-                        title={isOpen ? "" : "Community"}
-                    >
-                        <Users size={22} />
-                        <span className="btn-label">Community</span>
-                    </button>
+                    {/* Community hidden */}
                 </div>
 
                 {/* Pinned Folders List */}
@@ -199,9 +188,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                         title={isOpen ? "" : "Settings & Profile"}
                     >
                         <div className="settings-icon-wrapper">
-                            {user?.photoURL ? (
+                            {user?.user_metadata?.avatar_url || user?.photoURL ? (
                                 <img
-                                    src={user.photoURL}
+                                    src={user?.user_metadata?.avatar_url || user?.photoURL}
                                     alt="Profile"
                                     className="sidebar-profile-img"
                                     referrerPolicy="no-referrer"

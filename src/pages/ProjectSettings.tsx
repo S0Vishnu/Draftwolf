@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
+import { Session } from '@supabase/supabase-js';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import CustomPopup from '../components/CustomPopup';
@@ -12,7 +12,20 @@ import '../styles/AppLayout.css';
 import '../styles/Settings.css';
 
 const ProjectSettings: React.FC = () => {
-    const [user] = useAuthState(auth);
+    const [session, setSession] = React.useState<Session | null>(null);
+    const user = session?.user;
+
+    React.useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();

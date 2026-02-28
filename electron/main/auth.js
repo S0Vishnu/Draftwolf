@@ -3,13 +3,13 @@ import keytar from 'keytar';
 import { EventEmitter } from 'node:events';
 
 const SERVICE_NAME = 'DraftWolf-Auth';
-const ACCOUNT_NAME = 'firebase_id_token'; // Single user for now, or use dynamic
+const ACCOUNT_NAME = 'supabase_access_token';
 const DATE_KEY = 'token_date';
 
-// Validates token format (basic JWT check)
-// Validates token format (basic JWT check)
+// Validates token format (basic check)
 function isValidToken(token) {
-    return typeof token === 'string' && token.split('.').length === 3;
+    // Supabase tokens are JWTs (3 parts)
+    return typeof token === 'string' && token.length > 20;
 }
 
 class AuthManager extends EventEmitter {
@@ -19,31 +19,23 @@ class AuthManager extends EventEmitter {
         this.fallbackToken = null;
     }
 
-    // Initialize: Check if we have a valid token within 30 days
+    // Initialize: Check if we have a valid token
     async init() {
         try {
             const dateStored = await keytar.getPassword(SERVICE_NAME, DATE_KEY);
 
             if (dateStored) {
-                // Check if it's a timestamp (new format) or date string (old format)
                 const lastLogin = Number.parseInt(dateStored);
-                // Firebase ID Tokens expire in 1 hour (3600000 ms). 
-                // We use a slightly shorter buffer (e.g. 50 mins) to be safe or just 1 hour allowing auto-refresh if valid.
-                // However, we can't auto-refresh purely from ID token storage.
+                // Supabase/JWT Tokens usually expire in 1 hour (3600000 ms).
                 const TOKEN_VALIDITY_MS = 3600000;
 
                 const isTimestamp = !Number.isNaN(lastLogin);
                 const isValid = isTimestamp && (Date.now() - lastLogin < TOKEN_VALIDITY_MS);
 
-                // If old format (Date String) or expired timestamp, we consider it invalid/expired
-                // Note: Old format (string) parsing to int results in NaN, so `isValid` becomes false, forcing re-login which upgrades format.
-
                 if (isValid) {
                     const token = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
                     if (token && isValidToken(token)) {
                         this.isAuthenticated = true;
-                        // Notify renderer - but handle might not be ready if called too early. 
-                        // We will rely on renderer asking or `getToken` call.
                         return token;
                     }
                 }
@@ -57,42 +49,69 @@ class AuthManager extends EventEmitter {
 
     // Start Login Flow
     async login() {
-        // This URL should be the hosted Firebase Login page that redirects to myapp://
-        // For now, we use a placeholder or assume the user has configured one.
-        // user instruction: "Assume Firebase web auth & redirect page already exist"
-        // Use local dev server for auth when developing to test changes immediately
-        const FIREBASE_LOGIN_URL = 'https://draftflow-905d4.firebaseapp.com/auth-redirect.html?mode=google';
+        // Construct Supabase OAuth URL directly
+        // Replace with your project URL if different from the .env
+        const SUPABASE_PROJECT_URL = 'https://rsytfsaumksljinrxqer.supabase.co';
+        const REDIRECT_URL = encodeURIComponent('myapp://auth');
+        const SUPABASE_LOGIN_URL = `${SUPABASE_PROJECT_URL}/auth/v1/authorize?provider=google&redirect_to=${REDIRECT_URL}`;
 
-        await shell.openExternal(FIREBASE_LOGIN_URL);
+        await shell.openExternal(SUPABASE_LOGIN_URL);
     }
 
     // Handle Deep Link URL
     async handleDeepLink(url) {
+        console.log('[Auth] Deep link received:', url);
         try {
-            // url format: myapp://auth?token=...
             const urlObj = new URL(url);
-            if (urlObj.protocol !== 'myapp:') {
+            
+            // Log URL parts for debugging
+            console.log('[Auth] URL parts - Host:', urlObj.hostname, 'Path:', urlObj.pathname, 'Hash length:', urlObj.hash?.length);
+
+            // Extract from search params (?)
+            let accessToken = urlObj.searchParams.get('token') || urlObj.searchParams.get('access_token');
+            let refreshToken = urlObj.searchParams.get('refresh_token');
+
+            // Extraction from hash fragment (#)
+            if (!accessToken && urlObj.hash) {
+                console.log('[Auth] Checking hash fragment for tokens...');
+                // Remove leading # and potential trailing artifacts like &sb=
+                const hashClean = urlObj.hash.substring(1).split('&sb=')[0];
+                const hashParams = new URLSearchParams(hashClean);
+                accessToken = hashParams.get('access_token');
+                refreshToken = hashParams.get('refresh_token');
+            }
+
+            if (!accessToken) {
+                console.warn('[Auth] No access token found in URL');
+                // Check if it's an error
+                const error = urlObj.searchParams.get('error_description') || 
+                            new URLSearchParams(urlObj.hash.substring(1)).get('error_description');
+                if (error) {
+                    console.error('[Auth] Error from provider:', error);
+                    this.emit('auth-error', decodeURIComponent(error).replace(/\+/g, ' '));
+                }
                 return;
             }
 
-            if (urlObj.hostname === 'open' || urlObj.pathname.includes('open')) {
+            if (!isValidToken(accessToken)) {
+                console.warn('[Auth] Token failed validation check');
                 return;
             }
 
-            const token = urlObj.searchParams.get('token');
-
-            if (!token || !isValidToken(token)) {
-                return;
-            }
-
+            console.log('[Auth] Token extracted successfully. Emitting success...');
+            
             // Securely store token
-            await this.saveToken(token);
+            await this.saveToken(accessToken);
 
             this.isAuthenticated = true;
-            this.emit('auth-success', token);
+            this.emit('auth-success', { 
+                accessToken, 
+                refreshToken: refreshToken || '' 
+            });
 
         } catch (e) {
-            console.error('Deep Link Handling Error:', e);
+            console.error('[Auth] Critical handling error:', e);
+            this.emit('auth-error', 'An unexpected error occurred during login.');
         }
     }
 

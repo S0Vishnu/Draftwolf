@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleAuthProvider, signInWithCredential, sendSignInLinkToEmail } from 'firebase/auth';
-import { useSignInWithGoogle } from 'react-firebase-hooks/auth';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
 import { toast } from 'react-toastify';
 import logoFull from '../assets/logo_full.svg';
 import '../styles/AuthShared.css';
@@ -20,9 +18,8 @@ const GoogleIcon = () => (
 
 const Login = () => {
     const [email, setEmail] = useState('');
-    const [emailLoading, setEmailLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [linkSent, setLinkSent] = useState(false);
-    const [signInWithGoogle, googleUser, googleLoading, googleError] = useSignInWithGoogle(auth);
     const navigate = useNavigate();
 
     // Auto-redirect logic moved to App.tsx
@@ -37,11 +34,26 @@ const Login = () => {
         const api = globalThis.api;
         if (!api?.auth) return;
 
-        const cleanup = api.auth.onAuthSuccess(async (token) => {
+        const cleanup = api.auth.onAuthSuccess(async (sessionData) => {
+            console.log("Auth success event received in renderer:", sessionData);
             try {
                 toast.info("Verifying session...");
-                const credential = GoogleAuthProvider.credential(token);
-                await signInWithCredential(auth, credential);
+                const { accessToken, refreshToken } = typeof sessionData === 'string' 
+                    ? { accessToken: sessionData, refreshToken: '' } 
+                    : sessionData;
+                
+                console.log("Setting Supabase session...");
+                const { data, error } = await supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken || '',
+                });
+                
+                if (error) {
+                    console.error("Supabase setSession error:", error);
+                    throw error;
+                }
+                
+                console.log("Session set successfully:", data);
                 toast.success("Successfully logged in!");
                 navigate('/home', { replace: true });
             } catch (error: any) {
@@ -50,36 +62,34 @@ const Login = () => {
             }
         });
 
+        const errorCleanup = api.auth.onAuthError((error) => {
+            console.error("Auth error event received in renderer:", error);
+            toast.error(error);
+            setLoading(false);
+        });
+
         // Check for existing session token on mount
         api.auth.getToken().then((token) => {
             if (token) {
-                const credential = GoogleAuthProvider.credential(token);
-                signInWithCredential(auth, credential).catch(() => {});
+                supabase.auth.setSession({ access_token: token, refresh_token: '' }).catch(() => {});
             }
         });
 
-        return cleanup;
+        return () => {
+            cleanup();
+            errorCleanup();
+        };
     }, [navigate]);
 
-    // Effect to handle navigation on successful google login (Legacy/Web fallback)
+    // Effect to handle navigation on successful login
     React.useEffect(() => {
-        if (googleUser) {
-            navigate('/home', { replace: true });
-            toast.success("Successfully logged in!");
-        }
-    }, [googleUser, navigate]);
-
-    // Handle Google Error Logging with Toast
-    React.useEffect(() => {
-        if (googleError) {
-            console.error("Google Auth Error:", googleError);
-            if (googleError.message.includes('auth/popup-closed-by-user')) {
-                toast.info("Sign in cancelled");
-            } else {
-                toast.error(googleError.message);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+                navigate('/home', { replace: true });
             }
-        }
-    }, [googleError]);
+        });
+        return () => subscription.unsubscribe();
+    }, [navigate]);
 
     const handleEmailSignIn = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -89,18 +99,15 @@ const Login = () => {
         }
 
         try {
-            setEmailLoading(true);
-            const actionCodeSettings = {
-                // URL must be whitelisted in Firebase Console and point to the handler page
-                url: `https://draftflow-905d4.web.app/auth-redirect.html?email=${encodeURIComponent(email)}`,
-                // This must be true.
-                handleCodeInApp: true,
-            };
+            setLoading(true);
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    emailRedirectTo: 'myapp://auth',
+                }
+            });
 
-            await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-
-            // Save email locally (optional if passing in URL, but good practice)
-            localStorage.setItem('emailForSignIn', email);
+            if (error) throw error;
 
             setLinkSent(true);
             toast.success("Login link sent! Check your inbox.");
@@ -109,7 +116,7 @@ const Login = () => {
             console.error("Email Link Error:", error);
             toast.error("Failed to send link: " + error.message);
         } finally {
-            setEmailLoading(false);
+            setLoading(false);
         }
     };
 
@@ -127,25 +134,45 @@ const Login = () => {
 
                 <button
                     className="google-btn"
-                    onClick={() => {
-                        // Trigger Electron System Browser Login
-                        const api = globalThis.api;
-                        if (api?.auth) {
-                            console.log('[Login] Triggering system browser login...');
-                            api.auth.login();
-                            toast.info("Opening browser for login...");
-                        } else {
-                            console.error("Auth API not available");
-                            signInWithGoogle([], { prompt: 'select_account' }); // Fallback if API missing (e.g. web mode)
+                    onClick={async () => {
+                        try {
+                            setLoading(true);
+                            const { data, error } = await supabase.auth.signInWithOAuth({
+                                provider: 'google',
+                                options: {
+                                    redirectTo: 'myapp://auth',
+                                    skipBrowserRedirect: true,
+                                    queryParams: {
+                                        prompt: 'select_account'
+                                    }
+                                }
+                            });
+
+                            if (error) throw error;
+
+                            if (data?.url) {
+                                const api = globalThis.api;
+                                if (api?.openExternal) {
+                                    await api.openExternal(data.url);
+                                    toast.info("Opening browser for login...");
+                                } else {
+                                    window.location.href = data.url;
+                                }
+                            }
+                        } catch (error: any) {
+                            console.error("Google Auth Error:", error);
+                            toast.error("Google login failed: " + error.message);
+                        } finally {
+                            setLoading(false);
                         }
                     }}
-                    disabled={googleLoading}
-                    style={{ opacity: googleLoading ? 0.7 : 1, cursor: googleLoading ? 'wait' : 'pointer' }}
+                    disabled={loading}
+                    style={{ opacity: loading ? 0.7 : 1, cursor: loading ? 'wait' : 'pointer' }}
                 >
                     <div className="icon-wrapper">
-                        {googleLoading ? <div className="spinner" style={{ width: '20px', height: '20px' }}></div> : <GoogleIcon />}
+                        {loading ? <div className="spinner" style={{ width: '20px', height: '20px' }}></div> : <GoogleIcon />}
                     </div>
-                    <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
+                    <span>{loading ? 'Connecting...' : 'Continue with Google'}</span>
                 </button>
 
                 <div className="divider">
@@ -177,10 +204,10 @@ const Login = () => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            disabled={emailLoading}
+                            disabled={loading}
                         />
-                        <button type="submit" className="continue-btn" disabled={emailLoading}>
-                            {emailLoading ? 'Sending Link...' : 'Continue'}
+                        <button type="submit" className="continue-btn" disabled={loading}>
+                            {loading ? 'Sending Link...' : 'Continue'}
                         </button>
                     </form>
                 )}

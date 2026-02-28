@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useNavigate } from 'react-router-dom';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
+import { Session } from '@supabase/supabase-js';
 import { FileEntry } from '../components/FileItem';
 import { InspectorTab, InspectorAction } from '../components/inspector/types';
-import { LockService, Lock } from '../services/LockService';
-
-
 
 // Components
 import Sidebar from '../components/Sidebar';
@@ -30,6 +27,8 @@ import logo from '../assets/icons/logo.png';
 import '../styles/AuthShared.css';
 import Footer from '../components/Footer';
 
+
+
 const joinPath = (dir: string, file: string) => {
     const separator = dir.includes('/') ? '/' : '\\';
     return dir.endsWith(separator) ? `${dir}${file}` : `${dir}${separator}${file}`;
@@ -37,7 +36,8 @@ const joinPath = (dir: string, file: string) => {
 
 const Home = () => {
     const navigate = useNavigate();
-    const [user] = useAuthState(auth);
+    const [session, setSession] = useState<Session | null>(null);
+    const user = session?.user;
 
     // Layout
     const [isSidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
@@ -50,7 +50,6 @@ const Home = () => {
     const [currentPath, setCurrentPath] = useState<string | null>(null);
     const [rootDir, setRootDir] = useState<string | null>(null);
     const [files, setFiles] = useState<FileEntry[]>([]);
-    const [locks, setLocks] = useState<Map<string, Lock>>(new Map());
 
     // AI Modal State
     const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -205,74 +204,31 @@ const Home = () => {
         else localStorage.removeItem('rootDir');
     }, [rootDir]);
 
-    // Locks Subscription
     useEffect(() => {
-        const unsubscribe = LockService.subscribeToLocks((updatedLocks) => {
-            const map = new Map<string, Lock>();
-            updatedLocks.forEach(l => map.set(l.filePath, l));
-            setLocks(map);
+        // 1. Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
         });
-        return () => unsubscribe();
+
+        // 2. Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     const handleLockFile = async (path: string) => {
-        if (!user) {
-            toast.error("You must be logged in to lock files.");
-            return;
-        }
-        // Calculate relative path from project root if needed, 
-        // but for now we use the full path relative to projectRoot or simply the path as stored in files.
-        // Wait, LockService uses sanitized path as ID.
-        // If 'path' is absolute, sanitizing it works but sharing is issue.
-        // Let's try to make it relative if rootDir is set.
-        let relPath = path;
-        if (rootDir && path.startsWith(rootDir)) {
-            relPath = path.substring(rootDir.length);
-            if (relPath.startsWith('/') || relPath.startsWith('\\')) relPath = relPath.substring(1);
-        }
-
-        try {
-            await LockService.lockFile(relPath);
-            toast.success("File locked");
-        } catch (e: any) {
-            toast.error(e.message);
-        }
+        // Feature disabled - Supabase Migration
+        toast.info("File locking is currently disabled");
     };
 
     const handleUnlockFile = async (path: string) => {
-        let relPath = path;
-        if (rootDir && path.startsWith(rootDir)) {
-            relPath = path.substring(rootDir.length);
-            if (relPath.startsWith('/') || relPath.startsWith('\\')) relPath = relPath.substring(1);
-        }
-
-        try {
-            await LockService.unlockFile(relPath);
-            toast.success("File unlocked");
-        } catch (e: any) {
-            toast.error(e.message);
-        }
+        // Feature disabled - Supabase Migration
     };
 
-    const isFileLocked = (path: string) => {
-        if (!rootDir) return false;
-        let relPath = path;
-        if (path.startsWith(rootDir)) {
-            relPath = path.substring(rootDir.length);
-            if (relPath.startsWith('/') || relPath.startsWith('\\')) relPath = relPath.substring(1);
-        }
-        return locks.has(relPath);
-    };
-
-    const getFileLock = (path: string) => {
-        if (!rootDir) return undefined;
-        let relPath = path;
-        if (path.startsWith(rootDir)) {
-            relPath = path.substring(rootDir.length);
-            if (relPath.startsWith('/') || relPath.startsWith('\\')) relPath = relPath.substring(1);
-        }
-        return locks.get(relPath);
-    };
+    const isFileLocked = (path: string) => false;
+    const getFileLock = (path: string) => undefined;
 
 
     // ─── Auto-Snapshot on Open ──────────────────────────────────────
@@ -1514,35 +1470,6 @@ const Home = () => {
                     { label: 'Delete', action: menuActions.delete, shortcut: 'Del', danger: true },
                 ];
 
-            // Lock Options
-            // Helper to get relative path
-            const getRel = (p: string) => {
-                if (rootDir && p.startsWith(rootDir)) {
-                    let r = p.substring(rootDir.length);
-                    if (r.startsWith('/') || r.startsWith('\\')) r = r.substring(1);
-                    return r;
-                }
-                return p;
-            };
-
-            const targetRel = getRel(contextMenu.target.path);
-            const lock = locks.get(targetRel);
-            const isLockedByMe = lock?.userId === user?.uid;
-
-            if (!contextMenu.target.isDirectory) {
-                if (lock) {
-                    if (isLockedByMe) {
-                        baseOptions.push({ label: 'Unlock File', action: () => { handleUnlockFile(contextMenu.target!.path); } });
-
-                    } else {
-                        baseOptions.push({ label: `Locked by ${lock.userEmail}`, action: () => { }, disabled: true });
-                    }
-                } else {
-                    baseOptions.push({ label: 'Lock File', action: () => { handleLockFile(contextMenu.target!.path); } });
-
-                }
-            }
-
             return baseOptions;
 
         }
@@ -1702,7 +1629,7 @@ const Home = () => {
                         setSidebarOpen(newState);
                         localStorage.setItem('isSidebarOpen', String(newState));
                     }}
-                    user={user}
+                    user={user as any}
                     onOpenFolder={handleOpenFolder}
                     onGoHome={closeWorkspace}
                     hasActiveWorkspace={!!currentPath}
@@ -1811,9 +1738,9 @@ const Home = () => {
                                     onCreationChange={setCreationName}
                                     onCreationSubmit={submitCreation}
                                     onCreationCancel={cancelCreation}
-                                    locks={locks}
+                                    locks={new Map()}
                                     projectRoot={rootDir}
-                                    currentUserId={user?.uid}
+                                    currentUserId={user?.id}
                                     ignorePatterns={projectIgnorePatterns}
                                 />
 
@@ -1856,8 +1783,8 @@ const Home = () => {
                         initialAction={inspectorAction}
                         onActionHandled={() => setInspectorAction(null)}
                         backupPath={getBackupPath(rootDir)}
-                        fileLock={getFileLock(activeFile?.path || '')}
-                        currentUserId={user?.uid}
+                        fileLock={undefined}
+                        currentUserId={user?.id}
                     />
 
                 )}

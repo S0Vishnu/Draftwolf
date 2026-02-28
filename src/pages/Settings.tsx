@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { supabase } from '../supabase';
+import { Session } from '@supabase/supabase-js';
 import Sidebar from '../components/Sidebar';
-import { createAvatar } from '@dicebear/core';
-import { lorelei } from '@dicebear/collection';
 import {
-    LogOut, RefreshCw, User, Clock, Shield,
+    LogOut, User, Clock, Shield,
     Edit2, X, Check, Coffee, Monitor, Bell
 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -21,14 +17,14 @@ interface UserSettings {
     dndStart: string;
     dndEnd: string;
     notificationsEnabled: boolean;
-    avatarSeed: string;
     checkUpdates: boolean;
     fileMonitoringEnabled: boolean;
     changeNotificationInterval: number;
 }
 
 const Settings = () => {
-    const [user] = useAuthState(auth);
+    const [session, setSession] = useState<Session | null>(null);
+    const user = session?.user;
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -42,7 +38,6 @@ const Settings = () => {
         dndStart: '22:00',
         dndEnd: '08:00',
         notificationsEnabled: true,
-        avatarSeed: '',
         checkUpdates: true,
         fileMonitoringEnabled: true,
         changeNotificationInterval: 30,
@@ -58,8 +53,22 @@ const Settings = () => {
 
     // Load initial data
     useEffect(() => {
+        // 1. Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+        });
+
+        // 2. Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    useEffect(() => {
         if (!user) return;
-        const name = user.displayName || '';
+        const name = user.user_metadata?.full_name || user.email?.split('@')[0] || '';
         setDisplayName(name);
         setInitialDisplayName(name);
 
@@ -68,8 +77,8 @@ const Settings = () => {
             (globalThis as any).api.getAppVersion().then((v: string) => setAppVersion(v));
         }
 
-        // 1. Load from LocalStorage immediately for instant UI
-        const saved = localStorage.getItem(`user_settings_${user.uid}`);
+        // Load from LocalStorage for preferences
+        const saved = localStorage.getItem(`user_settings_${user.id}`);
         if (saved) {
             try {
                 const data = JSON.parse(saved);
@@ -79,29 +88,6 @@ const Settings = () => {
                 console.error("Failed to parse cached settings:", e);
             }
         }
-
-        const loadSettings = async () => {
-            try {
-                const docRef = doc(db, 'users', user.uid);
-                const docSnap = await getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data() as UserSettings;
-                    setSettings(data);
-                    setInitialSettings(data);
-                    // Update cache
-                    localStorage.setItem(`user_settings_${user.uid}`, JSON.stringify(data));
-                } else if (!saved) {
-                    // Only set defaults if we didn't populate from cache
-                    const newSettings = { ...defaultSettings, avatarSeed: '' };
-                    setSettings(newSettings);
-                    setInitialSettings(newSettings);
-                }
-            } catch (err) {
-                console.error("Failed to load settings from Firestore:", err);
-            }
-        };
-        loadSettings();
     }, [user]);
 
     // Handle Profile Save
@@ -110,38 +96,17 @@ const Settings = () => {
 
         setLoading(true);
         try {
-            // 1. Generate Avatar URL OR Use Existing
-            let newPhotoURL = user.photoURL;
+            // Update Supabase Auth Metadata (Simplified for now)
+            const { error } = await supabase.auth.updateUser({
+                data: { full_name: displayName }
+            });
 
-            if (settings.avatarSeed) {
-                const seed = encodeURIComponent(settings.avatarSeed);
-                newPhotoURL = `https://api.dicebear.com/9.x/lorelei/svg?seed=${seed}&radius=50&backgroundColor=b6e3f4,c0aede,d1d4f9,ffdfbf`;
-            }
+            if (error) throw error;
 
-            // 2. Update Firebase Auth Profile
-            if (displayName !== user.displayName || newPhotoURL !== user.photoURL) {
-                await updateProfile(user, {
-                    displayName: displayName || undefined,
-                    photoURL: newPhotoURL || undefined
-                });
-                setInitialDisplayName(displayName);
-            }
+            setInitialDisplayName(displayName);
 
-            // 3. Prepare Firestore Data
-            const profileData = {
-                bio: settings.bio || '',
-                avatarSeed: settings.avatarSeed || '',
-                photoURL: newPhotoURL || '',
-                updatedAt: new Date().toISOString(),
-                uid: user.uid,
-                email: user.email
-            };
-
-            // 4. Write to Firestore
-            await setDoc(doc(db, 'users', user.uid), profileData, { merge: true });
-
-            // 5. Update Local State
-            localStorage.setItem(`user_settings_${user.uid}`, JSON.stringify(settings));
+            // Update Local Storage for preferences (bio/seed)
+            localStorage.setItem(`user_settings_${user.id}`, JSON.stringify(settings));
             setInitialSettings(settings);
 
             setIsEditing(false);
@@ -159,8 +124,7 @@ const Settings = () => {
         setDisplayName(initialDisplayName);
         setSettings(prev => ({
             ...prev,
-            bio: initialSettings.bio,
-            avatarSeed: initialSettings.avatarSeed
+            bio: initialSettings.bio
         }));
         setIsEditing(false);
     };
@@ -173,19 +137,13 @@ const Settings = () => {
         setSettings(newSettings);
         setInitialSettings(prev => ({ ...prev, [key]: value }));
 
-
-
         try {
-            await setDoc(doc(db, 'users', user.uid), { [key]: value }, { merge: true });
-            localStorage.setItem(`user_settings_${user.uid}`, JSON.stringify(newSettings));
+            // Since we're removing Firestore, we only cache locally for now.
+            // In a real app, you'd save this to a Supabase table.
+            localStorage.setItem(`user_settings_${user.id}`, JSON.stringify(newSettings));
         } catch (error) {
             console.error("Failed to save preference:", error);
         }
-    };
-
-    const regenerateAvatar = () => {
-        const newSeed = Math.random().toString(36).substring(7);
-        setSettings({ ...settings, avatarSeed: newSeed });
     };
 
     const handleSignOut = async () => {
@@ -194,7 +152,7 @@ const Settings = () => {
             if ((globalThis as any)?.api?.auth) {
                 await (globalThis as any).api.auth.logout();
             }
-            await auth.signOut();
+            await supabase.auth.signOut();
             navigate('/');
         } catch (error) {
             console.error("Error signing out:", error);
@@ -203,25 +161,7 @@ const Settings = () => {
     };
 
     // Determine Avatar URL for display
-    let avatarUrl = user?.photoURL || '';
-
-    // If explicit seed is set (e.g. user regenerated), use that
-    if (settings.avatarSeed) {
-        const avatar = createAvatar(lorelei, {
-            seed: settings.avatarSeed,
-            backgroundColor: ['b6e3f4', 'c0aede', 'd1d4f9', 'ffdfbf'],
-            radius: 50,
-        });
-        avatarUrl = `data:image/svg+xml;utf8,${encodeURIComponent(avatar.toString())}`;
-    } else if (!avatarUrl) {
-        // Fallback if no photoURL and no seed
-        const avatar = createAvatar(lorelei, {
-            seed: user?.email || 'default',
-            backgroundColor: ['b6e3f4', 'c0aede', 'd1d4f9', 'ffdfbf'],
-            radius: 50,
-        });
-        avatarUrl = `data:image/svg+xml;utf8,${encodeURIComponent(avatar.toString())}`;
-    }
+    const avatarUrl = user?.user_metadata?.avatar_url || user?.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.email || 'DW'}`;
 
     return (
         <div className="settings-container">
@@ -233,7 +173,7 @@ const Settings = () => {
                         setIsSidebarOpen(newState);
                         localStorage.setItem('isSidebarOpen', String(newState));
                     }}
-                    user={user}
+                    user={user as any}
                 />
 
                 <main className="settings-content">
@@ -257,11 +197,6 @@ const Settings = () => {
                                 <div className="avatar-container">
                                     <div className="avatar-ring"></div>
                                     <img src={avatarUrl} alt="Avatar" className="avatar-img" referrerPolicy="no-referrer" />
-                                    {isEditing && (
-                                        <button onClick={regenerateAvatar} className="btn-regenerate" aria-label="Regenerate Avatar" title="Regenerate Avatar">
-                                            <RefreshCw size={20} />
-                                        </button>
-                                    )}
                                 </div>
 
                                 {isEditing ? (
@@ -571,14 +506,14 @@ const Settings = () => {
                                         type="button"
                                         className="id-badge"
                                         onClick={() => {
-                                            if (user?.uid) {
-                                                navigator.clipboard.writeText(user.uid);
+                                            if (user?.id) {
+                                                navigator.clipboard.writeText(user.id);
                                                 toast.success("User ID copied!");
                                             }
                                         }}
                                         title="Copy User ID"
                                     >
-                                        {user?.uid || 'Not Connected'}
+                                        {user?.id || 'Not Connected'}
                                     </button>
                                 </div>
 

@@ -3,8 +3,8 @@ import Sidebar from '../components/Sidebar';
 import { Trash2, Search, ArrowLeft, ArrowUp, ArrowDown, Filter, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Cleanup.css';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
+import { Session } from '@supabase/supabase-js';
 import { toast } from 'react-toastify';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -49,7 +49,20 @@ function formatBytes(bytes: number, decimals = 2) {
 
 const Cleanup = () => {
     const navigate = useNavigate();
-    const [user] = useAuthState(auth);
+    const [session, setSession] = useState<Session | null>(null);
+    const user = session?.user;
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
     const [storageReport, setStorageReport] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('isSidebarOpen') !== 'false');

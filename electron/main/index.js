@@ -115,6 +115,14 @@ authManager.on("auth-success", (token) => {
     mainWindow.webContents.send("auth:success", token);
   }
 });
+authManager.on("auth-error", (error) => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send("auth:error", error);
+  }
+});
 authManager.on("logout", () => {
   if (mainWindow) {
     mainWindow.webContents.send("auth:logout");

@@ -16,6 +16,7 @@ class AuthManager extends EventEmitter {
     constructor() {
         super();
         this.isAuthenticated = false;
+        this.fallbackToken = null;
     }
 
     // Initialize: Check if we have a valid token within 30 days
@@ -70,22 +71,17 @@ class AuthManager extends EventEmitter {
         try {
             // url format: myapp://auth?token=...
             const urlObj = new URL(url);
-            if (urlObj.protocol !== 'myapp:') return;
+            if (urlObj.protocol !== 'myapp:') {
+                return;
+            }
 
             if (urlObj.hostname === 'open' || urlObj.pathname.includes('open')) {
-                // Just opening the app, no auth needed
                 return;
             }
 
             const token = urlObj.searchParams.get('token');
 
-            if (!token) {
-                console.error('No token found in deep link');
-                return;
-            }
-
-            if (!isValidToken(token)) {
-                console.error('Invalid token format');
+            if (!token || !isValidToken(token)) {
                 return;
             }
 
@@ -107,7 +103,8 @@ class AuthManager extends EventEmitter {
             // Save timestamp to enforce validity logic
             await keytar.setPassword(SERVICE_NAME, DATE_KEY, Date.now().toString());
         } catch (e) {
-            console.error('Keytar Save Error:', e);
+            console.error('Keytar Save Error, using fallback:', e);
+            this.fallbackToken = token;
         }
     }
 
@@ -116,7 +113,6 @@ class AuthManager extends EventEmitter {
             const dateStored = await keytar.getPassword(SERVICE_NAME, DATE_KEY);
 
             let isValid = false;
-
             if (dateStored) {
                 const lastLogin = Number.parseInt(dateStored);
                 const TOKEN_VALIDITY_MS = 3600000;
@@ -126,15 +122,14 @@ class AuthManager extends EventEmitter {
             }
 
             if (!isValid) {
-                // Token expired - return null but do NOT clear keytar, so getTokenForDisplay()
-                // can still report "logged in" for the Blender addon until user explicitly logs out.
-                return null;
+                return this.fallbackToken;
             }
 
-            return await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
+            const token = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
+            return (token && isValidToken(token)) ? token : this.fallbackToken;
         } catch (e) {
             console.error('Get Token Error:', e);
-            return null;
+            return this.fallbackToken;
         }
     }
 

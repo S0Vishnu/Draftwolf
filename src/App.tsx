@@ -46,6 +46,7 @@ function TrayListener() {
 
 function App() {
   const [user, loading] = useAuthState(auth);
+
   const [updateState, setUpdateState] = useState({
     isOpen: false,
     version: '',
@@ -178,6 +179,7 @@ function App() {
         <TrayListener />
         <Routes>
           <Route path="/" element={user ? <Navigate to="/home" replace /> : <Login />} />
+
           <Route path="/verify" element={<OTPVerification />} />
           <Route path="/home" element={user ? <Home /> : <Navigate to="/" replace />} />
           <Route path="/settings" element={user ? <Settings /> : <Navigate to="/" replace />} />

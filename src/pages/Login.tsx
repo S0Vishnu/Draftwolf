@@ -19,7 +19,6 @@ const GoogleIcon = () => (
 );
 
 const Login = () => {
-    // const [user, authLoading] = useAuthState(auth); // Logic moved to App.tsx
     const [email, setEmail] = useState('');
     const [emailLoading, setEmailLoading] = useState(false);
     const [linkSent, setLinkSent] = useState(false);
@@ -34,24 +33,30 @@ const Login = () => {
     //     }
     // }, [user, navigate]);
 
-    // Listen for System Browser Auth Success
     React.useEffect(() => {
-        if (!window.api || !window.api.auth) return;
+        const api = globalThis.api;
+        if (!api?.auth) return;
 
-        const cleanup = window.api.auth.onAuthSuccess(async (token) => {
+        const cleanup = api.auth.onAuthSuccess(async (token) => {
             try {
-                toast.info("Verifying token...");
+                toast.info("Verifying session...");
                 const credential = GoogleAuthProvider.credential(token);
                 await signInWithCredential(auth, credential);
-                toast.success("Logged in via System Browser!");
+                toast.success("Successfully logged in!");
                 navigate('/home', { replace: true });
             } catch (error: any) {
-                console.error("Token sign-in failed", error);
+                console.error("Token sign-in failed:", error);
                 toast.error("Auth failed: " + error.message);
             }
         });
 
-
+        // Check for existing session token on mount
+        api.auth.getToken().then((token) => {
+            if (token) {
+                const credential = GoogleAuthProvider.credential(token);
+                signInWithCredential(auth, credential).catch(() => {});
+            }
+        });
 
         return cleanup;
     }, [navigate]);
@@ -95,7 +100,7 @@ const Login = () => {
             await sendSignInLinkToEmail(auth, email, actionCodeSettings);
 
             // Save email locally (optional if passing in URL, but good practice)
-            window.localStorage.setItem('emailForSignIn', email);
+            localStorage.setItem('emailForSignIn', email);
 
             setLinkSent(true);
             toast.success("Login link sent! Check your inbox.");
@@ -124,10 +129,10 @@ const Login = () => {
                     className="google-btn"
                     onClick={() => {
                         // Trigger Electron System Browser Login
-                        if (window.api && window.api.auth) {
-                            window.api.auth.login();
-                            // Show loading state here?
-                            // Since the user goes to browser, we might want to say "Check your browser"
+                        const api = globalThis.api;
+                        if (api?.auth) {
+                            console.log('[Login] Triggering system browser login...');
+                            api.auth.login();
                             toast.info("Opening browser for login...");
                         } else {
                             console.error("Auth API not available");

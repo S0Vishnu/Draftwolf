@@ -11,6 +11,7 @@ import log from "electron-log";
 // System tray: keep reference for menu updates; pinned folders from renderer
 let tray = null;
 let pinnedFoldersForTray = [];
+let mainWindow = null;
 
 // Secure Deep Linking & Auth
 import { authManager, setupAuthIPC } from "./auth";
@@ -57,40 +58,27 @@ if (process.platform === "win32" && isDev) {
 
 // Single Instance Lock
 const gotTheLock = app.requestSingleInstanceLock();
-
 if (gotTheLock) {
   app.on("second-instance", (event, argv, workingDirectory) => {
-    // Someone tried to run a second instance, we should focus our window.
-    // Protocol handler for Windows/Linux
-    const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
     }
 
-    // Check if a folder path was passed (e.g. from "Open with DraftWolf" context menu)
-    const folderPath = getFolderFromArgv(argv);
-    if (folderPath) {
+    const url = argv.find((arg) => arg.toLowerCase().includes("myapp://"));
+    if (url) {
+      const cleanUrl = url.replace(/^"|"$/g, '').trim();
       if (mainWindow) {
-        if (mainWindow.isMinimized()) mainWindow.restore();
-        mainWindow.show();
-        mainWindow.focus();
-        mainWindow.webContents.send("open-with-folder", folderPath);
+        authManager.handleDeepLink(cleanUrl);
       }
-      return;
     }
 
-    // Extract URL from argv
-    // argv: [path_to_app, args..., url]
-    const url = argv.find((arg) => arg.startsWith("myapp://"));
-    if (url) {
+    const folderPath = getFolderFromArgv(argv);
+    if (folderPath && folderPath !== '.') {
       if (mainWindow) {
-        if (mainWindow.isMinimized()) mainWindow.restore();
-        mainWindow.show();
-        mainWindow.focus();
+        mainWindow.webContents.send("open-with-folder", folderPath);
       }
-      authManager.handleDeepLink(url);
     }
   });
 
@@ -114,7 +102,6 @@ setupAuthIPC();
 
 // Listen for Auth Success and notify Renderer
 authManager.on("auth-success", (token) => {
-  const mainWindow = BrowserWindow.getAllWindows()[0];
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
@@ -123,7 +110,6 @@ authManager.on("auth-success", (token) => {
   }
 });
 authManager.on("logout", () => {
-  const mainWindow = BrowserWindow.getAllWindows()[0];
   if (mainWindow) {
     mainWindow.webContents.send("auth:logout");
   }
@@ -131,7 +117,7 @@ authManager.on("logout", () => {
 
 function createWindow() {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -192,20 +178,20 @@ function createWindow() {
 
     // Handle Cold Start Deep Link (Windows/Linux)
     if (process.platform === "win32" || process.platform === "linux") {
-      const url = process.argv.find((arg) => arg.startsWith("myapp://"));
+      const url = process.argv.find((arg) => arg.toLowerCase().includes("myapp://"));
       if (url) {
-        // Add a small delay/log to ensure window is ready? valid for ready-to-show.
-        console.log("Processing Cold Start Deep Link:", url);
-        authManager.handleDeepLink(url);
+        const cleanUrl = url.replace(/^"|"$/g, '').trim();
+        console.log("Processing Cold Start Deep Link:", cleanUrl);
+        authManager.handleDeepLink(cleanUrl);
       }
 
       // Handle Cold Start "Open with DraftWolf" from context menu
       const folderPath = getFolderFromArgv(process.argv);
-      if (folderPath) {
+      if (folderPath && folderPath !== '.') {
         console.log("Opening folder from context menu (cold start):", folderPath);
         // Small delay to let the renderer fully initialize
         setTimeout(() => {
-          mainWindow.webContents.send("open-with-folder", folderPath);
+          if (mainWindow) mainWindow.webContents.send("open-with-folder", folderPath);
         }, 500);
       }
     }

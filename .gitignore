@@ -8,3 +8,6 @@ dist-web
 .draft
 *.log
 electron.vite.config.*.mjs
+build
+# Local Netlify folder
+.netlify

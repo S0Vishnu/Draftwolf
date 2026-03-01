@@ -25,7 +25,7 @@ function getFolderFromArgv(argv) {
   const isDev = !app.isPackaged;
   const cwd = resolve(process.cwd()).toLowerCase().replace(/[\\/]+$/, '');
   const appPath = resolve(app.getAppPath()).toLowerCase().replace(/[\\/]+$/, '');
-  
+
   for (let i = argv.length - 1; i >= 1; i--) {
     let arg = argv[i];
     if (arg.startsWith('--') || arg.startsWith('-') || arg.startsWith('myapp://')) continue;
@@ -147,7 +147,7 @@ function createWindow() {
     },
   });
 
-  // FORCE CORS Allow for Firebase Storage and other external APIs
+  // FORCE CORS Allow for Supabase and other external APIs
   mainWindow.webContents.session.webRequest.onHeadersReceived(
     (details, callback) => {
       const responseHeaders = { ...details.responseHeaders };
@@ -290,7 +290,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    // Allow Google/Firebase Auth popups if any (though we are moving to system browser)
+    // Open external links in system browser (Google Auth, etc.)
     // We strictly use system browser for external links now as per requirement
     shell.openExternal(details.url);
     return { action: "deny" };
@@ -809,7 +809,7 @@ if (is.dev) {
   ipcMain.handle("update:install", () => {
     log.info("Installing update...");
     app.isQuitting = true;
-    
+
     // Destroy tray icon if it exists
     if (tray) {
       tray.destroy();

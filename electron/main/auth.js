@@ -49,10 +49,10 @@ class AuthManager extends EventEmitter {
 
     // Start Login Flow
     async login() {
-        // Construct Supabase OAuth URL directly
-        // Replace with your project URL if different from the .env
         const SUPABASE_PROJECT_URL = 'https://rsytfsaumksljinrxqer.supabase.co';
-        const REDIRECT_URL = encodeURIComponent('myapp://auth');
+        // Hosted auth page that extracts tokens and redirects to myapp:// deep link
+        const AUTH_REDIRECT_PAGE = 'https://draftwolf-authentication.netlify.app/auth-redirect.html';
+        const REDIRECT_URL = encodeURIComponent(AUTH_REDIRECT_PAGE);
         const SUPABASE_LOGIN_URL = `${SUPABASE_PROJECT_URL}/auth/v1/authorize?provider=google&redirect_to=${REDIRECT_URL}`;
 
         await shell.openExternal(SUPABASE_LOGIN_URL);
@@ -63,7 +63,7 @@ class AuthManager extends EventEmitter {
         console.log('[Auth] Deep link received:', url);
         try {
             const urlObj = new URL(url);
-            
+
             // Log URL parts for debugging
             console.log('[Auth] URL parts - Host:', urlObj.hostname, 'Path:', urlObj.pathname, 'Hash length:', urlObj.hash?.length);
 
@@ -84,8 +84,8 @@ class AuthManager extends EventEmitter {
             if (!accessToken) {
                 console.warn('[Auth] No access token found in URL');
                 // Check if it's an error
-                const error = urlObj.searchParams.get('error_description') || 
-                            new URLSearchParams(urlObj.hash.substring(1)).get('error_description');
+                const error = urlObj.searchParams.get('error_description') ||
+                    new URLSearchParams(urlObj.hash.substring(1)).get('error_description');
                 if (error) {
                     console.error('[Auth] Error from provider:', error);
                     this.emit('auth-error', decodeURIComponent(error).replace(/\+/g, ' '));
@@ -99,14 +99,14 @@ class AuthManager extends EventEmitter {
             }
 
             console.log('[Auth] Token extracted successfully. Emitting success...');
-            
+
             // Securely store token
             await this.saveToken(accessToken);
 
             this.isAuthenticated = true;
-            this.emit('auth-success', { 
-                accessToken, 
-                refreshToken: refreshToken || '' 
+            this.emit('auth-success', {
+                accessToken,
+                refreshToken: refreshToken || ''
             });
 
         } catch (e) {

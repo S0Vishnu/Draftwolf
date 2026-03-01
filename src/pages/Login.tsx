@@ -38,21 +38,21 @@ const Login = () => {
             console.log("Auth success event received in renderer:", sessionData);
             try {
                 toast.info("Verifying session...");
-                const { accessToken, refreshToken } = typeof sessionData === 'string' 
-                    ? { accessToken: sessionData, refreshToken: '' } 
+                const { accessToken, refreshToken } = typeof sessionData === 'string'
+                    ? { accessToken: sessionData, refreshToken: '' }
                     : sessionData;
-                
+
                 console.log("Setting Supabase session...");
                 const { data, error } = await supabase.auth.setSession({
                     access_token: accessToken,
                     refresh_token: refreshToken || '',
                 });
-                
+
                 if (error) {
                     console.error("Supabase setSession error:", error);
                     throw error;
                 }
-                
+
                 console.log("Session set successfully:", data);
                 toast.success("Successfully logged in!");
                 navigate('/home', { replace: true });
@@ -71,7 +71,7 @@ const Login = () => {
         // Check for existing session token on mount
         api.auth.getToken().then((token) => {
             if (token) {
-                supabase.auth.setSession({ access_token: token, refresh_token: '' }).catch(() => {});
+                supabase.auth.setSession({ access_token: token, refresh_token: '' }).catch(() => { });
             }
         });
 
@@ -140,7 +140,7 @@ const Login = () => {
                             const { data, error } = await supabase.auth.signInWithOAuth({
                                 provider: 'google',
                                 options: {
-                                    redirectTo: 'myapp://auth',
+                                    redirectTo: 'https://draftwolf-authentication.netlify.app/auth-redirect.html',
                                     skipBrowserRedirect: true,
                                     queryParams: {
                                         prompt: 'select_account'

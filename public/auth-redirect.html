@@ -3,30 +3,151 @@
 
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DraftWolf Authentication</title>
     <link rel="icon" href="icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --bg-color: #0d0d12;
+            --primary: #4da3ff;
+            --primary-glow: rgba(77, 163, 255, 0.6);
+            --surface: rgba(255, 255, 255, 0.03);
+            --surface-border: rgba(255, 255, 255, 0.08);
+            --text-main: #ffffff;
+            --text-muted: #8b8b99;
+        }
+
         body {
-            background: #111;
-            color: #eee;
-            font-family: system-ui, sans-serif;
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(77, 163, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(138, 43, 226, 0.08) 0%, transparent 50%);
+            color: var(--text-main);
+            font-family: 'Outfit', system-ui, -apple-system, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
+            overflow: hidden;
         }
 
-        .spinner {
+        .ambient-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .blob-1 {
+            width: 40vw;
+            height: 40vw;
+            background: rgba(77, 163, 255, 0.15);
+            top: -10vw;
+            left: -10vw;
+            animation-delay: 0s;
+        }
+
+        .blob-2 {
+            width: 30vw;
+            height: 30vw;
+            background: rgba(138, 43, 226, 0.15);
+            bottom: -5vw;
+            right: -5vw;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            33% {
+                transform: translate(30px, -50px) scale(1.1);
+            }
+
+            66% {
+                transform: translate(-20px, 20px) scale(0.9);
+            }
+        }
+
+        .auth-card {
+            position: relative;
+            z-index: 10;
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--surface-border);
+            border-radius: 24px;
+            padding: 48px;
+            width: 100%;
+            max-width: 420px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        @keyframes slideUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo-container {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .spinner-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            border-top-color: var(--primary);
+            border-right-color: rgba(77, 163, 255, 0.3);
+            animation: spin 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+            filter: drop-shadow(0 0 10px var(--primary-glow));
+        }
+
+        .spinner-ring-inner {
+            position: absolute;
+            width: 70%;
+            height: 70%;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            border-bottom-color: #8a2be2;
+            border-left-color: rgba(138, 43, 226, 0.3);
+            animation: spin-reverse 2s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+            filter: drop-shadow(0 0 8px rgba(138, 43, 226, 0.4));
+        }
+
+        .logo-img {
             width: 36px;
             height: 36px;
-            border-radius: 50%;
-            border: 4px solid rgba(255, 255, 255, .2);
-            border-top-color: #4da3ff;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            object-fit: contain;
+            animation: pulse 2s ease-in-out infinite;
+            z-index: 2;
         }
 
         @keyframes spin {
@@ -35,112 +156,210 @@
             }
         }
 
+        @keyframes spin-reverse {
+            to {
+                transform: rotate(-360deg);
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(0.95);
+                opacity: 0.8;
+                filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.2));
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+                filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.4));
+            }
+        }
+
+        .title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            background: linear-gradient(to right, #ffffff, #a5a5b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+            letter-spacing: -0.02em;
+        }
+
         #status {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
+            font-weight: 300;
+            color: var(--text-muted);
+            text-align: center;
+            height: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .logs-container {
+            width: 100%;
+            margin-top: 32px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            max-height: 120px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+            box-sizing: border-box;
+        }
+
+        .logs-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .logs-container::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
         }
 
         #logs {
-            margin-top: 20px;
-            font-family: monospace;
-            font-size: .85rem;
-            color: #999;
-            max-width: 90%;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.8rem;
+            color: #6c6c7d;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .log-entry {
+            display: flex;
+            align-items: flex-start;
+            animation: fadeIn 0.3s ease forwards;
+            line-height: 1.4;
             word-break: break-word;
+        }
+
+        .log-entry::before {
+            content: '›';
+            color: var(--primary);
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .success-mode .spinner-ring,
+        .success-mode .spinner-ring-inner {
+            animation-play-state: paused;
+            border-color: #22c55e !important;
+            filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.4)) !important;
+            transition: all 0.5s ease;
+        }
+
+        .success-mode .logo-img {
+            filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.5));
+        }
+
+        .error-mode {
+            border-color: rgba(239, 68, 68, 0.3) !important;
+        }
+
+        .error-mode .spinner-ring,
+        .error-mode .spinner-ring-inner {
+            animation-play-state: paused;
+            border-color: #ef4444 !important;
+            filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.4)) !important;
         }
     </style>
 </head>
 
 <body>
-    <div class="spinner"></div>
-    <div id="status">Initializing…</div>
-    <div id="logs"></div>
+    <div class="ambient-blob blob-1"></div>
+    <div class="ambient-blob blob-2"></div>
 
-    <script type="module">
-        import { initializeApp } from
-            "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import {
-            getAuth,
-            GoogleAuthProvider,
-            signInWithRedirect,
-            getRedirectResult,
-            setPersistence,
-            browserLocalPersistence
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    <div class="auth-card" id="auth-card">
+        <div class="logo-container">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring-inner"></div>
+            <img src="icon.png" class="logo-img" alt="Logo" onerror="this.style.display='none'" />
+        </div>
 
-        // Firebase config - values injected at build time
-        const firebaseConfig = {
-            apiKey: "AIzaSyD3BhG--fI6c8V3TSa5l-2uOBlvBZFt1SQ",
-            authDomain: "draftflow-905d4.firebaseapp.com",
-            projectId: "draftflow-905d4",
-            appId: "1:233410681710:web:33f6a0a6f39ba70c8dbf7f",
+        <h1 class="title">DraftWolf</h1>
+        <div id="status">Initializing…</div>
+
+        <div class="logs-container">
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById("status");
+        const logsEl = document.getElementById("logs");
+        const authCard = document.getElementById("auth-card");
+
+        const status = msg => {
+            statusEl.innerText = msg;
+            statusEl.style.opacity = '0.5';
+            setTimeout(() => statusEl.style.opacity = '1', 150);
         };
-
-        const status = msg =>
-            document.getElementById("status").innerText = msg;
 
         const log = msg => {
             console.log(msg);
-            document.getElementById("logs").innerHTML += `<div>${msg}</div>`;
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerText = msg;
+            logsEl.appendChild(entry);
+            logsEl.parentElement.scrollTop = logsEl.parentElement.scrollHeight;
         };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({
-            prompt: 'select_account'
-        });
+        const setSuccessUI = () => {
+            authCard.classList.add('success-mode');
+        };
+
+        const setErrorUI = () => {
+            authCard.classList.add('error-mode');
+        };
 
         try {
-            // 🔒 Required for redirect auth stability
-            await setPersistence(auth, browserLocalPersistence);
+            const hashFragment = globalThis.location.hash;
 
-            status("Checking sign-in result…");
+            if (hashFragment && hashFragment.includes('access_token')) {
+                status("Sign-in successful!");
+                setSuccessUI();
+                log("Redirecting to DraftWolf app…");
 
-            // 1️⃣ Check for Redirect Result (Google Credential)
-            const result = await getRedirectResult(auth);
+                // Forward the entire hash fragment directly to the Electron deep link
+                // No need to parse or consume tokens — Electron will handle them
+                setTimeout(() => {
+                    globalThis.location.href = `myapp://auth/${hashFragment}`;
+                }, 500);
 
-            if (result) {
-                // ✅ FIXED: Get the Google ID Token (from IdP), NOT the Firebase ID Token
-                // The Electron app needs this Google Token to call signInWithCredential/GoogleAuthProvider
-                const credential = GoogleAuthProvider.credentialFromResult(result);
-                const googleToken = credential?.idToken;
+                // Fallback message if deep link doesn't work
+                setTimeout(() => {
+                    log("If the app didn't open, make sure DraftWolf is installed and running.");
+                    status("Waiting for app to open...");
+                }, 3000);
 
-                if (googleToken) {
-                    status("Sign-in successful");
-                    log(`Logged in as ${result.user.displayName}`);
-                    log("You may now close this tab.");
-
-                    globalThis.location.href =
-                        `myapp://auth?token=${encodeURIComponent(googleToken)}`;
-                } else {
-                    throw new Error("Google Sign-In succeeded, but no ID Token was returned. Check scopes.");
-                }
             } else {
-                // 2️⃣ First visit → immediately start Google login
-                const params = new URLSearchParams(globalThis.location.search);
-                if (params.get("mode") === "google") {
-                    status("Redirecting to Google…");
-                    // Force a new login to ensure we get a fresh Google Credential
-                    await signInWithRedirect(auth, provider);
-                } else {
-                    // 3️⃣ Fallback: weird state (logged in but no credential?).
-                    // We cannot proceed because we need the Google Token which is not persisted in session.
-                    status("No credentials found. Please restart login.");
-                    log("Error: Session exists but Google Credential is lost. Redirecting to login...");
-
-                    // Optional: Auto-retry logic
-                    setTimeout(() => {
-                        const cleanUrl = new URL(globalThis.location.href);
-                        cleanUrl.searchParams.set("mode", "google");
-                        globalThis.location.href = cleanUrl.toString();
-                    }, 2000);
-                }
+                status("No authentication data found.");
+                log("Please use the login button inside DraftWolf to sign in.");
+                setErrorUI();
             }
 
         } catch (err) {
             status("Authentication error");
             log(err.message);
             console.error(err);
+            setErrorUI();
         }
     </script>
 </body>

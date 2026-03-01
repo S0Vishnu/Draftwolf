@@ -414,7 +414,7 @@
     color: #dbdee1;
 }
 
-.discord-message-action-btn:hover.danger {
+.discord-message-action-btn.danger {
     color: #da373c;
     display: none;
 }

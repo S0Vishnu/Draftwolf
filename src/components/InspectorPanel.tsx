@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
     X, Info, Layers, Paperclip,
     CheckCircle, Plus, HardDrive, FileWarning
@@ -74,6 +74,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         if (projectRoot) loadPatterns();
     }, [projectRoot, backupPath]);
 
+
     const fetchChanges = useCallback(async () => {
         try {
             // Use persistent changes from backend (diff against HEAD)
@@ -119,16 +120,6 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         }
     }, [file?.isDirectory, activeTab]);
 
-    // Confirm Dialog State
-    const [confirmState, setConfirmState] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        confirmText: 'Confirm',
-        isDangerous: false,
-        onConfirm: () => { }
-    });
-
     // Helper to get relative path
     const getRelativePath = useCallback(() => {
         if (!projectRoot) return null;
@@ -141,6 +132,37 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         }
         return rel || '.';
     }, [file, projectRoot]);
+
+    const isFileDirty = useMemo(() => {
+        if (!changedFiles || !projectRoot) return false;
+
+        const relPath = getRelativePath();
+        if (relPath === null) return false;
+
+        const normalize = (p: string) => p.replaceAll('\\', '/').toLowerCase();
+        const target = relPath === '.' ? '' : normalize(relPath);
+
+        if (target === '') return changedFiles.length > 0;
+
+        if (file?.isDirectory) {
+            return changedFiles.some(c => {
+                const cPath = normalize(c.path);
+                return cPath === target || cPath.startsWith(target + '/');
+            });
+        }
+        return changedFiles.some(c => normalize(c.path) === target);
+    }, [changedFiles, projectRoot, getRelativePath, file]);
+
+    // Confirm Dialog State
+    const [confirmState, setConfirmState] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        confirmText: 'Confirm',
+        isDangerous: false,
+        onConfirm: () => { }
+    });
+
 
     // Load Metadata
     useEffect(() => {
@@ -632,6 +654,11 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         if (!initialAction) return;
 
         if (initialAction === 'createVersion') {
+            if (!isFileDirty) {
+                toast.info(file?.isDirectory ? "No changes detected in this directory" : "No changes detected in this file");
+                if (onActionHandled) onActionHandled();
+                return;
+            }
             if (activeTab !== 'versions' && activeTab !== 'snapshots') {
                 setActiveTab(file?.isDirectory ? 'snapshots' : 'versions');
             }
@@ -997,16 +1024,19 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                             )}
                             {file && (
                                 <button
-                                    className={`upload-btn icon-only ${fileLock && fileLock.userId !== currentUserId ? 'disabled' : ''}`}
+                                    className={`upload-btn icon-only ${(fileLock && fileLock.userId !== currentUserId) || !isFileDirty ? 'disabled' : ''}`}
                                     onClick={() => {
                                         if (fileLock && fileLock.userId !== currentUserId) return;
+                                        if (!isFileDirty) return;
                                         setIsCreating(true);
                                     }}
                                     title={fileLock && fileLock.userId !== currentUserId
                                         ? `Locked by ${fileLock.userEmail}`
-                                        : "Create New Version"}
-                                    disabled={!!(fileLock && fileLock.userId !== currentUserId)}
-                                    style={fileLock && fileLock.userId !== currentUserId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                                        : !isFileDirty
+                                            ? (file.isDirectory ? "No changes detected in this directory" : "No changes detected in this file")
+                                            : "Create New Version"}
+                                    disabled={!!(fileLock && fileLock.userId !== currentUserId) || !isFileDirty}
+                                    style={(fileLock && fileLock.userId !== currentUserId) || !isFileDirty ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                 >
                                     <Plus size={16} />
                                 </button>

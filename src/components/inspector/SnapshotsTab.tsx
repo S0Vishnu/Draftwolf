@@ -65,6 +65,31 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
     const [editingLabel, setEditingLabel] = useState<string>('');
     const [stats, setStats] = useState<{ totalSize: number, totalCompressedSize: number, compressionRatio: string } | null>(null);
 
+    const isDirty = useMemo(() => {
+        if (!projectRoot || !changedFiles) return false;
+        // If file is explicitly passed (folder), check if any changed file is inside it
+        // Otherwise (project root), check if any changes exist
+        const normalize = (p: string) => p.replaceAll('\\', '/').toLowerCase();
+        
+        let target = '';
+        if (file) {
+            const normalizedRoot = normalize(projectRoot);
+            target = normalize(file.path);
+            if (target.startsWith(normalizedRoot)) {
+                target = target.substring(normalizedRoot.length).replaceAll(/^[/\\]+/g, '');
+            }
+        }
+        
+        if (!target || target === '.' || target === '') {
+            return changedFiles.length > 0;
+        }
+
+        return changedFiles.some(c => {
+            const cPath = normalize(c.path);
+            return cPath === target || cPath.startsWith(target + '/');
+        });
+    }, [projectRoot, changedFiles, file]);
+
     useEffect(() => {
         const fetchStats = async () => {
             try {
@@ -86,55 +111,53 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
         const idToIndex = new Map<string, number>();
         history.forEach((v, i) => idToIndex.set(v.id, i));
 
-        history.forEach((ver, index) => {
-            let parentId = ver.parentId || ver.parent;
-            const parentExists = parentId && idToIndex.has(parentId);
-            if (!parentExists && index < history.length - 1) {
-                parentId = history[index + 1].id;
+        const getLaneIndex = (idx: number, verId: string) => {
+            const currentLane = lanes.indexOf(verId);
+            if (currentLane !== -1) return currentLane;
+            if (idx === history.length - 1) return 0;
+            const emptyLane = lanes.indexOf(null);
+            if (emptyLane !== -1) return emptyLane;
+            lanes.push(null);
+            return lanes.length - 1;
+        };
+
+        history.forEach((ver: any, index: number) => {
+            let pId = ver.parentId || ver.parent;
+            const needsFallback = (!pId || !idToIndex.has(pId)) && index < history.length - 1;
+            
+            if (needsFallback) {
+                pId = history[index + 1].id;
             }
 
-            let laneIndex = lanes.indexOf(ver.id);
-            if (laneIndex === -1) {
-                if (index === history.length - 1) {
-                    laneIndex = 0;
-                } else {
-                    laneIndex = lanes.indexOf(null);
-                    if (laneIndex === -1) {
-                        laneIndex = lanes.length;
-                        lanes.push(null);
-                    }
-                }
-            }
-
+            const laneIndex = getLaneIndex(index, ver.id);
             if (lanes.length === 0 && laneIndex === 0) lanes.push(null);
-            lanes[laneIndex] = parentId || null;
-            const color = LANE_COLORS[laneIndex % LANE_COLORS.length];
+            lanes[laneIndex] = pId || null;
 
             nodes.push({
                 ...ver,
-                parentId,
+                parentId: pId,
                 index,
                 laneIndex,
-                color,
+                color: LANE_COLORS[laneIndex % LANE_COLORS.length],
                 x: LEFT_PADDING + laneIndex * LANE_WIDTH,
                 y: index * ROW_HEIGHT + (ROW_HEIGHT / 2)
             });
-
-
         });
 
         // Second pass for links
         nodes.forEach(node => {
-            const parentId = node.parentId || node.parent;
-            if (parentId) {
-                const parentNode = nodes.find((n: any) => n.id === parentId);
-                if (parentNode) {
-                    links.push({
-                        source: { x: node.x, y: node.y },
-                        target: { x: parentNode.x, y: parentNode.y },
-                        color: node.color
-                    });
-                }
+            const pId = node.parentId || node.parent;
+            if (!pId) return;
+
+            const pNode = nodes.find((n: any) => n.id === pId);
+            if (pNode) {
+                links.push({
+                    source: { x: node.x, y: node.y },
+                    target: { x: pNode.x, y: pNode.y },
+                    color: node.color,
+                    sourceId: node.id,
+                    targetId: pNode.id
+                });
             }
         });
 
@@ -156,12 +179,18 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
                         <span className="changes-preview-count">{changedFiles.length}</span>
                     </div>
                     <div className="changes-preview-items">
-                        {previewFiles.map((f, i) => {
-                            const Icon = f.type === 'add' ? FilePlus : f.type === 'unlink' ? FileX : FileText;
-                            const color = f.type === 'add' ? '#50fa7b' : f.type === 'unlink' ? '#ff5555' : '#ffb86c';
-                            const name = f.path.replace(/\\/g, '/').split('/').pop() || f.path;
+                        {previewFiles.map((f) => {
+                            let Icon = FileText;
+                            if (f.type === 'add') Icon = FilePlus;
+                            if (f.type === 'unlink') Icon = FileX;
+
+                            let color = '#ffb86c';
+                            if (f.type === 'add') color = '#50fa7b';
+                            if (f.type === 'unlink') color = '#ff5555';
+
+                            const name = f.path.replaceAll('\\', '/').split('/').pop() || f.path;
                             return (
-                                <div key={f.path + i} className="changes-preview-item">
+                                <div key={f.path} className="changes-preview-item">
                                     <Icon size={12} style={{ color, flexShrink: 0 }} />
                                     <span className="changes-preview-name" title={f.path}>{name}</span>
                                 </div>
@@ -221,7 +250,15 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
                     />
                     <div className="creation-actions">
                         <button onClick={() => setIsCreating(false)} className="btn-cancel">Cancel</button>
-                        <button onClick={onCreateVersion} disabled={loading} className="btn-commit">{loading ? 'Saving...' : 'Snapshot'}</button>
+                        <button
+                            onClick={onCreateVersion}
+                            disabled={loading || !isDirty}
+                            className="btn-commit"
+                            style={loading || !isDirty ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                            title={isDirty ? undefined : "No changes detected in this directory"}
+                        >
+                            {loading ? 'Saving...' : 'Snapshot'}
+                        </button>
                     </div>
                 </div>
             )}
@@ -239,7 +276,7 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
                             const c2y = link.target.y - dy * 0.5;
                             d = `M ${link.source.x} ${link.source.y} C ${link.source.x} ${c1y}, ${link.target.x} ${c2y}, ${link.target.x} ${link.target.y}`;
                         }
-                        return <path key={i} d={d} stroke={link.color} strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.5" />;
+                        return <path key={`${link.sourceId}-${link.targetId}`} d={d} stroke={link.color} strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.5" />;
                     })}
                 </svg>
 

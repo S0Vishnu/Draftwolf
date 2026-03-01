@@ -68,120 +68,68 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     };
 
-    // Calculate Graph Layout
+    const isDirty = useMemo(() => {
+        if (!projectRoot || !changedFiles) return false;
+        // Use the relative path passed from parent if available, otherwise try file.path
+        const normalize = (p: string) => p.replaceAll('\\', '/').toLowerCase();
+        
+        let pathForComparison = null;
+        if (currentRelativePath) {
+            pathForComparison = normalize(currentRelativePath);
+        } else if (file) {
+            pathForComparison = normalize(file.path);
+        }
+
+        if (pathForComparison) {
+            // Compare against changedFiles
+            // The backend sends paths relative to project root
+            const change = changedFiles.find(c => normalize(c.path) === pathForComparison);
+
+            if (change) return true;
+        }
+        return false;
+    }, [file, projectRoot, changedFiles, currentRelativePath]);
+
     const graphData = useMemo(() => {
         const nodes: any[] = [];
         const links: any[] = [];
-        const lanes: (string | null)[] = []; // Stores the 'next expected parent ID' for each lane
+        const lanes: (string | null)[] = [];
+        const idToIndex = new Map<string, number>(history.map((v, i) => [v.id, i]));
 
-        // Check for unsaved changes
-        // let effectiveHistory = [...history]; // Removed as per request to not modify graph
-        let isDirty = false;
+        const getLaneIndex = (idx: number, verId: string) => {
+            const currentLane = lanes.indexOf(verId);
+            if (currentLane !== -1) return currentLane;
+            if (idx === history.length - 1) return 0;
+            const emptyLane = lanes.indexOf(null);
+            if (emptyLane !== -1) return emptyLane;
+            lanes.push(null);
+            return lanes.length - 1;
+        };
 
-        if (projectRoot && changedFiles) {
-            // Use the relative path passed from parent if available, otherwise try file.path
-            const normalize = (p: string) => p.replace(/\\/g, '/').toLowerCase();
-            const target = currentRelativePath ? normalize(currentRelativePath) : (file ? normalize(file.path) : null);
-
-            if (target) {
-                // 2. Compare against changedFiles
-                // The backend sends paths relative to project root
-                let change = changedFiles.find(c => {
-                    const cPath = normalize(c.path);
-                    return cPath === target;
-                });
-
-                if (change) {
-                    isDirty = true;
-                }
-            }
-        }
-
-        // Use standard history (no unsaved node)
-        const workingHistory = history;
-
-        // Map ID to Index for quick lookup
-        const idToIndex = new Map<string, number>();
-        workingHistory.forEach((v, i) => idToIndex.set(v.id, i));
-
-        workingHistory.forEach((ver: any, index: number) => {
-            // Determine Parent ID
-            // Logic: ver.parentId is the primary source.
-            // Check validity: Does the parent exist in our current list?
-            let parentId = ver.parentId || ver.parent;
-
-            const parentExists = parentId && idToIndex.has(parentId);
-
-            // Fallback: If no explicit parent OR parent not found (orphan reference), 
-            // assume linear history and connect to the chronologically previous version (next in list).
-            if (!parentExists && index < workingHistory.length - 1) {
-                parentId = workingHistory[index + 1].id;
+        history.forEach((ver: any, index: number) => {
+            let pId = ver.parentId || ver.parent;
+            if ((!pId || !idToIndex.has(pId)) && index < history.length - 1) {
+                pId = history[index + 1].id;
             }
 
-            // Find a lane
-            // Check if any lane is expecting this version ID
-            let laneIndex = lanes.findIndex(expectedId => expectedId === ver.id);
-
-            if (laneIndex === -1) {
-                // If it's the very last node (oldest), always snap to Lane 0 to anchor the graph
-                // This prevents the "genesis" commit from floating off to the side if links are broken
-                if (index === workingHistory.length - 1) {
-                    laneIndex = 0;
-                } else {
-                    // Start a new lane or find empty
-                    laneIndex = lanes.findIndex(l => l === null);
-                    if (laneIndex === -1) {
-                        laneIndex = lanes.length;
-                        lanes.push(null);
-                    }
-                }
-            }
-
-            // Assign this version to the lane
-            // Update what this lane expects next (the parent of this version)
-            // If we forced Lane 0, we overwrite whatever it was expecting (which is fine, we are at the end)
-            if (laneIndex >= lanes.length) { // safety extension if forced 0 on empty array? no, lanes.length logic handles pushes
-                // handle push cases above
-            }
-            // Ensure array expands if we forced 0 (should be covered by findIndex logic usually, but 0 is always safe-ish)
+            const laneIndex = getLaneIndex(index, ver.id);
             if (lanes.length === 0 && laneIndex === 0) lanes.push(null);
-
-            lanes[laneIndex] = parentId || null;
-
-            // Determine Color
-            const color = LANE_COLORS[laneIndex % LANE_COLORS.length];
+            lanes[laneIndex] = pId || null;
 
             nodes.push({
                 ...ver,
-                parentId, // Explicitly use the resolved/inferred parentId
+                parentId: pId,
                 index,
                 laneIndex,
-                color,
+                color: LANE_COLORS[laneIndex % LANE_COLORS.length],
                 x: LEFT_PADDING + laneIndex * LANE_WIDTH,
                 y: index * ROW_HEIGHT + (ROW_HEIGHT / 2)
             });
-
-            // Create Link to Parent
-            if (parentId) {
-                // We don't know the parent's coordinates yet if we strictly go top-down and parent is below.
-                // But we know parent's index via idToIndex map.
-                const parentIndex = idToIndex.get(parentId);
-                if (parentIndex !== undefined && parentIndex > index) {
-                    // Parent is strictly older (lower in list)
-                    // We can defer link creation? No, we need to draw lines.
-                    // We can tentatively predict parent lane?
-                    // Actually, the simple "lane history" logic above already tracks flows.
-                    // But for drawing the SVG line, we need source and target (x,y).
-                    // We can't know TARGET X until we process the parent.
-                    // So we will process links in a second pass or check if we can predict.
-                }
-            }
         });
 
-        // Second pass for links now that all nodes have assigned lanes/coordinates
         nodes.forEach(node => {
             const parentId = node.parentId || node.parent;
             if (parentId) {
@@ -190,14 +138,16 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                     links.push({
                         source: { x: node.x, y: node.y },
                         target: { x: parentNode.x, y: parentNode.y },
-                        color: node.color // Use child's color for the line? or parent? usually child flowing into parent.
+                        color: node.color,
+                        sourceId: node.id,
+                        targetId: parentNode.id
                     });
                 }
             }
         });
 
-        return { nodes, links, maxLane: lanes.length, isDirty };
-    }, [history, file, projectRoot, changedFiles]);
+        return { nodes, links, maxLane: lanes.length };
+    }, [history]);
 
     const { nodes, links, maxLane } = graphData;
 
@@ -207,26 +157,30 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
 
     return (
         <div className="versions-list">
-            {graphData.isDirty && (
-                <div style={{
-                    padding: '8px 12px',
-                    margin: '8px 12px 12px 12px',
-                    backgroundColor: 'rgba(255, 184, 108, 0.1)',
-                    border: '1px solid rgba(255, 184, 108, 0.2)',
-                    borderRadius: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '12px',
-                    color: '#ffb86c',
-                    cursor: onNavigateToChanges ? 'pointer' : 'default'
-                }}
+            {isDirty && (
+                <button 
+                    className="unsaved-changes-banner"
+                    style={{
+                        padding: '8px 12px',
+                        margin: '8px 12px 12px 12px',
+                        backgroundColor: 'rgba(255, 184, 108, 0.1)',
+                        border: '1px solid rgba(255, 184, 108, 0.2)',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '12px',
+                        color: '#ffb86c',
+                        cursor: onNavigateToChanges ? 'pointer' : 'default',
+                        width: 'calc(100% - 24px)',
+                        textAlign: 'left'
+                    }}
                     onClick={() => onNavigateToChanges?.()}
                     title="Click to view changes"
                 >
                     <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffb86c' }} />
                     <span>This file has unsaved changes</span>
-                </div>
+                </button>
             )}
             {isCreating && (
                 <div className="creation-form">
@@ -248,7 +202,15 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                     />
                     <div className="creation-actions">
                         <button onClick={() => setIsCreating(false)} className="btn-cancel">Cancel</button>
-                        <button onClick={onCreateVersion} disabled={loading} className="btn-commit">{loading ? 'Saving...' : 'Commit'}</button>
+                        <button
+                            onClick={onCreateVersion}
+                            disabled={loading || !isDirty}
+                            className="btn-commit"
+                            style={loading || !isDirty ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                            title={isDirty ? undefined : "No changes detected in this file"}
+                        >
+                            {loading ? 'Saving...' : 'Commit'}
+                        </button>
                     </div>
                 </div>
             )}
@@ -257,23 +219,21 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                 {/* SVG Layer for Connections */}
                 <svg className="version-graph-svg" style={{ height: Math.max(200, history.length * ROW_HEIGHT) }}>
                     {links.map((link, i) => {
-                        const dx = link.target.x - link.source.x;
                         const dy = link.target.y - link.source.y;
-
-                        let d = '';
+                        let dPath = '';
+                        
                         if (link.source.x === link.target.x) {
-                            d = `M ${link.source.x} ${link.source.y} L ${link.target.x} ${link.target.y}`;
+                            dPath = `M ${link.source.x} ${link.source.y} L ${link.target.x} ${link.target.y}`;
                         } else {
-                            // Smooth Cubic Bezier
                             const c1y = link.source.y + dy * 0.5;
                             const c2y = link.target.y - dy * 0.5;
-                            d = `M ${link.source.x} ${link.source.y} C ${link.source.x} ${c1y}, ${link.target.x} ${c2y}, ${link.target.x} ${link.target.y}`;
+                            dPath = `M ${link.source.x} ${link.source.y} C ${link.source.x} ${c1y}, ${link.target.x} ${c2y}, ${link.target.x} ${link.target.y}`;
                         }
 
                         return (
                             <path
-                                key={i}
-                                d={d}
+                                key={`${link.sourceId}-${link.targetId}`}
+                                d={dPath}
                                 stroke={link.color}
                                 strokeWidth="2"
                                 strokeLinecap="round"
@@ -354,7 +314,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                                 </div>
 
                                 <div className="commit-actions">
-                                    {onCompare && (!file || !file.isDirectory) && (
+                                    {onCompare && !file?.isDirectory && (
                                         <button
                                             className="version-action-btn version-compare-btn"
                                             onClick={(e) => { e.stopPropagation(); onCompare(node.id); }}
@@ -377,9 +337,9 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                                     <button
                                         className="version-action-btn"
                                         onClick={(e) => { e.stopPropagation(); onDownload(node, verNum); }}
-                                        title={(!file || file.isDirectory) ? "Cannot download directory" : "Download"}
-                                        disabled={!file || file.isDirectory}
-                                        style={(!file || file.isDirectory) ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                                        title={file?.isDirectory ? "Cannot download directory" : "Download"}
+                                        disabled={file?.isDirectory}
+                                        style={file?.isDirectory ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                     >
                                         <Download size={13} />
                                     </button>
@@ -395,7 +355,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                     );
                 })}
 
-                {history.length === 0 && !graphData.isDirty && !isCreating && (
+                {history.length === 0 && !isDirty && !isCreating && (
                     <div className="empty-state">
                         <GitCommit size={32} style={{ opacity: 0.2, marginBottom: 8 }} />
                         <div>No versions created yet</div>

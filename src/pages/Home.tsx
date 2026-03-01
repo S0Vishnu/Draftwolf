@@ -238,7 +238,14 @@ const Home = () => {
             if (!rootDir) return;
 
             const sessionKey = `autosnapshot_${rootDir}`;
-            if (sessionStorage.getItem(sessionKey)) return;
+            const isManualAction = sessionStorage.getItem('manual_workspace_action') === 'true';
+
+            if (sessionStorage.getItem(sessionKey)) {
+                // Already checked this project in this session
+                // Clear manual action if it was set
+                if (isManualAction) sessionStorage.removeItem('manual_workspace_action');
+                return;
+            }
 
             try {
                 // Get Backup Path Logic
@@ -259,7 +266,8 @@ const Home = () => {
                     // Do NOT set sessionKey yet, wait for user action
                 } else {
                     // Existing Project - Auto Snapshot Logic
-                    if (meta.createSnapshotOnOpen !== false) {
+                    // NEW: Only trigger if it was a manual "Create Workspace" action
+                    if (meta.createSnapshotOnOpen !== false && isManualAction) {
                         // @ts-ignore
                         const changes = await globalThis.api.draft.getWorkingChanges(rootDir, bp);
                         const hasChanges = changes && (changes.modified.length > 0 || changes.added.length > 0 || changes.deleted.length > 0);
@@ -275,10 +283,13 @@ const Home = () => {
                         }
                     }
                     sessionStorage.setItem(sessionKey, 'true');
+                    // Always clear manual action after processing
+                    if (isManualAction) sessionStorage.removeItem('manual_workspace_action');
                 }
             } catch (e) {
                 console.error("Project Check Failed:", e);
                 sessionStorage.setItem(sessionKey, 'true'); // avoid infinite retry loop on error
+                if (isManualAction) sessionStorage.removeItem('manual_workspace_action');
             }
         };
 
@@ -965,9 +976,13 @@ const Home = () => {
     };
 
     const handleOpenFolder = async () => {
+        sessionStorage.setItem('manual_workspace_action', 'true');
         const path = await globalThis.api.openFolder();
         if (path) {
             openWorkspace(path);
+        } else {
+            // Cancelled
+            sessionStorage.removeItem('manual_workspace_action');
         }
     };
 

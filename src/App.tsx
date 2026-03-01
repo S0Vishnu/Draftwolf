@@ -12,7 +12,7 @@ import OTPVerification from './pages/OTPVerification';
 import Home from './pages/Home';
 import Settings from './pages/Settings';
 import Cleanup from './pages/Cleanup';
-// import Community from './pages/Community'; // Hiding for Supabase migration
+import Community from './pages/Community';
 import Extensions from './pages/Extensions';
 import ProjectSettings from './pages/ProjectSettings';
 
@@ -197,12 +197,11 @@ function App() {
         <TrayListener />
         <Routes>
           <Route path="/" element={user ? <Navigate to="/home" replace /> : <Login />} />
-
           <Route path="/verify" element={<OTPVerification />} />
           <Route path="/home" element={user ? <Home /> : <Navigate to="/" replace />} />
           <Route path="/settings" element={user ? <Settings /> : <Navigate to="/" replace />} />
           <Route path="/cleanup" element={user ? <Cleanup /> : <Navigate to="/" replace />} />
-          {/* <Route path="/community" element={user ? <Community /> : <Navigate to="/" replace />} /> */}
+          <Route path="/community" element={user ? <Community /> : <Navigate to="/" replace />} />
           <Route path="/extensions" element={user ? <Extensions /> : <Navigate to="/" replace />} />
           <Route path="/project-settings" element={user ? <ProjectSettings /> : <Navigate to="/" replace />} />
         </Routes>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home as HomeIcon, Folder, Settings as SettingsIcon, Package, PanelLeftClose, PanelLeftOpen, Database } from 'lucide-react';
+import { Home as HomeIcon, Folder, Settings as SettingsIcon, Package, PanelLeftClose, PanelLeftOpen, Database, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import logo from '../assets/icons/logo.png';
 
@@ -32,7 +32,7 @@ const SidebarProjectLink: React.FC<SidebarProjectLinkProps> = ({ folder, isActiv
         }}
         title={isOpen ? "" : folder.name}
     >
-        <div className="project-icon-wrapper" style={{ 
+        <div className="project-icon-wrapper" style={{
             background: folder.color ? `${folder.color}25` : 'rgba(59, 130, 246, 0.1)',
             border: folder.color ? `1px solid ${folder.color}55` : '1px solid rgba(59, 130, 246, 0.2)',
         }}>
@@ -41,9 +41,9 @@ const SidebarProjectLink: React.FC<SidebarProjectLinkProps> = ({ folder, isActiv
             </span>
         </div>
         <span className="btn-label">{folder.name}</span>
-        
+
         {isOpen && (
-            <button 
+            <button
                 className="project-settings-trigger"
                 onClick={(e) => {
                     e.stopPropagation();
@@ -83,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 
     return (
-        <aside 
+        <aside
             className={`sidebar ${isOpen ? '' : 'collapsed'}`}
             onClick={(e) => {
                 // Only trigger if clicking the aside background or non-button elements
@@ -124,14 +124,24 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 e.stopPropagation();
                                 onOpenFolder();
                             }}
-                            title={isOpen ? "" : "Open Folder"}
+                            title={isOpen ? "" : "Create Workspace"}
                         >
                             <Folder size={22} />
-                            <span className="btn-label">Open Folder</span>
+                            <span className="btn-label">Create Workspace</span>
                         </button>
                     )}
 
-                    {/* Community hidden */}
+                    <button
+                        className={`side-btn ${isActive('/community') ? 'active' : ''}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/community');
+                        }}
+                        title={isOpen ? "" : "Community"}
+                    >
+                        <MessageCircle size={22} />
+                        <span className="btn-label">Community</span>
+                    </button>
                 </div>
 
                 {/* Pinned Folders List */}
@@ -139,14 +149,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {pinnedFolders.length > 0 && (
                         <>
                             <div className="sidebar-divider" />
-                            {isOpen && <div className="section-label">PROJECTS</div>}
+                            {isOpen && <div className="section-label">WORKSPACES</div>}
                             {pinnedFolders.map((folder: any, index) => (
                                 <SidebarProjectLink
                                     key={`${folder.path}-${index}`}
                                     folder={folder}
                                     isActive={activePath === folder.path}
                                     isOpen={isOpen}
-                                    onSelect={onSelectProject || (() => {})}
+                                    onSelect={onSelectProject || (() => { })}
                                     navigate={navigate}
                                 />
                             ))}

@@ -42,7 +42,7 @@ const RecentWorkspaces: React.FC<RecentWorkspacesProps> = ({
             <div className="action-buttons" style={{ marginBottom: '48px' }}>
                 <button className="big-action-btn primary" onClick={onOpenFolder}>
                     <FolderPlus size={24} />
-                    Open Folder
+                    Create Workspace
                 </button>
             </div>
 

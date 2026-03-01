@@ -69,6 +69,25 @@ const Cleanup = () => {
 
     const [activeTab, setActiveTab] = useState<'versioned' | 'snapshots'>('versioned');
 
+    // Project Selection State
+    const [rootDir, setRootDir] = useState<string | null>(localStorage.getItem('rootDir'));
+    const [pinnedFolders, setPinnedFolders] = useState<any[]>([]);
+    const [recentWorkspaces, setRecentWorkspaces] = useState<any[]>([]);
+    const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+    const [projectSearchTerm, setProjectSearchTerm] = useState('');
+    const projectDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        try {
+            const pinned = JSON.parse(localStorage.getItem('pinnedFolders') || '[]');
+            const recent = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
+            setPinnedFolders(pinned);
+            setRecentWorkspaces(recent);
+        } catch (e) {
+            console.error('Error loading projects:', e);
+        }
+    }, []);
+
     // Filter & Sort State
     const [searchTerm, setSearchTerm] = useState('');
     const [extensionFilter, setExtensionFilter] = useState('');
@@ -86,22 +105,23 @@ const Cleanup = () => {
     const [selectedVersion, setSelectedVersion] = useState<VersionDetail | null>(null);
     const [versionsToDelete, setVersionsToDelete] = useState<Set<string>>(new Set());
 
-    const rootDir = localStorage.getItem('rootDir');
     const [backupPath, setBackupPath] = useState<string | undefined>(undefined);
 
     useEffect(() => {
-        if (!rootDir) return;
+        if (!rootDir) {
+            setStorageReport(null);
+            return;
+        }
         try {
-            const pinned = JSON.parse(localStorage.getItem('pinnedFolders') || '[]');
-            const recent = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
-            const p = pinned.find((f: any) => f.path === rootDir);
-            const r = recent.find((w: any) => w.path === rootDir);
-            const bp = (p as any)?.backupPath || (r as any)?.backupPath;
+            const normRoot = rootDir.toLowerCase().replaceAll('\\', '/');
+            const p = pinnedFolders.find((f: any) => f.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
+            const r = recentWorkspaces.find((w: any) => w.path?.toLowerCase().replaceAll('\\', '/') === normRoot);
+            const bp = p?.backupPath || r?.backupPath;
             setBackupPath(bp);
         } catch (e) {
             console.error(e);
         }
-    }, [rootDir]);
+    }, [rootDir, pinnedFolders, recentWorkspaces]);
 
     const fetchReport = () => {
         if (rootDir) {
@@ -123,12 +143,22 @@ const Cleanup = () => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
             }
+            if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target as Node)) {
+                setIsProjectDropdownOpen(false);
+            }
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
     }, []);
+
+    const handleProjectChange = (path: string) => {
+        setRootDir(path);
+        localStorage.setItem('rootDir', path);
+        setInspectingFile(null);
+        setIsProjectDropdownOpen(false);
+    };
 
     // Handle File Click -> Inspect Versions
     const handleFileClick = async (file: FileReport) => {
@@ -285,9 +315,108 @@ const Cleanup = () => {
 
     const renderStorageDetail = () => {
         if (!rootDir) {
+            const allProjects = [
+                ...pinnedFolders.map(p => ({ ...p, type: 'Pinned' })),
+                ...recentWorkspaces.filter(r => !pinnedFolders.some(p => p.path === r.path)).map(r => ({ ...r, type: 'Recent' }))
+            ];
+
+            const filteredProjects = allProjects.filter(p => 
+                p.name.toLowerCase().includes(projectSearchTerm.toLowerCase()) || 
+                p.path.toLowerCase().includes(projectSearchTerm.toLowerCase())
+            );
+
             return (
                 <div className="empty-state">
-                    <p>Open a folder to analyze storage and clean up old versions.</p>
+                    <div className="empty-state-icon" style={{ marginBottom: '1.5rem', opacity: 0.1 }}>
+                        <Search size={80} />
+                    </div>
+                    <h2 style={{ color: '#ffffff', marginBottom: '0.5rem' }}>No Project Selected</h2>
+                    <p style={{ color: '#a1a1aa' }}>Select a project to analyze storage and clean up old versions.</p>
+
+                    <div className="project-selector-wrapper" style={{ marginTop: '2rem', width: '100%', maxWidth: '400px', position: 'relative' }}>
+                        <div ref={projectDropdownRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div
+                                onClick={() => { setIsProjectDropdownOpen(!isProjectDropdownOpen); setProjectSearchTerm(''); }}
+                                style={{ 
+                                    padding: '12px 16px', 
+                                    borderRadius: '12px', 
+                                    background: 'rgba(255,255,255,0.05)', 
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    cursor: 'pointer',
+                                    color: '#ffffff'
+                                }}
+                            >
+                                <span>{isProjectDropdownOpen ? 'Select or Search...' : 'Click to select project...'}</span>
+                                <ChevronDown size={18} style={{ transform: isProjectDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                            </div>
+
+                            {isProjectDropdownOpen && (
+                                <div style={{ 
+                                    background: '#18181b', 
+                                    border: '1px solid #3f3f46', 
+                                    borderRadius: '12px', 
+                                    padding: '8px', 
+                                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                                    maxHeight: '400px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '8px',
+                                    zIndex: 1000
+                                }}>
+                                    <input 
+                                        type="text"
+                                        placeholder="Search projects..."
+                                        autoFocus
+                                        value={projectSearchTerm}
+                                        onChange={(e) => setProjectSearchTerm(e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                            width: '100%',
+                                            padding: '8px 12px',
+                                            backgroundColor: '#27272a',
+                                            border: '1px solid #3f3f46',
+                                            borderRadius: '6px',
+                                            color: '#ffffff',
+                                            fontSize: '13px',
+                                            outline: 'none'
+                                        }}
+                                    />
+                                    <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        {filteredProjects.length > 0 ? (
+                                            filteredProjects.map((proj, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    onClick={() => handleProjectChange(proj.path)}
+                                                    style={{ 
+                                                        display: 'flex', 
+                                                        flexDirection: 'column', 
+                                                        gap: '4px', 
+                                                        padding: '12px 16px',
+                                                        cursor: 'pointer',
+                                                        borderRadius: '8px',
+                                                        transition: 'background 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                >
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span style={{ fontWeight: 700, color: '#ffffff', fontSize: '14px' }}>{proj.name}</span>
+                                                        <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.2)', padding: '2px 6px', borderRadius: '4px' }}>{proj.type}</span>
+                                                    </div>
+                                                    <span style={{ fontSize: '12px', color: '#71717a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.path}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div style={{ padding: '20px', textAlign: 'center', color: '#71717a' }}>No projects found</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             );
         }
@@ -556,6 +685,107 @@ const Cleanup = () => {
                                 )}
                                 <h1 className="cleanup-title">
                                     {inspectingFile ? 'File History' : 'Storage Optimization'}
+                                    {!inspectingFile && rootDir && (
+                                        <div className="header-project-selector" ref={projectDropdownRef} style={{ marginLeft: '1rem', position: 'relative' }}>
+                                            <div
+                                                onClick={() => { setIsProjectDropdownOpen(!isProjectDropdownOpen); setProjectSearchTerm(''); }}
+                                                style={{
+                                                    fontSize: '0.85rem',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '20px',
+                                                    background: 'rgba(99, 102, 241, 0.15)',
+                                                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                                                    color: '#a5b4fc',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <span style={{ fontWeight: 600 }}>{pinnedFolders.find(p => p.path === rootDir)?.name || recentWorkspaces.find(r => r.path === rootDir)?.name || rootDir.split(/[/\\]/).pop()}</span>
+                                                <ChevronDown size={14} style={{ transform: isProjectDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                                            </div>
+                                            {isProjectDropdownOpen && (
+                                                <div style={{ 
+                                                    position: 'absolute',
+                                                    top: 'calc(100% + 8px)',
+                                                    right: 0,
+                                                    width: '320px',
+                                                    background: '#18181b',
+                                                    border: '1px solid #3f3f46',
+                                                    borderRadius: '12px',
+                                                    padding: '8px',
+                                                    boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '8px',
+                                                    zIndex: 10000
+                                                }}>
+                                                    <input 
+                                                        type="text"
+                                                        placeholder="Search projects..."
+                                                        autoFocus
+                                                        value={projectSearchTerm}
+                                                        onChange={(e) => setProjectSearchTerm(e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '8px 12px',
+                                                            backgroundColor: '#27272a',
+                                                            border: '1px solid #3f3f46',
+                                                            borderRadius: '6px',
+                                                            color: '#ffffff',
+                                                            fontSize: '13px',
+                                                            outline: 'none'
+                                                        }}
+                                                    />
+                                                    <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        {(() => {
+                                                            const allProjects = [
+                                                                ...pinnedFolders.map(p => ({ ...p, type: 'Pinned' })),
+                                                                ...recentWorkspaces.filter(r => !pinnedFolders.some(p => p.path === r.path)).map(r => ({ ...r, type: 'Recent' }))
+                                                            ];
+
+                                                            const filtered = allProjects.filter(p => 
+                                                                p.name.toLowerCase().includes(projectSearchTerm.toLowerCase()) || 
+                                                                p.path.toLowerCase().includes(projectSearchTerm.toLowerCase())
+                                                            );
+
+                                                            if (filtered.length === 0) {
+                                                                return <div style={{ padding: '20px', textAlign: 'center', color: '#71717a' }}>No projects found</div>;
+                                                            }
+
+                                                            return filtered.map((proj, idx) => (
+                                                                <div
+                                                                    key={idx}
+                                                                    onClick={() => handleProjectChange(proj.path)}
+                                                                    style={{ 
+                                                                        display: 'flex', 
+                                                                        flexDirection: 'column', 
+                                                                        gap: '4px', 
+                                                                        padding: '10px 14px',
+                                                                        cursor: 'pointer',
+                                                                        borderRadius: '8px',
+                                                                        background: proj.path === rootDir ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                                                                        borderLeft: proj.path === rootDir ? '3px solid #818cf8' : 'none'
+                                                                    }}
+                                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = proj.path === rootDir ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.05)'}
+                                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = proj.path === rootDir ? 'rgba(99, 102, 241, 0.15)' : 'transparent'}
+                                                                >
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                        <span style={{ fontWeight: 700, color: '#ffffff', fontSize: '13px' }}>{proj.name}</span>
+                                                                        <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.2)', padding: '1px 5px', borderRadius: '3px' }}>{proj.type}</span>
+                                                                    </div>
+                                                                    <span style={{ fontSize: '11px', color: '#71717a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.path}</span>
+                                                                </div>
+                                                            ));
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </h1>
                                 {!inspectingFile && (
                                     <p className="cleanup-subtitle">

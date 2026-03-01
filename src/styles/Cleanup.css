@@ -62,7 +62,6 @@
     background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
     background-clip: text;
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
     letter-spacing: -0.03em;
     display: flex;
     align-items: center;
@@ -270,7 +269,7 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
     padding: 6px;
-    z-index: 100;
+    z-index: 2000;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
     animation: scaleIn 0.1s ease-out;
 }
@@ -557,6 +556,8 @@
         padding: 0.4rem 0.8rem;
         font-size: 0.86rem;
         color: var(--ev-c-text-2);
+        position: relative;
+        z-index: 1;
     }
 }
 
@@ -748,3 +749,13 @@ input[type="checkbox"]:checked:hover {
     background: #a5b4fc;
     border-radius: 2px 2px 0 0;
 }
+
+.empty-state-icon {
+    animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.1; transform: scale(1); }
+    50% { opacity: 0.15; transform: scale(1.05); }
+}
+

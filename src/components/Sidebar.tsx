@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home as HomeIcon, Folder, Settings as SettingsIcon, Package, PanelLeftClose, PanelLeftOpen, Database, MessageCircle } from 'lucide-react';
+import { Home as HomeIcon, Folder, Settings as SettingsIcon, Package, PanelLeftClose, PanelLeftOpen, Database, Users } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import logo from '../assets/icons/logo.png';
 
@@ -81,7 +81,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         }
     };
 
-
     return (
         <aside
             className={`sidebar ${isOpen ? '' : 'collapsed'}`}
@@ -139,7 +138,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         }}
                         title={isOpen ? "" : "Community"}
                     >
-                        <MessageCircle size={22} />
+                        <Users size={22} />
                         <span className="btn-label">Community</span>
                     </button>
                 </div>

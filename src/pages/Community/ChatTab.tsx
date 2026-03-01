@@ -25,7 +25,10 @@ interface ChatTabProps {
 }
 
 const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<Message[]>(() => {
+        const cached = localStorage.getItem(`chat_messages_${channel}`);
+        return cached ? JSON.parse(cached) : [];
+    });
     const [newMessage, setNewMessage] = useState('');
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -37,9 +40,33 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
 
         const subscription = supabase
             .channel(`public:community_messages:${channel}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `channel=eq.${channel}` }, payload => {
-                // Simple reload to fetch joins properly (could be optimized)
-                fetchMessages();
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages', filter: `channel=eq.${channel}` }, async payload => {
+                const newMsg = payload.new as Message;
+
+                // Fetch the joined author profile since realtime just gives us user_id
+                const { data: profile } = await supabase.from('profiles').select('*').eq('id', newMsg.user_id).single();
+                if (profile) newMsg.profiles = profile;
+
+                if (newMsg.reply_to) {
+                    const { data: repMsg } = await supabase.from('community_messages').select('*, profiles(*)').eq('id', newMsg.reply_to).single();
+                    if (repMsg) newMsg.reply_message = repMsg as Message;
+                }
+
+                setMessages(prev => {
+                    // Avoid duplicates if this client just sent the message and already fetched it
+                    if (prev.some(m => m.id === newMsg.id)) return prev;
+                    const newMessages = [...prev, newMsg];
+                    localStorage.setItem(`chat_messages_${channel}`, JSON.stringify(newMessages.slice(-50)));
+                    return newMessages;
+                });
+                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'community_messages', filter: `channel=eq.${channel}` }, payload => {
+                setMessages(prev => {
+                    const newMessages = prev.filter(m => m.id !== payload.old.id);
+                    localStorage.setItem(`chat_messages_${channel}`, JSON.stringify(newMessages.slice(-50)));
+                    return newMessages;
+                });
             })
             .subscribe();
 
@@ -60,13 +87,14 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
         )
       `)
             .eq('channel', channel)
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: false })
+            .limit(50);
 
         if (error) {
             console.error('Error fetching messages', error);
         } else {
             // Small logic to fetch reply messages content (can be done with a map/reduce or a second query)
-            const msgs = data as any[];
+            const msgs = data;
 
             // Let's populate reply_message if reply_to is present
             const enhancedMsgs = msgs.map(m => {
@@ -77,7 +105,9 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
                 return m;
             });
 
-            setMessages(enhancedMsgs);
+            const finalMsgs = [...enhancedMsgs].reverse(); // we fetched descending to get latest 50, now reverse to chronological
+            setMessages(finalMsgs);
+            localStorage.setItem(`chat_messages_${channel}`, JSON.stringify(finalMsgs));
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
     };
@@ -150,9 +180,9 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#313338' }}>
+        <div className="discord-chat-container">
             {/* Messages Area */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="discord-chat-messages-area">
                 {messages.map(msg => (
                     <MessageItem
                         key={msg.id}
@@ -165,38 +195,29 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
             </div>
 
             {/* Input Area */}
-            <div style={{ padding: '0 16px 24px 16px', backgroundColor: '#313338', flexShrink: 0 }}>
+            <div className="discord-chat-input-area">
                 {replyingTo && (
-                    <div style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        backgroundColor: '#2b2d31', padding: '8px 12px', borderRadius: '8px 8px 0 0',
-                        fontSize: '12px', color: '#b5bac1', borderBottom: '1px solid #1e1f22'
-                    }}>
-                        <div>Replying to <strong style={{ color: '#f2f3f5' }}>@{replyingTo.profiles.username}</strong></div>
-                        <button onClick={() => setReplyingTo(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={14} /></button>
+                    <div className="discord-chat-replying-bar">
+                        <div>Replying to <strong>@{replyingTo.profiles.username}</strong></div>
+                        <button onClick={() => setReplyingTo(null)} className="discord-chat-close-btn"><X size={14} /></button>
                     </div>
                 )}
 
                 {imageFile && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '12px' }}>
-                        <span style={{ color: '#4ade80' }}>Image ready: {imageFile.name}</span>
-                        <button onClick={() => setImageFile(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={14} /></button>
+                    <div className="discord-chat-image-ready-bar">
+                        <span className="discord-chat-image-ready-text">Image ready: {imageFile.name}</span>
+                        <button onClick={() => setImageFile(null)} className="discord-chat-close-btn"><X size={14} /></button>
                     </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', position: 'relative' }}>
+                <div className="discord-chat-input-wrapper">
                     {showEmojiPicker && (
-                        <div style={{ position: 'absolute', bottom: '100%', left: 0, zIndex: 10, marginBottom: '10px' }}>
+                        <div className="discord-chat-emoji-picker-container">
                             <EmojiPicker onEmojiClick={onEmojiClick} theme={Theme.DARK} />
                         </div>
                     )}
 
-                    <div style={{
-                        flex: 1, display: 'flex', alignItems: 'center',
-                        backgroundColor: '#383a40', /* Discord input box color */
-                        borderRadius: replyingTo ? '0 0 8px 8px' : '8px',
-                        padding: '0 16px'
-                    }}>
+                    <div className={`discord-chat-input-box ${replyingTo ? 'replying' : ''}`}>
                         <input
                             id="image-upload"
                             type="file"
@@ -206,7 +227,7 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
                             }}
                             style={{ display: 'none' }}
                         />
-                        <label htmlFor="image-upload" className="chat-action-btn" aria-label="Upload image" style={{ color: '#b5bac1', padding: '10px 10px 10px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <label htmlFor="image-upload" className="discord-chat-action-btn" aria-label="Upload image">
                             <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M13 11.5A2.5 2.5 0 0 1 10.5 14A2.5 2.5 0 0 1 8 11.5A2.5 2.5 0 0 1 10.5 9A2.5 2.5 0 0 1 13 11.5M4 18V6A2 2 0 0 1 6 4H18A2 2 0 0 1 20 6V18A2 2 0 0 1 18 20H6A2 2 0 0 1 4 18M18 18V14L14.5 9.5L10 15L8 12.5L6 15.5V18H18Z" /></svg>
                         </label>
                         <input
@@ -215,29 +236,20 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
                             onChange={(e) => setNewMessage(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleSendMessage() }}
                             placeholder={`Message #${channel}`}
-                            style={{
-                                flex: 1, background: 'none', border: 'none', color: '#dbdee1', padding: '14px 0',
-                                outline: 'none', fontSize: '15px'
-                            }}
+                            className="discord-chat-text-input"
                         />
                         <button
                             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                            style={{ background: 'none', border: 'none', color: '#b5bac1', padding: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            className="discord-chat-emoji-btn"
                         >
                             <Smile size={24} />
                         </button>
                         <button
                             onClick={handleSendMessage}
                             disabled={!newMessage.trim() && !imageFile}
-                            style={{
-                                background: 'none', border: 'none',
-                                color: (newMessage.trim() || imageFile) ? '#5865f2' : '#b5bac1', /* Discord blurple if active */
-                                padding: '10px', cursor: (newMessage.trim() || imageFile) ? 'pointer' : 'default',
-                                display: 'flex', alignItems: 'center', transition: 'color 0.2s',
-                                opacity: (newMessage.trim() || imageFile) ? 1 : 0.5
-                            }}
+                            className="discord-chat-send-btn"
                         >
-                            <Send size={20} style={{ transform: 'rotate(45deg)', marginTop: '-4px' }} />
+                            <Send size={20} className="discord-chat-send-icon" />
                         </button>
                     </div>
                 </div>

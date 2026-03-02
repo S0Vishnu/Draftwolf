@@ -1,7 +1,7 @@
 # DraftWolf - Roadmap & TODO
 
-**Current Version:** 1.1.9  
-**Last Updated:** February 13, 2026
+**Current Version:** 1.1.10  
+**Last Updated:** March 2, 2026
 
 ---
 

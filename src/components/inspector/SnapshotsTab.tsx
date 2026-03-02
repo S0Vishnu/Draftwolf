@@ -216,7 +216,7 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
 
     return (
         <div className="versions-list">
-            {(changedFiles && changedFiles.length > 0) && (
+            {(changedFiles && changedFiles.length > 0 && !isFolderScope) && (
                 <div className="changes-preview-card">
                     <div className="changes-preview-header">
                         <span className="changes-preview-title">Pending Changes</span>

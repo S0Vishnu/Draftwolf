@@ -1,6 +1,6 @@
 import React from 'react';
 import { supabase } from '../../supabase';
-import { Reply, AlertTriangle, Trash2, ShieldAlert } from 'lucide-react';
+import { Reply, AlertTriangle, Trash2, BadgeCheck } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { formatDistanceToNow } from 'date-fns';
 import { Message } from './ChatTab';
@@ -38,15 +38,15 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
 
     return (
         <div className="discord-message-item-container">
-            {/* Admin subtle glow effect */}
-            {message.profiles?.is_admin && (
-                <div className="discord-message-admin-glow" />
-            )}
 
             <img
                 src={message.profiles?.avatar_url || `https://api.dicebear.com/9.x/avataaars/svg?seed=${message.profiles?.username || 'user'}`}
                 alt={message.profiles?.username}
-                className={`discord-message-avatar ${message.profiles?.is_admin ? 'admin' : ''}`}
+                className={`discord-message-avatar ${message.profiles?.is_admin ? 'verified' : ''}`}
+                onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = `https://api.dicebear.com/9.x/avataaars/svg?seed=${message.profiles?.username || 'user'}`;
+                }}
             />
 
             <div className="discord-message-content-wrapper">
@@ -57,6 +57,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
                             src={message.reply_message.profiles?.avatar_url || `https://api.dicebear.com/9.x/avataaars/svg?seed=${message.reply_message.profiles?.username || 'user'}`}
                             className="discord-message-reply-avatar"
                             alt=""
+                            onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = `https://api.dicebear.com/9.x/avataaars/svg?seed=${message.reply_message.profiles?.username || 'user'}`;
+                            }}
                         />
                         <span className="discord-message-reply-username">@{message.reply_message.profiles?.username}</span>
                         <span className="discord-message-reply-text">
@@ -66,10 +70,14 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
                 )}
 
                 <div className="discord-message-header">
-                    <strong className={`discord-message-username ${message.profiles?.is_admin ? 'admin' : ''}`}>
+                    <strong className="discord-message-username">
                         {message.profiles?.username || 'Unknown User'}
                     </strong>
-                    {message.profiles?.is_admin && <ShieldAlert size={14} color="gold" className="discord-message-admin-badge" />}
+                    {message.profiles?.is_admin && (
+                        <span className="discord-message-verified-badge" title="Verified">
+                            <BadgeCheck size={14} strokeWidth={2.5} />
+                        </span>
+                    )}
                     <span className="discord-message-timestamp">
                         {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                     </span>
@@ -97,13 +105,13 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentUser, onReply
                         <Reply size={16} />
                     </button>
 
-                    <button
+                    {/* <button
                         onClick={handleReport}
                         className="discord-message-action-btn danger"
                         title="Report"
                     >
                         <AlertTriangle size={16} />
-                    </button>
+                    </button> */}
 
                     {canDelete && (
                         <button

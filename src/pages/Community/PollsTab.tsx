@@ -3,6 +3,7 @@ import { supabase } from '../../supabase';
 import { Profile } from './index';
 import { toast } from 'react-toastify';
 import { formatDistanceToNow } from 'date-fns';
+import { BarChart2, Check, Plus, Sparkles } from 'lucide-react';
 
 interface PollOption {
     id: string;
@@ -68,15 +69,19 @@ const PollsTab: React.FC<PollsTabProps> = ({ currentUser }) => {
             toast.error('Question and at least 2 options are required');
             return;
         }
+        if (!currentUser?.id) {
+            toast.error('You must be logged in to create a poll');
+            return;
+        }
 
         const { data: pollData, error: pollError } = await supabase
             .from('polls')
-            .insert({ question: newQuestion, created_by: currentUser?.id })
+            .insert({ question: newQuestion, created_by: currentUser.id })
             .select()
             .single();
 
         if (pollError) {
-            toast.error('Failed to create poll');
+            toast.error(pollError.message || 'Failed to create poll');
             return;
         }
 
@@ -93,33 +98,126 @@ const PollsTab: React.FC<PollsTabProps> = ({ currentUser }) => {
         fetchPolls(); // Refresh immediately
     };
 
-    const handleVote = async (optionId: string) => {
+    const handleVote = async (poll: Poll, optionId: string) => {
         if (!currentUser) return;
 
-        // Check if user already voted on this poll broadly (requires checking context of option to poll)
-        // Simplified: optimistic insert, rely on DB constraints or just let them switch votes if DB allows.
+        const previousPolls = JSON.parse(JSON.stringify(polls)) as Poll[];
+
+        // Optimistic update: apply vote in UI immediately
+        setPolls((current) =>
+            current.map((p) => {
+                if (p.id !== poll.id) return p;
+                const votesWithoutMine = (p.votes ?? []).filter((v) => v.user_id !== currentUser.id);
+                const newVote = { option_id: optionId, user_id: currentUser.id };
+                return { ...p, votes: [...votesWithoutMine, newVote] };
+            })
+        );
+
+        // Sync with backend afterwards
+        const optionIds = poll.options?.map((o) => o.id) ?? [];
+        if (optionIds.length > 0) {
+            await supabase
+                .from('poll_votes')
+                .delete()
+                .eq('user_id', currentUser.id)
+                .in('option_id', optionIds);
+        }
+
         const { error } = await supabase.from('poll_votes').insert({
             option_id: optionId,
             user_id: currentUser.id
         });
 
         if (error) {
-            toast.error('Vote failed: ' + error.message);
+            setPolls(previousPolls);
+            if (error.code === '23505') {
+                toast.info("You've already voted for this option.");
+            } else {
+                toast.error(error.message || 'Vote failed');
+            }
         }
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', padding: '16px' }}>
+        <div className="poll-page-wrap">
 
+            {polls.length === 0 && (
+                <div className="community-empty-state community-empty-state-polls">
+                    <div className="community-empty-state-icon-wrap community-empty-state-icon-polls">
+                        <BarChart2 size={48} strokeWidth={1.5} />
+                    </div>
+                    <h3 className="community-empty-state-title">No polls yet</h3>
+                    <p className="community-empty-state-text">
+                        {currentUser?.is_admin
+                            ? 'Create the first poll to get community feedback.'
+                            : 'There are no active polls. Check back later!'}
+                    </p>
+                </div>
+            )}
+
+            {/* Render Polls */}
+            {polls.length > 0 && polls.map(poll => {
+                const totalVotes = poll.votes?.length || 0;
+
+                return (
+                    <article key={poll.id} className="poll-card">
+                        <h3 className="poll-question">{poll.question}</h3>
+                        <p className="poll-meta">
+                            Asked by <strong>{poll.profiles?.username ?? 'Unknown'}</strong>
+                            <span>·</span>
+                            {formatDistanceToNow(new Date(poll.created_at), { addSuffix: true })}
+                        </p>
+
+                        <div className="poll-options">
+                            {poll.options?.map(option => {
+                                const optionVotes = poll.votes?.filter(v => v.option_id === option.id).length || 0;
+                                const percentage = totalVotes > 0 ? Math.round((optionVotes / totalVotes) * 100) : 0;
+                                const hasVoted = poll.votes?.some(v => v.option_id === option.id && v.user_id === currentUser?.id);
+
+                                return (
+                                    <button
+                                        key={option.id}
+                                        type="button"
+                                        onClick={() => handleVote(poll, option.id)}
+                                        className={`poll-option-btn ${hasVoted ? 'voted' : ''}`}
+                                    >
+                                        <div
+                                            className="poll-option-fill"
+                                            style={{ width: `${percentage}%` }}
+                                            aria-hidden
+                                        />
+                                        <span className="option-label">
+                                            {hasVoted && <Check size={18} strokeWidth={2.5} className="poll-option-check" />}
+                                            {option.option_text}
+                                        </span>
+                                        <span className="option-stats">{percentage}% ({optionVotes})</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="poll-total">
+                            <span className="poll-total-dot" aria-hidden />
+                            {totalVotes} total vote{totalVotes !== 1 ? 's' : ''}
+                        </div>
+                    </article>
+                );
+            })}
+
+            {/* Create New Poll (Admin) - at bottom */}
             {currentUser?.is_admin && (
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px' }}>
-                    <h3 style={{ marginTop: 0, color: 'white' }}>Create New Poll (Admin)</h3>
+                <section className="poll-create-card">
+                    <h3 className="poll-create-title">
+                        <span className="poll-create-title-icon">
+                            <Sparkles size={20} strokeWidth={2} />
+                        </span>
+                        Create New Poll
+                    </h3>
                     <input
                         type="text"
-                        placeholder="Poll Question"
+                        placeholder="What do you want to ask?"
                         value={newQuestion}
                         onChange={e => setNewQuestion(e.target.value)}
-                        style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '8px', marginBottom: '12px' }}
+                        className="poll-create-input"
                     />
                     {newOptions.map((opt, i) => (
                         <input
@@ -132,69 +230,27 @@ const PollsTab: React.FC<PollsTabProps> = ({ currentUser }) => {
                                 updated[i] = e.target.value;
                                 setNewOptions(updated);
                             }}
-                            style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '6px', marginBottom: '8px' }}
+                            className="poll-create-input"
                         />
                     ))}
                     <button
+                        type="button"
                         onClick={() => setNewOptions([...newOptions, ''])}
-                        style={{ background: 'none', color: '#3b82f6', border: 'none', cursor: 'pointer', padding: '8px' }}
+                        className="poll-add-option"
                     >
-                        + Add Option
+                        <Plus size={16} strokeWidth={2.5} />
+                        Add option
                     </button>
 
                     <button
+                        type="button"
                         onClick={handleCreatePoll}
-                        style={{ width: '100%', padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', marginTop: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+                        className="poll-create-submit"
                     >
-                        Create Poll
+                        Create poll
                     </button>
-                </div>
+                </section>
             )}
-
-            {/* Render Polls */}
-            {polls.map(poll => {
-                const totalVotes = poll.votes?.length || 0;
-
-                return (
-                    <div key={poll.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0, color: 'white', fontSize: '18px' }}>{poll.question}</h3>
-                            <span style={{ fontSize: '12px', color: 'gray' }}>
-                                Asked by {poll.profiles.username} • {formatDistanceToNow(new Date(poll.created_at))} ago
-                            </span>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {poll.options?.map(option => {
-                                const optionVotes = poll.votes?.filter(v => v.option_id === option.id).length || 0;
-                                const percentage = totalVotes > 0 ? Math.round((optionVotes / totalVotes) * 100) : 0;
-                                const hasVoted = poll.votes?.some(v => v.option_id === option.id && v.user_id === currentUser?.id);
-
-                                return (
-                                    <button
-                                        key={option.id}
-                                        onClick={() => handleVote(option.id)}
-                                        style={{
-                                            position: 'relative', overflow: 'hidden', padding: '12px 16px',
-                                            background: hasVoted ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
-                                            border: hasVoted ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
-                                            borderRadius: '8px', color: 'white', cursor: 'pointer',
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                                        }}
-                                    >
-                                        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${percentage}%`, background: 'rgba(59, 130, 246, 0.1)', zIndex: 0 }} />
-                                        <span style={{ zIndex: 1 }}>{option.option_text}</span>
-                                        <span style={{ zIndex: 1, fontSize: '14px', color: 'gray' }}>{percentage}% ({optionVotes})</span>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                        <div style={{ marginTop: '12px', fontSize: '12px', color: 'gray', textAlign: 'right' }}>
-                            {totalVotes} total votes
-                        </div>
-                    </div>
-                );
-            })}
         </div>
     );
 };

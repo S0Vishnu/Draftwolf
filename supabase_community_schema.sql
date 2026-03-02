@@ -97,3 +97,52 @@ CREATE POLICY "Auth Users Upload"
   ON storage.objects FOR INSERT
   WITH CHECK ( bucket_id = 'community_images' AND auth.role() = 'authenticated' );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 5. Polls tables (for Community Polls tab)
+CREATE TABLE IF NOT EXISTS public.polls (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  question text NOT NULL,
+  created_by uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.poll_options (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  poll_id uuid REFERENCES public.polls(id) ON DELETE CASCADE NOT NULL,
+  option_text text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.poll_votes (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  option_id uuid REFERENCES public.poll_options(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  UNIQUE(option_id, user_id)
+);
+
+ALTER TABLE public.polls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.poll_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.poll_votes ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Polls are viewable by everyone." ON public.polls FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can create polls." ON public.polls FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND auth.uid() = created_by);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Poll options are viewable by everyone." ON public.poll_options FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can insert poll options (via app)." ON public.poll_options FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Poll votes are viewable by everyone." ON public.poll_votes FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can vote." ON public.poll_votes FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Users can delete their own votes." ON public.poll_votes FOR DELETE USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

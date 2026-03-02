@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabase';
 import { Profile } from './index';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
-import { Send, Smile, X } from 'lucide-react';
+import { Send, Smile, X, MessageCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import MessageItem from './MessageItem';
 
@@ -36,7 +36,11 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        fetchMessages();
+        fetchMessages(true);
+
+        const pollInterval = setInterval(() => {
+            fetchMessages(false);
+        }, 5000);
 
         const subscription = supabase
             .channel(`public:community_messages:${channel}`)
@@ -57,9 +61,9 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
                     if (prev.some(m => m.id === newMsg.id)) return prev;
                     const newMessages = [...prev, newMsg];
                     localStorage.setItem(`chat_messages_${channel}`, JSON.stringify(newMessages.slice(-50)));
+                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
                     return newMessages;
                 });
-                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'community_messages', filter: `channel=eq.${channel}` }, payload => {
                 setMessages(prev => {
@@ -71,11 +75,12 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
             .subscribe();
 
         return () => {
+            clearInterval(pollInterval);
             supabase.removeChannel(subscription);
         };
     }, [channel]);
 
-    const fetchMessages = async () => {
+    const fetchMessages = async (isInitial = false) => {
         // We join rows with profiles to get user info
         // Assuming supabase supports this nested select out-of-the-box if foreign keys are set
         const { data, error } = await supabase
@@ -100,15 +105,20 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
             const enhancedMsgs = msgs.map(m => {
                 if (m.reply_to) {
                     const repMsg = msgs.find(cm => cm.id === m.reply_to);
-                    return { ...m, reply_message: repMsg };
+                    return { ...m, reply_message: repMsg as any };
                 }
                 return m;
             });
 
             const finalMsgs = [...enhancedMsgs].reverse(); // we fetched descending to get latest 50, now reverse to chronological
-            setMessages(finalMsgs);
+            setMessages(prev => {
+                const hasNewMessages = finalMsgs.length > prev.length || (finalMsgs.length > 0 && prev.length > 0 && finalMsgs[finalMsgs.length - 1].id !== prev[prev.length - 1].id);
+                if (isInitial || hasNewMessages) {
+                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                }
+                return finalMsgs;
+            });
             localStorage.setItem(`chat_messages_${channel}`, JSON.stringify(finalMsgs));
-            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
     };
 
@@ -172,6 +182,7 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
             setImageFile(null);
             setReplyingTo(null);
             setShowEmojiPicker(false);
+            fetchMessages(true);
         }
     };
 
@@ -183,15 +194,29 @@ const ChatTab: React.FC<ChatTabProps> = ({ channel, currentUser }) => {
         <div className="discord-chat-container">
             {/* Messages Area */}
             <div className="discord-chat-messages-area">
-                {messages.map(msg => (
-                    <MessageItem
-                        key={msg.id}
-                        message={msg}
-                        currentUser={currentUser}
-                        onReply={() => setReplyingTo(msg)}
-                    />
-                ))}
-                <div ref={messagesEndRef} />
+                {messages.length === 0 ? (
+                    <div className="community-empty-state">
+                        <div className="community-empty-state-icon-wrap community-empty-state-icon-chat">
+                            <MessageCircle size={48} strokeWidth={1.5} />
+                        </div>
+                        <h3 className="community-empty-state-title">No messages yet</h3>
+                        <p className="community-empty-state-text">
+                            Be the first to send a message in <strong>#{channel}</strong>
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        {messages.map(msg => (
+                            <MessageItem
+                                key={msg.id}
+                                message={msg}
+                                currentUser={currentUser}
+                                onReply={() => setReplyingTo(msg)}
+                            />
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </>
+                )}
             </div>
 
             {/* Input Area */}

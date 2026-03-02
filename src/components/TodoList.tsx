@@ -35,6 +35,7 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAdd, onToggle, onDelete, a
 
     // Track items pending deletion for animation
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -216,15 +217,17 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAdd, onToggle, onDelete, a
                 <div className="search-wrapper">
                     <input
                         type="text"
-                        placeholder="Search..."
+                        placeholder="Search tasks…"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        onFocus={() => setIsSearchFocused(true)}
+                        onBlur={() => setIsSearchFocused(false)}
                         className="search-input"
                     />
                     <Search size={14} className="search-icon" />
                 </div>
 
-                <div className="filter-group">
+                <div className={`filter-group ${isSearchFocused ? 'search-focused' : ''}`}>
                     {(['all', 'active', 'completed'] as const).map((f) => (
                         <button
                             key={f}
@@ -270,9 +273,9 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAdd, onToggle, onDelete, a
 
                 {/* Meta Inputs */}
                 <div className="meta-inputs">
-                    {/* Priority Selector */}
+                    {/* Priority Selector — High / Medium / Low */}
                     <div className="priority-selector">
-                        {(['low', 'medium', 'high'] as const).map(p => (
+                        {(['high', 'medium', 'low'] as const).map(p => (
                             <button
                                 key={p}
                                 onClick={() => setNewPriority(p)}
@@ -286,6 +289,7 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAdd, onToggle, onDelete, a
                                         opacity: newPriority === p ? 1 : 0.3
                                     }}
                                 />
+                                <span className="priority-label">{p.charAt(0).toUpperCase() + p.slice(1)}</span>
                             </button>
                         ))}
                     </div>
@@ -295,7 +299,7 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAdd, onToggle, onDelete, a
                         onClick={() => setIsTagInputVisible(!isTagInputVisible)}
                         className={`tag-trigger-btn ${isTagInputVisible ? 'active' : ''}`}
                     >
-                        <Tag size={14} /> {newTags.length > 0 ? `${newTags.length} tags` : 'Tags'}
+                        <Tag size={14} /> {newTags.length > 0 ? `${newTags.length} tags` : 'Add tags'}
                     </button>
 
                     {/* Active Tags Display in Input */}
@@ -349,7 +353,9 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAdd, onToggle, onDelete, a
             <div className="todo-list">
                 {filteredTodos.length === 0 && (
                     <div className="empty-state fade-in">
-                        {searchQuery ? 'No matches found.' : 'No tasks found.'}
+                        {todos.length === 0
+                            ? 'No tasks yet. Add one above to get started.'
+                            : 'No matches found. Try a different search or filter.'}
                     </div>
                 )}
 

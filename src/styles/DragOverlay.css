@@ -1,0 +1,86 @@
+.drag-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(9, 9, 11, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none; /* Allow events to pass through to underlying elements if needed, or handle in Home.tsx */
+    transition: opacity 0.3s ease;
+    padding: 32px;
+}
+
+.drag-overlay-content {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed var(--accent);
+    border-radius: 24px;
+    background: rgba(59, 130, 246, 0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    animation: scaleUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.drag-icon-wrapper {
+    width: 100px;
+    height: 100px;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+    animation: pulse 2s infinite;
+}
+
+.drag-text {
+    text-align: center;
+}
+
+.drag-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+}
+
+.drag-subtitle {
+    font-size: 16px;
+    color: var(--text-muted);
+}
+
+@keyframes scaleUp {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 50px rgba(59, 130, 246, 0.4);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+    }
+}

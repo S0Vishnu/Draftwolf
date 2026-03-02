@@ -44,6 +44,8 @@ interface FileListProps {
 
     // Ignore pattern support
     ignorePatterns?: string[];
+
+    onDrop?: (e: React.DragEvent, targetFolder?: string) => void;
 }
 
 
@@ -53,7 +55,8 @@ const FileList: React.FC<FileListProps> = ({
     onSort, onSelect, onNavigate, onRenameChange, onRenameSubmit, onRenameCancel, onContextMenu, onVersionClick,
     onCreationChange, onCreationSubmit, onCreationCancel,
     locks, projectRoot, currentUserId,
-    ignorePatterns
+    ignorePatterns,
+    onDrop
 }) => {
 
 
@@ -89,6 +92,18 @@ const FileList: React.FC<FileListProps> = ({
             <div
                 className={viewMode === 'list' ? 'file-list' : 'file-grid'}
                 onContextMenu={(e) => onContextMenu(e)}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                }}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDrop?.(e);
+                }}
+                role="listbox"
+                aria-label="Files"
+                tabIndex={0}
             >
 
                 {isCreating && creationItem && (
@@ -156,6 +171,11 @@ const FileList: React.FC<FileListProps> = ({
                             onRenameCancel={onRenameCancel}
                             onContextMenu={(e) => onContextMenu(e, file)}
                             onVersionClick={onVersionClick ? (e) => onVersionClick(e, file) : undefined}
+                            onDrop={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onDrop?.(e, file.path);
+                            }}
                             isLocked={isLocked}
                             lockedBy={lockedBy}
                             isIgnored={isIgnored}
@@ -166,7 +186,18 @@ const FileList: React.FC<FileListProps> = ({
             </div>
 
             {files.length === 0 && !isCreating && (
-                <div className="empty-state" onContextMenu={(e) => onContextMenu(e)}>
+                <div
+                    className="empty-state"
+                    onContextMenu={(e) => onContextMenu(e)}
+                    onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'copy';
+                    }}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        onDrop?.(e);
+                    }}
+                >
                     <p>This folder is empty.</p>
                 </div>
             )}

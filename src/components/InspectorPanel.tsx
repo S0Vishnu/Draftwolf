@@ -16,7 +16,6 @@ import ChangesTab from './inspector/ChangesTab';
 import { InspectorPanelProps, AttachmentItem, InspectorTab } from './inspector/types';
 import DiffViewer, { getCategory } from './diff/DiffViewer';
 
-// type Tab = 'info' | 'tasks' | 'versions' | 'attachments'; // Removed in favor of InspectorTab
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 800;
 
@@ -49,13 +48,19 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
     // Version State
     const [history, setHistory] = useState<any[]>([]);
+    const hasLoadedOnce = useRef(false);
     const [isCreating, setIsCreating] = useState(false);
     const [versionLabel, setVersionLabel] = useState('');
     const [loading, setLoading] = useState(false);
     const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
 
     // Diff Viewer State
-    const [diffState, setDiffState] = useState<{ oldPath: string; newPath: string; oldLabel: string; newLabel: string } | null>(null);
+    const [diffState, setDiffState] = useState<{ 
+        relativePath: string; 
+        currentFilePath: string;
+        initialLeftVersionId: string;
+        initialRightVersionId?: string;
+    } | null>(null);
 
     // Changed Files State
     const [changedFiles, setChangedFiles] = useState<{ path: string; type: 'add' | 'change' | 'unlink'; timestamp: number }[]>([]);
@@ -102,6 +107,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
     // Reset active version when file changes
     useEffect(() => {
         setActiveVersionId(null);
+        hasLoadedOnce.current = false;
     }, [file?.path]);
 
     // Update activeTab when initialTab prop changes
@@ -173,7 +179,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             if (!relPath) return;
 
             try {
-                const meta = await window.api.draft.getMetadata(projectRoot, relPath, backupPath);
+                const meta = await globalThis.api.draft.getMetadata(projectRoot, relPath, backupPath);
                 if (meta) {
                     setTodos(meta.tasks || []);
                     setAttachments(meta.attachments || []);
@@ -213,7 +219,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         if (!relPath || !projectRoot) return;
 
         // Use current todos and attachments
-        window.api.draft.saveMetadata(projectRoot, relPath, {
+        globalThis.api.draft.saveMetadata(projectRoot, relPath, {
             tasks: todos,
             attachments: attachments,
             tags: newTags
@@ -269,16 +275,18 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
     useEffect(() => {
         if ((activeTab === 'versions' || activeTab === 'tasks' || activeTab === 'snapshots') && projectRoot) {
             const loadVersions = async () => {
+                setLoading(true);
                 let relPath = getRelativePath();
                 if (relPath === null) {
                     setHistory([]);
+                    setLoading(false);
                     return;
                 }
                 if (relPath === '') relPath = '.'; // Handle root directory
 
                 try {
-                    const filtered = await window.api.draft.getHistory(projectRoot, relPath, backupPath);
-                    const currentHead = await window.api.draft.getCurrentHead(projectRoot, backupPath);
+                    const filtered = await globalThis.api.draft.getHistory(projectRoot, relPath, backupPath);
+                    const currentHead = await globalThis.api.draft.getCurrentHead(projectRoot, backupPath);
 
                     if (currentHead && filtered.some(v => v.id === currentHead)) {
                         setActiveVersionId(currentHead);
@@ -289,6 +297,9 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 } catch (err) {
                     console.error("Failed to load history:", err);
                     setHistory([]);
+                } finally {
+                    setLoading(false);
+                    hasLoadedOnce.current = true;
                 }
             };
 
@@ -303,7 +314,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
     }, [activeTab, projectRoot, file, getRelativePath]);
 
     const recursiveScan = async (dir: string): Promise<string[]> => {
-        const entries = await window.api.readDir(dir);
+        const entries = await globalThis.api.readDir(dir);
         let files: string[] = [];
         for (const entry of entries) {
             if (entry.isDirectory) {
@@ -331,10 +342,8 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             } else {
                 filesToVersion = [file.path];
             }
-
             console.log('📦 Creating version for:', filesToVersion);
-
-            const result = await window.api.draft.commit(projectRoot, versionLabel, filesToVersion, backupPath);
+            const result = await globalThis.api.draft.commit(projectRoot, versionLabel, filesToVersion, backupPath);
             if (result && result.success && result.versionId) {
                 setActiveVersionId(result.versionId);
             }
@@ -362,8 +371,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         try {
             // Use logical relative path or . for root
             const relPath = getRelativePath() || '.';
-            const result = await window.api.draft.createSnapshot(projectRoot, relPath, versionLabel, backupPath);
-
+            const result = await globalThis.api.draft.createSnapshot(projectRoot, relPath, versionLabel, backupPath);
             if (result && result.success && result.versionId) {
                 setActiveVersionId(result.versionId);
                 toast.success("Snapshot created successfully");
@@ -378,7 +386,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             const refreshScope = getRelativePath();
             if (refreshScope !== null) {
                 const p = refreshScope === '' ? '.' : refreshScope;
-                const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
+                const filtered = await globalThis.api.draft.getHistory(projectRoot, p, backupPath);
                 setHistory(filtered);
                 onRefresh?.();
             }
@@ -394,8 +402,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         setLoading(true);
         try {
             // Force root path '.'
-            const result = await window.api.draft.createSnapshot(projectRoot, '.', label, backupPath);
-
+            const result = await globalThis.api.draft.createSnapshot(projectRoot, '.', label, backupPath);
             if (result && result.success && result.versionId) {
                 setActiveVersionId(result.versionId);
                 toast.success("Root snapshot created successfully");
@@ -410,7 +417,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             const relPath = getRelativePath();
             if (relPath !== null) {
                 const p = relPath === '' ? '.' : relPath;
-                const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
+                const filtered = await globalThis.api.draft.getHistory(projectRoot, p, backupPath);
                 setHistory(filtered);
                 onRefresh?.();
             }
@@ -430,8 +437,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             isDangerous: true,
             onConfirm: async () => {
                 try {
-                    const result = await window.api.draft.restore(projectRoot, vId, backupPath);
-
+                    const result = await globalThis.api.draft.restore(projectRoot, vId, backupPath);
                     if (result && result.success) {
                         setActiveVersionId(vId);
                         onRefresh?.();
@@ -504,7 +510,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
         const performExtraction = async () => {
             try {
-                await window.api.draft.extract(projectRoot, ver.id, relativePath, destPath, backupPath);
+                await globalThis.api.draft.extract(projectRoot, ver.id, relativePath, destPath, backupPath);
             } catch (e: any) {
                 toast.error(`Failed to save: ${e.message || e}`);
             }
@@ -512,7 +518,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         };
 
         // Check availability
-        const stats = await window.api.getStats(destPath);
+        const stats = await globalThis.api.getStats(destPath);
         if (stats) {
             setConfirmState({
                 isOpen: true,
@@ -535,12 +541,11 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             confirmText: 'Delete',
             isDangerous: true,
             onConfirm: async () => {
-                await window.api.draft.delete(projectRoot, vId, backupPath);
-
+                await globalThis.api.draft.delete(projectRoot, vId, backupPath);
                 const relPath = getRelativePath();
                 if (relPath !== null) {
                     const p = relPath === '' ? '.' : relPath;
-                    const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
+                    const filtered = await globalThis.api.draft.getHistory(projectRoot, p, backupPath);
                     setHistory(filtered);
                     onRefresh?.();
                 } else {
@@ -595,15 +600,13 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
     const handleRenameVersion = async (vId: string, newLabel: string) => {
         if (!projectRoot || !newLabel.trim()) return;
-
         try {
-            await window.api.draft.renameVersion(projectRoot, vId, newLabel.trim(), backupPath);
-
+            await globalThis.api.draft.renameVersion(projectRoot, vId, newLabel.trim(), backupPath);
             // Refresh the history
             const relPath = getRelativePath();
             if (relPath !== null) {
                 const p = relPath === '' ? '.' : relPath;
-                const filtered = await window.api.draft.getHistory(projectRoot, p, backupPath);
+                const filtered = await globalThis.api.draft.getHistory(projectRoot, p, backupPath);
                 setHistory(filtered);
             }
         } catch (e) {
@@ -625,79 +628,71 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             return;
         }
 
-        // Extract old version to a temp file
-        const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
-        const tempDir = `${projectRoot}/.draft/temp`;
-        const tempFile = `${tempDir}/${file.name.replace(ext, '')}_v${versionId}_${Date.now()}${ext}`;
-
-        try {
-            await window.api.draft.extract(projectRoot, versionId, relativePath, tempFile, backupPath);
-
-            // Find the version label
-            const ver = history.find(v => v.id === versionId);
-            const verLabel = ver?.label || `Version ${versionId.slice(0, 8)}`;
-
-            setDiffState({
-                oldPath: tempFile,
-                newPath: file.path,
-                oldLabel: verLabel,
-                newLabel: 'Current',
-            });
-        } catch (e: any) {
-            console.error('[DiffViewer] Failed to extract version for diff:', e);
-            toast.error(`Failed to load version for comparison: ${e.message || e}`);
-        }
+        setDiffState({
+            relativePath,
+            currentFilePath: file.path,
+            initialLeftVersionId: versionId,
+            initialRightVersionId: 'current',
+        });
     };
 
     // Handle initialAction (shortcuts)
+    const hasTriggeredInitial = useRef(false);
+
+    // Reset hasTriggeredInitial when a new initialAction is received
     useEffect(() => {
-        if (!initialAction) return;
+        if (initialAction) {
+            hasTriggeredInitial.current = false;
+        }
+    }, [initialAction]);
 
-        if (initialAction === 'createVersion') {
-            if (!isFileDirty) {
-                toast.info(file?.isDirectory ? "No changes detected in this directory" : "No changes detected in this file");
-                if (onActionHandled) onActionHandled();
-                return;
-            }
-            if (activeTab !== 'versions' && activeTab !== 'snapshots') {
-                setActiveTab(file?.isDirectory ? 'snapshots' : 'versions');
-            }
-            // Use a small timeout to ensure the tab has rendered and state can settle
-            setTimeout(() => {
-                if (!isCreating) setIsCreating(true);
-            }, 0);
-        } else if (initialAction === 'compare') {
-            if (file?.isDirectory) return;
-            if (activeTab !== 'versions') setActiveTab('versions');
+    useEffect(() => {
+        if (!initialAction || hasTriggeredInitial.current) return;
 
-            // Trigger compare with latest version if history exists
-            if (history.length > 0) {
-                // Determine latest version (assuming last in array based on index 0 being newest visually? 
-                // Wait, logic in VersionsTab: verNum = history.length - node.index. Node index 0 is top?
-                // In VersionsTab: history.forEach((v, i) -> ...
-                // Usually list is descending?
-                // Let's assume history[0] is most recent? 
-                // VersionsTab uses node.y = index * ROW_HEIGHT.
-                // Latest is usually top.
-                // If history is appended to, history[last] is newest?
-                // DraftControlSystem `getMetadata` usually returns chronological list?
-                // Let's try comparing with the one at index 0 or index length-1.
-                // If I pick the wrong one, user sees diff with old version.
-                // Safest to compare with the one that has the highest timestamp or ID?
-                // Let's assume history[history.length - 1] is the LATEST created version.
-                const latest = history[history.length - 1];
-                if (latest) {
-                    handleCompare(latest.id);
+        const handleInitial = async () => {
+            if (initialAction === 'createVersion') {
+                if (!isFileDirty) {
+                    toast.info(file?.isDirectory ? "No changes detected in this directory" : "No changes detected in this file");
+                    if (onActionHandled) onActionHandled();
+                    hasTriggeredInitial.current = true;
+                    return;
                 }
-            } else if (!loading) {
-                toast.info("No versions to compare.");
-            }
-        }
+                if (activeTab !== 'versions' && activeTab !== 'snapshots') {
+                    setActiveTab(file?.isDirectory ? 'snapshots' : 'versions');
+                }
+                setTimeout(() => {
+                    if (!isCreating) setIsCreating(true);
+                }, 0);
+                if (onActionHandled) onActionHandled();
+                hasTriggeredInitial.current = true;
+            } else if (initialAction === 'compare') {
+                if (file?.isDirectory) {
+                    if (onActionHandled) onActionHandled();
+                    hasTriggeredInitial.current = true;
+                    return;
+                }
+                
+                if (activeTab !== 'versions') setActiveTab('versions');
 
-        if (onActionHandled) {
-            onActionHandled();
-        }
-    }, [initialAction, file, history, isCreating, activeTab, loading, onActionHandled]);
+                // Wait until versions have been fetched at least once
+                if (loading || !hasLoadedOnce.current) return;
+
+                if (history.length > 0) {
+                    // history[0] is typically the latest version
+                    handleCompare(history[0].id);
+                    if (onActionHandled) onActionHandled();
+                    hasTriggeredInitial.current = true;
+                } else {
+                    // If not loading and history is still empty, no versions exist
+                    toast.info("No versions to compare.");
+                    if (onActionHandled) onActionHandled();
+                    hasTriggeredInitial.current = true;
+                }
+            }
+        };
+
+        handleInitial();
+    }, [initialAction, file, history, isCreating, activeTab, loading, onActionHandled, isFileDirty]);
 
     // Todo Logic
     const handleAddTodo = (text: string, priority: Priority, tags: string[]) => {
@@ -727,8 +722,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             toast.error("No project root found.");
             return;
         }
-
-        const filePath = await window.api.openFile({
+        const filePath = await globalThis.api.openFile({
             filters: [
                 { name: 'Images', extensions: ['jpg', 'png', 'gif', 'jpeg', 'webp', 'svg'] },
                 { name: 'All Files', extensions: ['*'] }
@@ -736,8 +730,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
         });
 
         if (filePath) {
-            const result = await window.api.draft.saveAttachment(projectRoot, filePath, backupPath);
-
+            const result = await globalThis.api.draft.saveAttachment(projectRoot, filePath, backupPath);
             if (result.success) {
                 const newAttach: AttachmentItem = {
                     id: Date.now().toString(),
@@ -1092,10 +1085,13 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             {/* Diff Viewer Overlay */}
             {diffState && (
                 <DiffViewer
-                    oldPath={diffState.oldPath}
-                    newPath={diffState.newPath}
-                    oldLabel={diffState.oldLabel}
-                    newLabel={diffState.newLabel}
+                    history={history}
+                    projectRoot={projectRoot}
+                    backupPath={backupPath}
+                    relativePath={diffState.relativePath}
+                    currentFilePath={diffState.currentFilePath}
+                    initialLeftVersionId={diffState.initialLeftVersionId}
+                    initialRightVersionId={diffState.initialRightVersionId}
                     onClose={() => setDiffState(null)}
                 />
             )}

@@ -2,7 +2,7 @@ import React from 'react';
 import {
     ChevronLeft, ChevronRight, Home as HomeIcon, ChevronRight as ChevronRightIcon,
     FolderPlus, FilePlus, List, LayoutGrid, Check, RotateCw,
-    FilterIcon, History
+    FilterIcon, History, ChevronDown
 } from 'lucide-react';
 import { FileEntry } from './FileItem';
 
@@ -32,6 +32,7 @@ interface ToolbarProps {
     onCreateFile: () => void;
     setViewMode: (mode: 'list' | 'grid') => void;
     onNavigate: (path: string) => void;
+    onImport?: (type: 'file' | 'folder') => void;
 
 }
 
@@ -57,6 +58,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     onCreateFile,
     setViewMode,
     onNavigate,
+    onImport,
 }) => {
     // Helper to rebuild path up to index
     const getPathAtIndex = (parts: string[], index: number) => {
@@ -73,12 +75,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
     };
 
     const [isOptionsOpen, setOptionsOpen] = React.useState(false);
+    const [isImportOpen, setImportOpen] = React.useState(false);
     const optionsRef = React.useRef<HTMLDivElement>(null);
+    const importRef = React.useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (optionsRef.current && !optionsRef.current.contains(event.target as Node)) {
                 setOptionsOpen(false);
+            }
+            if (importRef.current && !importRef.current.contains(event.target as Node)) {
+                setImportOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -221,9 +228,52 @@ const Toolbar: React.FC<ToolbarProps> = ({
                             <FilePlus size={16} /> <span className="btn-text">New File</span>
                         </button>
 
+                        <div className="options-wrapper" ref={importRef}>
+                            <button className="action-btn" onClick={() => setImportOpen(!isImportOpen)} title="Import">
+                                <FilePlus size={16} /> <span className="btn-text">Import</span>
+                                <ChevronDown size={14} style={{ marginLeft: '4px', opacity: 0.7 }} />
+                            </button>
+                            {isImportOpen && (
+                                <div className="options-popover" style={{ left: 0, right: 'auto' }}>
+                                    <div 
+                                        className="option-item" 
+                                        onClick={() => { onImport?.('file'); setImportOpen(false); }}
+                                        role="menuitem"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                onImport?.('file');
+                                                setImportOpen(false);
+                                            }
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <FilePlus size={14} /> <span>Import File</span>
+                                        </div>
+                                    </div>
+                                    <div 
+                                        className="option-item" 
+                                        onClick={() => { onImport?.('folder'); setImportOpen(false); }}
+                                        role="menuitem"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                onImport?.('folder');
+                                                setImportOpen(false);
+                                            }
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <FolderPlus size={14} /> <span>Import Folder</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {onOpenChanges && (
                             <button className="action-btn" onClick={onOpenChanges} title="Show Changes">
-                                <History size={16} /> <span className="btn-text">Changes</span>
+                                <History size={16} />
                             </button>
                         )}
 

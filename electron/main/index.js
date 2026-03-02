@@ -414,6 +414,19 @@ ipcMain.handle("dialog:openFolder", async () => {
   }
 });
 
+ipcMain.handle("dialog:openCombined", async () => {
+  const { canceled, filePaths } = await import("electron").then((mod) =>
+    mod.dialog.showOpenDialog({
+      properties: ["openFile", "openDirectory", "multiSelections"],
+    }),
+  );
+  if (canceled) {
+    return null;
+  } else {
+    return filePaths; // Return all selected paths
+  }
+});
+
 ipcMain.handle("dialog:confirm", async (event, options) => {
   const { dialog, BrowserWindow } = await import("electron");
   const win = BrowserWindow.fromWebContents(event.sender);

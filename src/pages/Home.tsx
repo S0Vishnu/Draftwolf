@@ -13,7 +13,10 @@ import Toolbar from '../components/Toolbar';
 import FileList from '../components/FileList';
 import InspectorPanel from '../components/InspectorPanel';
 import ContextMenu from '../components/ContextMenu';
+import { getCategory } from '../components/diff/DiffViewer';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ConflictDialog from '../components/ConflictDialog';
+import DragOverlay from '../components/DragOverlay';
 import CustomPopup from '../components/CustomPopup';
 import RecentWorkspaces from '../components/RecentWorkspaces';
 import AICommitModal from '../components/AICommitModal';
@@ -203,6 +206,46 @@ const Home = () => {
         if (rootDir) localStorage.setItem('rootDir', rootDir);
         else localStorage.removeItem('rootDir');
     }, [rootDir]);
+
+    // Global Drag State
+    const [isDraggingGlobal, setIsDraggingGlobal] = useState(false);
+    const dragCounter = useRef(0);
+
+    const handleGlobalDragEnter = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter.current++;
+        if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+            setIsDraggingGlobal(true);
+        }
+    };
+
+    const handleGlobalDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter.current--;
+        if (dragCounter.current === 0) {
+            setIsDraggingGlobal(false);
+        }
+    };
+
+    const handleGlobalDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleGlobalDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDraggingGlobal(false);
+        dragCounter.current = 0;
+
+        // Only handle if it's dropped on some random space
+        // FileList has its own handler that stops propagation
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            await handleDrop(e);
+        }
+    };
 
     useEffect(() => {
         // 1. Get initial session
@@ -557,6 +600,19 @@ const Home = () => {
         paths: string[];
         op: 'copy' | 'cut';
     } | null>(null);
+
+    // Conflict Dialog State
+    const [conflictState, setConflictState] = useState<{
+        isOpen: boolean;
+        item: { name: string, fullPath: string };
+        targetFolder: string;
+        onResolved: (action: 'replace' | 'skip') => void;
+    }>({
+        isOpen: false,
+        item: { name: '', fullPath: '' },
+        targetFolder: '',
+        onResolved: () => { }
+    });
 
     // Dialogs
     const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean, targets: FileEntry[] }>({ isOpen: false, targets: [] });
@@ -1305,42 +1361,129 @@ const Home = () => {
         }
     };
 
-    const processExternalFiles = async (fileList: FileList) => {
-        // Fallback to project root if currentPath is somehow empty but rootDir exists
-        const targetDir = currentPath || rootDir;
+    const checkCollision = async (targetDir: string, name: string) => {
+        const destPath = joinPath(targetDir, name);
+        try {
+            // Check if file exists
+            const stats = await globalThis.api.getStats(destPath);
+            return stats !== null;
+        } catch (e) {
+            return false;
+        }
+    };
 
-        if (!targetDir || fileList.length === 0) return;
+    const copyItems = async (sourcePaths: string[], targetDir: string, op: 'copy' | 'cut' = 'copy') => {
+        if (!targetDir || sourcePaths.length === 0) return;
 
         let successCount = 0;
-        const toastId = toast.loading("Copying files...");
+        const toastId = toast.loading(`${op === 'copy' ? 'Copying' : 'Moving'} items...`);
 
         try {
-            for (let i = 0; i < fileList.length; i++) {
-                const file = fileList[i];
-                // @ts-ignore - 'path' property exists on File object in Electron environment
-                const sourcePath = file.path;
+            for (const src of sourcePaths) {
+                const name = src.split(/[/\\]/).pop() || 'item';
+                const dest = joinPath(targetDir, name);
 
-                if (sourcePath) {
-                    const fileName = sourcePath.split(/[/\\]/).pop();
-                    const destPath = joinPath(targetDir, fileName);
+                const hasCollision = await checkCollision(targetDir, name);
 
-                    // Use existing copy API
-                    // @ts-ignore
-                    const result = await globalThis.api.copyEntry({ sourcePath, destPath });
+                if (hasCollision) {
+                    // Item exists, ask user
+                    const action = await new Promise<'replace' | 'skip' | 'cancel'>((resolve) => {
+                        setConflictState({
+                            isOpen: true,
+                            item: { name, fullPath: src },
+                            targetFolder: targetDir,
+                            onResolved: (act) => {
+                                setConflictState(prev => ({ ...prev, isOpen: false }));
+                                resolve(act);
+                            }
+                        });
+                    });
+
+                    if (action === 'skip') continue;
+                    if (action === 'cancel') break;
+                    // For 'replace', we just proceed. fs.cp handles overwrite if we delete first or if supported.
+                    // Actually fs.cp on Electron might need recursive: true and force if available.
+                    // If replacing, let's delete first to be safe since we don't have 'force' prop in index.js for fs.cp
+                    if (action === 'replace') {
+                        await globalThis.api.deleteEntry(dest);
+                    }
+                }
+
+                if (op === 'copy') {
+                    const result = await globalThis.api.copyEntry(src, dest);
                     if (result) successCount++;
+                } else {
+                    await globalThis.api.renameEntry(src, dest);
+                    successCount++;
                 }
             }
 
             if (successCount > 0) {
-                toast.update(toastId, { render: `Copied ${successCount} items`, type: "success", isLoading: false, autoClose: 2000 });
+                toast.update(toastId, { render: `${op === 'copy' ? 'Copied' : 'Moved'} ${successCount} item(s)`, type: "success", isLoading: false, autoClose: 2000 });
                 refreshDirectory();
             } else {
-                toast.update(toastId, { render: "Failed to copy items", type: "error", isLoading: false, autoClose: 2000 });
+                toast.update(toastId, { render: "No items were changed", type: "info", isLoading: false, autoClose: 2000 });
             }
-        } catch (err) {
-            console.error("Paste error:", err);
-            toast.update(toastId, { render: "Error copying files", type: "error", isLoading: false, autoClose: 2000 });
+        } catch (err: any) {
+            console.error("File operation error:", err);
+            toast.update(toastId, { render: "Error: " + err.message, type: "error", isLoading: false, autoClose: 2000 });
         }
+    };
+
+    const handleImport = async (type: 'file' | 'folder') => {
+        if (!currentPath) return;
+
+        try {
+            const api = globalThis.api;
+            const openPath = type === 'file'
+                ? await api.openFile()
+                : await api.openFolder();
+
+            if (openPath) {
+                await copyItems([openPath], currentPath, 'copy');
+            }
+        } catch (e) {
+            console.error("Import failed:", e);
+            toast.error("Failed to import");
+        }
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetFolder?: string) => {
+        e.preventDefault();
+        const destDir = targetFolder || currentPath;
+        if (!destDir) return;
+
+        // Internal Drag
+        const internalData = e.dataTransfer.getData('application/json');
+        if (internalData) {
+            const { path } = JSON.parse(internalData);
+            // Don't drop item into itself
+            if (path === destDir) return;
+            // Don't drop into parent of itself (nothing would change)
+            if (destDir === currentPath) {
+                // Check if currentPath is actually different from path's parent
+                // But for now, just let it through, or if selectedPaths includes destDir, ignore
+            }
+
+            const paths = selectedPaths.has(path) ? Array.from(selectedPaths) : [path];
+            await copyItems(paths, destDir, 'cut'); // Drag and drop usually moves
+            return;
+        }
+
+        // External Files
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const paths = Array.from(e.dataTransfer.files).map(f => (f as any).path).filter(p => !!p);
+            if (paths.length > 0) {
+                await copyItems(paths, destDir, 'copy');
+            }
+        }
+    };
+
+    const processExternalFiles = async (fileList: FileList) => {
+        const targetDir = currentPath || rootDir;
+        if (!targetDir || fileList.length === 0) return;
+        const paths = Array.from(fileList).map(f => (f as any).path).filter(p => !!p);
+        await copyItems(paths, targetDir, 'copy');
     };
 
     // System Paste Listener (for files from Explorer)
@@ -1391,36 +1534,8 @@ const Home = () => {
         },
         paste: async () => {
             if (!appClipboard || !currentPath) return;
-            for (const src of appClipboard.paths) {
-                const srcName = src.split(/[/\\]/).pop() || 'unknown';
-                let dest = joinPath(currentPath, srcName);
-
-                // Collision handling
-                if (appClipboard.op === 'copy') {
-                    // If file exists, find unique name
-                    // Pattern: name (N).ext
-                    let finalName = srcName;
-                    let counter = 1;
-
-                    const nameParts = srcName.split('.');
-                    const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
-                    const base = nameParts.join('.');
-
-                    while (files.some(f => f.name === finalName)) {
-                        finalName = `${base} (${counter})${ext}`;
-                        counter++;
-                    }
-                    dest = joinPath(currentPath, finalName);
-                    await globalThis.api.copyEntry(src, dest);
-                }
-                else {
-                    // Cut/Move
-                    await globalThis.api.renameEntry(src, dest);
-                }
-            }
+            await copyItems(appClipboard.paths, currentPath, appClipboard.op);
             if (appClipboard.op === 'cut') setAppClipboard(null);
-            refreshDirectory();
-            toast.success(`Pasted ${appClipboard.paths.length} item(s)`);
         },
         newFolder: () => initCreateFolder(),
         newFile: () => initCreateFile(),
@@ -1441,6 +1556,14 @@ const Home = () => {
                         toast.success("Pinned to sidebar");
                     }
                 }
+            }
+        },
+        compare: () => {
+            const targets = getSelectedFiles();
+            if (targets.length === 1) {
+                setInspectorTab('versions');
+                setPreviewOpen(true);
+                setInspectorAction('compare');
             }
         }
     };
@@ -1484,6 +1607,20 @@ const Home = () => {
                     { label: 'Copy', action: menuActions.copy, shortcut: 'Ctrl+C' },
                     { label: 'Delete', action: menuActions.delete, shortcut: 'Del', danger: true },
                 ];
+
+            if (!contextMenu.target.isDirectory) {
+                const category = getCategory(contextMenu.target.path);
+                if (category === 'image' || category === 'model') {
+                    // Find index of Delete to insert before it
+                    const deleteIndex = baseOptions.findIndex(o => o.label === 'Delete');
+                    const compareOption = { label: 'Compare', action: menuActions.compare, shortcut: 'Ctrl+D', disabled: isMulti };
+                    if (deleteIndex !== -1) {
+                        baseOptions.splice(deleteIndex, 0, compareOption);
+                    } else {
+                        baseOptions.push(compareOption);
+                    }
+                }
+            }
 
             return baseOptions;
 
@@ -1635,7 +1772,15 @@ const Home = () => {
     );
 
     return (
-        <div className="app-shell" style={{ flexDirection: 'column' }}>
+        <div 
+            className="app-shell" 
+            style={{ flexDirection: 'column' }}
+            onDragEnter={handleGlobalDragEnter}
+            onDragLeave={handleGlobalDragLeave}
+            onDragOver={handleGlobalDragOver}
+            onDrop={handleGlobalDrop}
+        >
+            <DragOverlay isVisible={isDraggingGlobal} />
             <div className="app-inner" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%' }}>
                 <Sidebar
                     isOpen={isSidebarOpen}
@@ -1707,7 +1852,7 @@ const Home = () => {
                                     setPreviewOpen(true);
                                 }}
                                 onNavigate={navigateTo}
-
+                                onImport={handleImport}
                             />
 
                             <div
@@ -1719,14 +1864,7 @@ const Home = () => {
                                     e.preventDefault();
                                     e.stopPropagation();
                                 }}
-                                onDrop={async (e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-
-                                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                                        processExternalFiles(e.dataTransfer.files);
-                                    }
-                                }}
+                                onDrop={handleDrop}
                                 role="grid"
                                 aria-label="File explorer content area"
                                 tabIndex={0}
@@ -1757,6 +1895,7 @@ const Home = () => {
                                     projectRoot={rootDir}
                                     currentUserId={user?.id}
                                     ignorePatterns={projectIgnorePatterns}
+                                    onDrop={handleDrop}
                                 />
 
 

@@ -5,6 +5,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   openFile: (options) => electronAPI.ipcRenderer.invoke('dialog:openFile', options),
   openFolder: () => electronAPI.ipcRenderer.invoke('dialog:openFolder'),
+  openCombined: () => electronAPI.ipcRenderer.invoke('dialog:openCombined'),
   readDir: (path) => electronAPI.ipcRenderer.invoke('fs:readDir', path),
   createFolder: (path) => electronAPI.ipcRenderer.invoke('fs:createFolder', path),
   createFile: (path) => electronAPI.ipcRenderer.invoke('fs:createFile', path),

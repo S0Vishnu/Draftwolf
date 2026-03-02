@@ -155,6 +155,16 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
     // Content starts after all lanes
     const contentLeftMargin = LEFT_PADDING + (maxLane * LANE_WIDTH) + 12;
 
+    const [comparingId, setComparingId] = useState<string | null>(null);
+
+    const handleCompareClick = (nodeId: string) => {
+        if (comparingId) return;
+        setComparingId(nodeId);
+        onCompare?.(nodeId);
+        // Re-enable after a short delay to prevent spamming while modal/pane opens
+        setTimeout(() => setComparingId(null), 2000);
+    };
+
     return (
         <div className="versions-list">
             {isDirty && (
@@ -317,8 +327,10 @@ const VersionsTab: React.FC<VersionsTabProps> = ({
                                     {onCompare && !file?.isDirectory && (
                                         <button
                                             className="version-action-btn version-compare-btn"
-                                            onClick={(e) => { e.stopPropagation(); onCompare(node.id); }}
-                                            title="Compare with current"
+                                            onClick={(e) => { e.stopPropagation(); handleCompareClick(node.id); }}
+                                            disabled={!!comparingId}
+                                            style={!!comparingId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                                            title={!!comparingId ? "Launching comparison..." : "Compare with current"}
                                         >
                                             <Eye size={13} />
                                         </button>

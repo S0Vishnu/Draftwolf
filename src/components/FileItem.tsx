@@ -32,6 +32,7 @@ interface FileItemProps {
     isLocked?: boolean;
     lockedBy?: string;
     isIgnored?: boolean;
+    onDrop?: (e: React.DragEvent) => void;
 }
 
 const FileItem: React.FC<FileItemProps> = ({
@@ -50,7 +51,8 @@ const FileItem: React.FC<FileItemProps> = ({
     showExtensions = true,
     isLocked,
     lockedBy,
-    isIgnored
+    isIgnored,
+    onDrop
 }) => {
 
     const inputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +82,7 @@ const FileItem: React.FC<FileItemProps> = ({
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     };
 
     const formatDate = (date?: Date) => {
@@ -111,10 +113,42 @@ const FileItem: React.FC<FileItemProps> = ({
             <div
                 className={`list-row ${selected ? 'selected' : ''}`}
                 data-path={file.path}
+                draggable={!renaming}
+                onDragStart={(e) => {
+                    if (renaming) return;
+                    if (!selected) {
+                        onSelect(e as any);
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify({ path: file.path }));
+                    e.dataTransfer.effectAllowed = 'copyMove';
+                }}
+                onDragOver={(e) => {
+                    if (file.isDirectory) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    }
+                }}
+                onDrop={(e) => {
+                    if (file.isDirectory) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDrop?.(e);
+                    }
+                }}
                 onMouseDown={onSelect}
                 onDoubleClick={onNavigate}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') onNavigate();
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        onSelect(e as any);
+                    }
+                }}
                 onContextMenu={onContextMenu}
                 style={isIgnored ? { opacity: 0.5 } : undefined}
+                role="option"
+                tabIndex={0}
+                aria-selected={selected}
             >
                 <div className="col col-icon">
                     <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -174,10 +208,43 @@ const FileItem: React.FC<FileItemProps> = ({
         <div
             className={`grid-card ${selected ? 'selected' : ''}`}
             data-path={file.path}
+            draggable={!renaming}
+            onDragStart={(e) => {
+                if (renaming) return;
+                // If not already selected, select only this one
+                if (!selected) {
+                    onSelect(e as any);
+                }
+                e.dataTransfer.setData('application/json', JSON.stringify({ path: file.path }));
+                e.dataTransfer.effectAllowed = 'copyMove';
+            }}
+            onDragOver={(e) => {
+                if (file.isDirectory) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                }
+            }}
+            onDrop={(e) => {
+                if (file.isDirectory) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDrop?.(e);
+                }
+            }}
             onMouseDown={onSelect}
             onDoubleClick={onNavigate}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') onNavigate();
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    onSelect(e as any);
+                }
+            }}
             onContextMenu={onContextMenu}
             style={isIgnored ? { opacity: 0.5 } : undefined}
+            role="option"
+            tabIndex={0}
+            aria-selected={selected}
         >
             <div className="card-icon">
                 {file.latestVersion && (

@@ -51,7 +51,7 @@ const Extensions = () => {
     const downloadInApp = typeof globalThis.api?.downloadFile === 'function';
     if (!downloadInApp) {
       window.open(url, '_blank');
-      toast.success('Download started. Check your downloads folder.');
+      toast.success('Download started.');
       return;
     }
 
@@ -73,12 +73,12 @@ const Extensions = () => {
 
   const handleInstall = (ext: Extension) => {
     window.open(ext.repositoryUrl, '_blank');
-    toast.info(`Open the repository to install ${ext.name}.`);
+    toast.info('Opening installation guide.');
   };
 
   const handleTheme = (ext: Extension) => {
     window.open(ext.repositoryUrl, '_blank');
-    toast.info(`Open the theme repository to install ${ext.name}.`);
+    toast.info('Opening theme page.');
   };
 
   const getActionButton = (ext: Extension) => {
@@ -97,7 +97,7 @@ const Extensions = () => {
           className="ext-btn ext-btn-primary"
           disabled={isDownloading}
         >
-          <Download size={16} /> {isDownloading ? 'Downloading…' : 'Download .zip'}
+          <Download size={16} /> {isDownloading ? 'Downloading…' : 'Download'}
         </button>
       );
     }
@@ -134,19 +134,16 @@ const Extensions = () => {
 
         <main className="extensions-content">
           <header className="extensions-header">
-            <div className="extensions-header-text">
-              <h1>Add-ons</h1>
-              <p>Plugins, moodboards, and themes from the DraftWolf ecosystem. Each comes from its own repository.</p>
-            </div>
+            <h1>Add-ons</h1>
             <div className="extensions-search-wrap">
               <Search size={20} className="extensions-search-icon" />
               <input
                 type="search"
-                placeholder="Search extensions…"
+                placeholder="Search add-ons…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="extensions-search-input"
-                aria-label="Search extensions"
+                aria-label="Search add-ons"
               />
             </div>
           </header>
@@ -187,9 +184,9 @@ const Extensions = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="ext-btn ext-btn-ghost"
-                          title="View repository"
+                          title="Learn more"
                         >
-                          <ExternalLink size={16} /> Visit
+                          <ExternalLink size={16} /> Learn more
                         </a>
                       )}
                     </div>

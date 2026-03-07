@@ -19,6 +19,14 @@ import DiffViewer, { getCategory } from './diff/DiffViewer';
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 800;
 
+/** True when nothing is selected or the selected item is the project root (workspace-level view). */
+function isRootOrNoSelection(file: { path: string; isDirectory?: boolean } | null, projectRoot: string): boolean {
+    if (!file || !projectRoot) return true;
+    const n = (p: string) => p.replace(/\\/g, '/');
+    const rel = n(file.path).replace(n(projectRoot), '').replace(/^\/+/, '').replace(/\/+$/, '') || '.';
+    return rel === '' || rel === '.';
+}
+
 const InspectorPanel: React.FC<InspectorPanelProps> = ({
     file,
     projectRoot,
@@ -855,6 +863,28 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     />
                 );
             case 'versions':
+                if (isRootOrNoSelection(file, projectRoot)) {
+                    return (
+                        <SnapshotsTab
+                            history={history}
+                            isCreating={isCreating}
+                            setIsCreating={setIsCreating}
+                            versionLabel={versionLabel}
+                            setVersionLabel={setVersionLabel}
+                            onCreateVersion={handleCreateSnapshot}
+                            loading={loading}
+                            activeVersionId={activeVersionId}
+                            file={file}
+                            onDownload={handleDownload}
+                            onDelete={handleDeleteVersion}
+                            onRestore={handleRestore}
+                            onRename={handleRenameVersion}
+                            projectRoot={projectRoot}
+                            changedFiles={changedFiles}
+                            onNavigateToChanges={() => setActiveTab('changes')}
+                        />
+                    );
+                }
                 return (
                     <VersionsTab
                         history={history}
@@ -997,7 +1027,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             <div className="inspector-content">
                 <div className="inspector-header">
                     <h3>
-                        {activeTab === 'versions' ? 'Versions' :
+                        {activeTab === 'versions' ? (isRootOrNoSelection(file, projectRoot) ? 'Snapshots' : 'Versions') :
                             activeTab === 'tasks' ? 'Tasks' :
                                 activeTab === 'attachments' ? 'Attachments' :
                                     activeTab === 'snapshots' ? 'Snapshots' :

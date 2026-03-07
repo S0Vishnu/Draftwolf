@@ -64,7 +64,7 @@ To transition from a "local tool for freelancers" to a viable competitor against
 ### Cloud Infrastructure (The "Wolf Pack")
 
 #### 1. Cloud Synchronization & Collaboration
-*   **Requirement:** Users must be able to push their local snapshots to a remote server (Firebase/AWS) to collaborate with others.
+*   **Requirement:** Users must be able to push their local snapshots to a remote server (e.g. Supabase Storage or AWS) to collaborate with others.
 *   **Why:** Collaboration is the primary reason teams use Perforce/Plastic. Without it, Draftwolf is limited to solo use.
 
 #### 2. Exclusive File Locking (Binary Locking)

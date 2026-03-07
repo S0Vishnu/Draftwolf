@@ -1,6 +1,6 @@
 # Feature Implementation Prompts
 
-This document contains a set of prompts to be used in a fresh chat session to implement specific features for DraftWolf. The features are ordered from easiest to hardest to integrate.
+This document contains prompts for implementing specific features for DraftWolf. Use in a fresh chat when tackling a feature. Features are ordered from easiest to hardest. Completed items are marked.
 
 ## 1. Background File Monitoring & System Notifications (Easy) - [COMPLETED]
 **Context:** The application already uses `chokidar` for file watching. We need to move from potential immediate actions (or no actions) to a polling-based notification system. Notifications must be **native OS-level** (e.g., Windows toast notifications, macOS Notification Center), not in-app messages.
@@ -14,8 +14,8 @@ This document contains a set of prompts to be used in a fresh chat session to im
 > 6.  Clicking the notification should bring the app window to the foreground and navigate to the relevant view.
 > 7.  Ensure this runs unobtrusively in the background, even when the app is minimized to the system tray.
 
-## 2. Custom Version Storage Location (Medium)
-**Context:** Currently, `.draft` folders are likely created directly in the project root. Users need the ability to centralize or offload this storage to avoid cluttering the source directory.
+## 2. Custom Version Storage Location (Medium) — [COMPLETED]
+**Context:** Users can set a backup path in Settings; when using a shared backup folder, the app auto-appends the project name to avoid collisions.
 **Prompt:**
 > I want to separate the version history data from the source code.
 > 1.  Add a new option in the 'General' Settings page: "Version Storage Path".

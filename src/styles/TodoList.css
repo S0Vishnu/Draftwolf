@@ -51,11 +51,24 @@
 
 .todo-container .filter-group {
     height: 100%;
+    max-width: 200px;
     display: flex;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 8px;
     padding: 2px;
     gap: 0;
+    min-width: 0;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 0.2s ease, max-width 0.2s ease;
+}
+
+.todo-container .filter-group.search-focused {
+    opacity: 0;
+    max-width: 0;
+    padding: 0;
+    margin: 0;
+    pointer-events: none;
 }
 
 .todo-container .filter-btn {
@@ -150,8 +163,9 @@
 }
 
 .priority-btn {
-    width: 20px;
+    min-width: 20px;
     height: 20px;
+    padding: 0 6px;
     border-radius: 4px;
     border: none;
     background: transparent;
@@ -159,6 +173,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     transition: background 0.2s;
 }
 
@@ -169,8 +184,19 @@
 .priority-dot {
     width: 8px;
     height: 8px;
+    flex-shrink: 0;
     border-radius: 50%;
     transition: opacity 0.2s;
+}
+
+.priority-label {
+    font-size: 10px;
+    text-transform: capitalize;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.priority-btn.active .priority-label {
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .tag-trigger-btn {

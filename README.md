@@ -6,7 +6,7 @@ Welcome to **DraftWolf**, the desktop application that understands your commitme
 
 ---
 
-## 🤔 Why purely?
+## 🤔 Why DraftWolf?
 
 We've all been there. Your folder looks like a graveyard of good intentions:
 - `script.txt`
@@ -42,6 +42,9 @@ Click a file. Boom. History. Metadata. File size trends. It's an X-Ray for your 
 ### 🔔 Smart Notifications
 We watch your files in the background. If you've been working for a while, we'll gently nudge you to version your changes. No more "I forgot to save" excuses.
 
+### 👥 Community
+Sign in with email or Google to join the in-app Community: chat, polls, and shared discussions so you can connect with other DraftWolf users.
+
 ---
 
 ## 🌍 The Ecosystem
@@ -65,7 +68,7 @@ We threw a bunch of buzzwords into a blender and this came out perfectly:
 - **Electron** – Desktop power with web tech.
 - **Zustand** – State management without the headache.
 - **Tailwind CSS** – Pretty styles, fast.
-- **Firebase** – Real-time magic for locking and auth.
+- **Supabase** – Auth (email, Google), real-time community chat, and profiles.
 - **Three.js** – For when we need to get 3D.
 - **Chokidar** – Watching your files like a hawk.
 
@@ -80,10 +83,13 @@ Here's a quick tour of the codebase:
   - `InspectorPanel.tsx`: The details view.
   - `FileList.tsx`: Where your files live.
 - **`src/pages`**: The main screens.
-  - `Home.tsx`: The dashboard.
-  - `ProjectSettings.tsx`: Where you configure ignores and other settings.
+  - `Home.tsx`: The dashboard and file browser.
+  - `ProjectSettings.tsx`: Configure ignores, backup location, and other project settings.
   - `Settings.tsx`: App-wide preferences.
-  - `Cleanup.tsx`: The snapshot management interface.
+  - `Cleanup.tsx`: Snapshot management and storage.
+  - `Community/`: In-app community (chat, polls).
+  - `Login.tsx`, `OTPVerification.tsx`: Auth (Supabase).
+  - `Extensions.tsx`: Extensions / add-ons.
 - **`src/services`**: The logic layer.
   - `LockService.ts`: Handles file locking.
   - `AIService.ts`: Brains of the operation.

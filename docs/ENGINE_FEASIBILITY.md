@@ -1,7 +1,7 @@
 # DraftWolf Feasibility: Unity & Unreal Engine Projects
 
-**Date:** February 14, 2026  
-**Version:** 1.1.9 (Local-First Architecture)
+**Date:** February 14, 2026 (updated March 2, 2026)  
+**Version:** 1.1.10 (Local-First Architecture)
 
 ---
 

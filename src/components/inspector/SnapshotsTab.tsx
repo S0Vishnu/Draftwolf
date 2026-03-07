@@ -12,7 +12,7 @@ interface SnapshotsTabProps {
     onCreateVersion: () => void;
     loading: boolean;
     activeVersionId: string | null;
-    file: FileEntry;
+    file: FileEntry | null;
     onDownload: (ver: any, verNum: number) => void;
     onDelete: (id: string) => void;
     onRestore: (id: string) => void;
@@ -42,6 +42,18 @@ const formatSize = (bytes?: number) => {
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
+/** Normalized relative path from project root (forward slashes, no leading slash; root → '.'). */
+function getNormalizedRelativePath(file: FileEntry | null, projectRoot: string): string {
+    if (!file || !projectRoot) return '.';
+    const normalize = (p: string) => p.replaceAll('\\', '/');
+    const root = normalize(projectRoot);
+    let rel = normalize(file.path);
+    if (rel.startsWith(root)) {
+        rel = rel.substring(root.length).replace(/^[/\\]+/g, '') || '.';
+    }
+    return rel || '.';
+}
+
 const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
     history,
     isCreating,
@@ -63,7 +75,22 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
 }) => {
     const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
     const [editingLabel, setEditingLabel] = useState<string>('');
-    const [stats, setStats] = useState<{ totalSize: number, totalCompressedSize: number, compressionRatio: string } | null>(null);
+    const [stats, setStats] = useState<{
+        totalSize: number;
+        totalCompressedSize: number;
+        compressionRatio: string;
+        snapshots?: { scope: string; totalSize: number; totalCompressedSize: number }[];
+    } | null>(null);
+
+    const relativePath = useMemo(
+        () => getNormalizedRelativePath(file, projectRoot),
+        [file, projectRoot]
+    );
+
+    const isFolderScope = useMemo(
+        () => Boolean(file && file.isDirectory && relativePath !== '' && relativePath !== '.'),
+        [file, relativePath]
+    );
 
     const isDirty = useMemo(() => {
         if (!projectRoot || !changedFiles) return false;
@@ -89,6 +116,23 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
             return cPath === target || cPath.startsWith(target + '/');
         });
     }, [projectRoot, changedFiles, file]);
+
+    const displayStats = useMemo(() => {
+        if (!stats) return null;
+        if (!isFolderScope) {
+            return { totalSize: stats.totalSize, totalCompressedSize: stats.totalCompressedSize };
+        }
+        const match = (stats.snapshots || []).find(
+            (s) => s.scope === relativePath
+        );
+        if (!match) {
+            return { totalSize: 0, totalCompressedSize: 0 };
+        }
+        return {
+            totalSize: match.totalSize,
+            totalCompressedSize: match.totalCompressedSize
+        };
+    }, [stats, isFolderScope, relativePath]);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -172,7 +216,7 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
 
     return (
         <div className="versions-list">
-            {(changedFiles && changedFiles.length > 0) && (
+            {(changedFiles && changedFiles.length > 0 && !isFolderScope) && (
                 <div className="changes-preview-card">
                     <div className="changes-preview-header">
                         <span className="changes-preview-title">Pending Changes</span>
@@ -207,24 +251,26 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({
                     )}
                 </div>
             )}
-            {/* Stats Header */}
-            {stats && (
+            {/* Stats Header — compressed size is what's stored/used; original is pre-compression; % Saved = compression efficiency */}
+            {displayStats && (
                 <div className="snapshot-stats-container">
                     <div className="stats-info-group">
                         <HardDrive size={16} className="text-muted" />
                         <div>
-                            <div className="stats-label">Storage Used</div>
+                            <div className="stats-label" title="Stored size (compressed) / original size">
+                                Storage used (compressed){isFolderScope ? ' (this folder)' : ''}
+                            </div>
                             <div className="stats-value">
-                                {formatSize(stats.totalCompressedSize)}
-                                <span className="stats-sub-text"> / {formatSize(stats.totalSize)}</span>
+                                {formatSize(displayStats.totalCompressedSize)}
+                                <span className="stats-sub-text"> / {formatSize(displayStats.totalSize)} original</span>
                             </div>
                         </div>
                     </div>
                     <div className="stats-efficiency-group">
-                        <div className="stats-label">Efficiency</div>
+                        <div className="stats-label" title="Space saved by compression">Efficiency</div>
                         <div className="stats-efficiency-value">
-                            {stats.totalSize > 0
-                                ? Math.round((1 - (stats.totalCompressedSize / stats.totalSize)) * 100)
+                            {displayStats.totalSize > 0
+                                ? Math.round((1 - (displayStats.totalCompressedSize / displayStats.totalSize)) * 100)
                                 : 0}% Saved
                         </div>
                     </div>

@@ -32,8 +32,13 @@ function TrayListener() {
     });
     // Listen for "Open with DraftWolf" from Windows context menu
     const unsubContextMenu = api.onOpenWithFolder?.((path: string) => {
-      sessionStorage.setItem('trayOpenPath', path);
-      navigate('/home');
+      try {
+        sessionStorage.setItem('trayOpenPath', path);
+        sessionStorage.setItem('manual_workspace_action', 'true');
+        navigate('/home');
+      } catch (err) {
+        console.error("Failed to routing to workspace from context menu", err);
+      }
     });
     return () => {
       unsubFolder();

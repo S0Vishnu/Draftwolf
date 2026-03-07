@@ -22,31 +22,47 @@ import { startApiServer } from "./api-server";
 let apiServer = startApiServer();
 
 // Helper: extract a folder path from command-line argv
+/**
+ * @param {string[]} argv
+ * @returns {string | null}
+ */
 function getFolderFromArgv(argv) {
-  const isDev = !app.isPackaged;
-  const cwd = resolve(process.cwd()).toLowerCase().replace(/[\\/]+$/, '');
-  const appPath = resolve(app.getAppPath()).toLowerCase().replace(/[\\/]+$/, '');
-
   for (let i = argv.length - 1; i >= 1; i--) {
-    let arg = argv[i];
-    if (arg.startsWith('--') || arg.startsWith('-') || arg.startsWith('myapp://')) continue;
-    if (arg.toLowerCase().includes('electron.exe') || arg.toLowerCase().includes('node_modules')) continue;
-    if (arg.endsWith('.js') || arg.endsWith('.ts') || arg.endsWith('.json')) continue;
-
-    try {
-      if (existsSync(arg) && statSync(arg).isDirectory()) {
-        const fullPath = resolve(arg).toLowerCase().replace(/[\\/]+$/, '');
-        // In dev mode, don't auto-open current project or root '.'
-        if (isDev && (arg === '.' || fullPath === cwd || fullPath === appPath)) {
-          continue;
-        }
-        return resolve(arg);
-      }
-    } catch (error) {
-      // Ignored
-    }
+    const folderPath = parseArgForFolder(argv[i]);
+    if (folderPath) return folderPath;
   }
   return null;
+}
+
+/**
+ * Helper to validate if an argument is a valid directory
+ * @param {string} arg
+ * @returns {string | null}
+ */
+function parseArgForFolder(arg) {
+  if (typeof arg !== 'string') return null;
+  if (arg.startsWith('--') || arg.startsWith('-') || arg.startsWith('myapp://')) return null;
+  const lower = arg.toLowerCase();
+  if (lower.includes('electron.exe') || lower.includes('node_modules')) return null;
+  if (arg.endsWith('.js') || arg.endsWith('.ts') || arg.endsWith('.json')) return null;
+
+  try {
+    if (!existsSync(arg)) return null;
+    const stat = statSync(arg);
+    if (!stat.isDirectory()) return null;
+
+    const fullPath = resolve(arg).toLowerCase().replace(/[\\/]+$/, '');
+    const isDev = !app.isPackaged;
+    if (isDev) {
+      const cwd = resolve(process.cwd()).toLowerCase().replace(/[\\/]+$/, '');
+      const appPath = resolve(app.getAppPath()).toLowerCase().replace(/[\\/]+$/, '');
+      if (arg === '.' || fullPath === cwd || fullPath === appPath) return null;
+    }
+    return resolve(arg);
+  } catch (error) {
+    console.warn(`[Argv parsing] Error checking path ${arg}:`, error.message);
+    return null;
+  }
 }
 
 // Register custom protocol
@@ -409,11 +425,27 @@ function createWindow() {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  // Set app user model id for windows
+  // This method will be called when Electron has finished
+  // initialization and is ready to create browser windows.
+  // Some APIs can only be used after this event occurs.
+  app.whenReady().then(() => {
+    // Attempt Windows 11 Initial Context Menu Registration
+    try {
+      if (process.platform === 'win32') {
+        // Attempt to load the native addon for Windows 11 IExplorerCommand context menu
+        const { registerContextMenu } = require('windows-11-context-menu');
+        registerContextMenu({
+          name: 'Open with DraftWolf',
+          command: `"${process.execPath}" "%V"`,
+          icon: process.execPath
+        });
+        console.log("Successfully registered Windows 11 native context menu.");
+      }
+    } catch (error) {
+      console.warn("Failed to register Windows 11 initial context menu (Native module not found or failed). Falling back to classic menu.", error.message);
+    }
+
+    // Set app user model id for windows
   electronApp.setAppUserModelId("com.draftwolf.app");
 
   // Default open or close DevTools by F12 in development

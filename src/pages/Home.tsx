@@ -335,10 +335,16 @@ const Home = () => {
 
                 if (!meta) {
                     // New Project / Uninitialized - Show Modal
+                    if (isManualAction) {
+                        toast.info("Preparing New Workspace Environment...");
+                    }
                     setInitModalOpen(true);
                     // Do NOT set sessionKey yet, wait for user action
                 } else {
                     // Existing Project - Auto Snapshot Logic
+                    if (isManualAction) {
+                        toast.info("Loading Workspace...");
+                    }
                     // NEW: Only trigger if it was a manual "Create Workspace" action
                     if (meta.createSnapshotOnOpen !== false && isManualAction) {
                         // @ts-ignore

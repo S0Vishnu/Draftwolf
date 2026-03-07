@@ -102,7 +102,19 @@ const Home = () => {
 
     useEffect(() => {
         if (typeof globalThis.api?.setPinnedFoldersForTray === 'function') {
-            globalThis.api.setPinnedFoldersForTray(pinnedFolders);
+            const recents = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
+            globalThis.api.setPinnedFoldersForTray(
+                pinnedFolders.map(f => {
+                    const recentMatch = recents.find((r: any) =>
+                        r.path?.toLowerCase().replaceAll('\\\\', '/') === f.path.toLowerCase().replaceAll('\\\\', '/')
+                    );
+                    return {
+                        path: f.path,
+                        name: f.name,
+                        backupPath: (f as any).backupPath || recentMatch?.backupPath || '',
+                    };
+                })
+            );
         }
     }, [pinnedFolders]);
 
@@ -142,6 +154,24 @@ const Home = () => {
         });
         return unsub;
     }, []);
+
+    // Listen for tray Quick Snapshot completions
+    useEffect(() => {
+        const api = (globalThis as any).api;
+        if (!api?.onTraySnapshotComplete) return;
+        const unsub = api.onTraySnapshotComplete((data: any) => {
+            if (data?.success) {
+                toast.success(`Snapshot created: "${data.label}"`);
+                // Refresh if we're viewing the same project
+                if (currentPath) {
+                    loadDirectory(currentPath);
+                }
+            } else if (data?.error) {
+                toast.error(`Snapshot failed: ${data.error}`);
+            }
+        });
+        return unsub;
+    }, [currentPath]);
 
     const addToPinned = (path: string) => {
         if (pinnedFolders.length >= 3) {

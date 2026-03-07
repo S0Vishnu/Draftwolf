@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Snapshot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: transparent;
+      color: rgba(255, 255, 245, 0.86);
+      -webkit-font-smoothing: antialiased;
+      -webkit-app-region: drag;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .container {
+      background: #1b1b1f;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 20px 22px 18px;
+      box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(139, 92, 246, 0.1),
+        0 0 40px rgba(139, 92, 246, 0.06);
+      -webkit-app-region: no-drag;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      height: 100%;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header .icon {
+      font-size: 16px;
+      filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.5));
+    }
+
+    .header .title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: rgba(255, 255, 245, 0.86);
+    }
+
+    .project-name {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: rgba(235, 235, 245, 0.5);
+      padding: 0 2px;
+    }
+
+    .project-name .folder-icon {
+      font-size: 13px;
+    }
+
+    .project-name span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 280px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      color: rgba(255, 255, 245, 0.86);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input:focus {
+      border-color: rgba(139, 92, 246, 0.5);
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1), 0 0 12px rgba(139, 92, 246, 0.08);
+    }
+
+    input::placeholder {
+      color: rgba(235, 235, 245, 0.25);
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-cancel {
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(235, 235, 245, 0.5);
+    }
+
+    .btn-cancel:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(235, 235, 245, 0.7);
+    }
+
+    .btn-create {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(139, 92, 246, 0.25);
+    }
+
+    .btn-create:hover {
+      background: linear-gradient(135deg, #9f73fa, #8b5cf6);
+      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn-create:active {
+      transform: translateY(0);
+    }
+
+    .btn-logo {
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+      vertical-align: middle;
+      border-radius: 3px;
+    }
+
+    /* Subtle entrance animation */
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .container {
+      animation: slideIn 0.2s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="title">Quick Snapshot</span>
+    </div>
+    <div class="project-name">
+      <span class="folder-icon">📁</span>
+      <span id="projectName">Project</span>
+    </div>
+    <div class="input-wrapper">
+      <input
+        type="text"
+        id="labelInput"
+        placeholder="Snapshot label…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+    <div class="actions">
+      <button class="btn btn-cancel" id="cancelBtn">Cancel</button>
+      <button class="btn btn-create" id="createBtn">
+        <img src="icon.png" alt="" class="btn-logo" />Create Snapshot
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    let folderData = null;
+
+    // Receive folder data from main process
+    ipcRenderer.on('snapshot-prompt:data', (_, data) => {
+      folderData = data;
+      document.getElementById('projectName').textContent = data.name || data.path;
+
+      // Generate default label
+      const now = new Date();
+      const timeStr = now.toLocaleString('en-US', {
+        month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+        hour12: true
+      });
+      const defaultLabel = `Quick Snapshot — ${timeStr}`;
+
+      const input = document.getElementById('labelInput');
+      input.value = defaultLabel;
+      input.select();
+      input.focus();
+    });
+
+    function submit() {
+      const label = document.getElementById('labelInput').value.trim();
+      if (!label || !folderData) return;
+
+      ipcRenderer.send('tray-snapshot:submit', {
+        label,
+        projectPath: folderData.path,
+        backupPath: folderData.backupPath || ''
+      });
+    }
+
+    function cancel() {
+      ipcRenderer.send('tray-snapshot:cancel');
+    }
+
+    document.getElementById('createBtn').addEventListener('click', submit);
+    document.getElementById('cancelBtn').addEventListener('click', cancel);
+
+    document.getElementById('labelInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancel();
+      }
+    });
+
+    // Overlay handles blocking — no need for blur-to-cancel
+  </script>
+</body>
+</html>

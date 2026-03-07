@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from "electron";
+import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, Notification } from "electron";
 import { join, resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
@@ -11,6 +11,7 @@ import log from "electron-log";
 // System tray: keep reference for menu updates; pinned folders from renderer
 let tray = null;
 let pinnedFoldersForTray = [];
+let buildTrayMenu = null; // assigned inside createWindow, called from IPC handler
 let mainWindow = null;
 
 // Secure Deep Linking & Auth
@@ -231,7 +232,100 @@ function createWindow() {
   }
   tray.setToolTip("DraftWolf");
 
-  function buildTrayMenu() {
+  // ─── Quick Snapshot Prompt ──────────────────────────────────────
+  let snapshotPromptWindow = null;
+  let snapshotOverlayWindow = null;
+
+  function closeSnapshotPrompt() {
+    if (snapshotPromptWindow && !snapshotPromptWindow.isDestroyed()) {
+      snapshotPromptWindow.close();
+    }
+    if (snapshotOverlayWindow && !snapshotOverlayWindow.isDestroyed()) {
+      snapshotOverlayWindow.close();
+    }
+    snapshotPromptWindow = null;
+    snapshotOverlayWindow = null;
+  }
+
+  function openSnapshotPrompt(folderData) {
+    // Close any existing prompt
+    closeSnapshotPrompt();
+
+    // Get the primary display dimensions for fullscreen overlay
+    const { screen } = require("electron");
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenW, height: screenH } = primaryDisplay.size;
+
+    // Create dark overlay that covers the entire screen
+    snapshotOverlayWindow = new BrowserWindow({
+      x: 0,
+      y: 0,
+      width: screenW,
+      height: screenH,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      focusable: false,
+      show: false,
+      webPreferences: { nodeIntegration: true, contextIsolation: false },
+    });
+
+    snapshotOverlayWindow.loadURL(`data:text/html,
+      <html><body style="margin:0;background:rgba(0,0,0,0.45);width:100vw;height:100vh;"></body></html>
+    `);
+
+    snapshotOverlayWindow.setAlwaysOnTop(true, "screen-saver");
+
+    snapshotOverlayWindow.once("ready-to-show", () => {
+      if (snapshotOverlayWindow && !snapshotOverlayWindow.isDestroyed()) {
+        snapshotOverlayWindow.show();
+      }
+    });
+
+    // Create the prompt window on top of the overlay
+    snapshotPromptWindow = new BrowserWindow({
+      width: 380,
+      height: 190,
+      frame: false,
+      resizable: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      transparent: true,
+      show: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+      },
+    });
+
+    snapshotPromptWindow.setAlwaysOnTop(true, "screen-saver");
+
+    snapshotPromptWindow.loadFile(join(__dirname, "traySnapshotPrompt.html"));
+
+    snapshotPromptWindow.once("ready-to-show", () => {
+      if (!snapshotPromptWindow || snapshotPromptWindow.isDestroyed()) return;
+      snapshotPromptWindow.show();
+      // Send folder data to prompt
+      snapshotPromptWindow.webContents.send("snapshot-prompt:data", {
+        path: folderData.path,
+        name: folderData.name || folderData.path,
+        backupPath: folderData.backupPath || "",
+      });
+    });
+
+    snapshotPromptWindow.on("closed", () => {
+      snapshotPromptWindow = null;
+      // Also close overlay when prompt closes
+      if (snapshotOverlayWindow && !snapshotOverlayWindow.isDestroyed()) {
+        snapshotOverlayWindow.close();
+      }
+      snapshotOverlayWindow = null;
+    });
+  }
+
+  buildTrayMenu = function() {
     const pinnedSubmenu =
       pinnedFoldersForTray.length > 0
         ? pinnedFoldersForTray.map((f) => ({
@@ -247,6 +341,14 @@ function createWindow() {
         }))
         : [{ label: "No pinned folders", enabled: false }];
 
+    const snapshotSubmenu =
+      pinnedFoldersForTray.length > 0
+        ? pinnedFoldersForTray.map((f) => ({
+          label: `\u{1F4C1} ${(f.name || f.path).slice(0, 45)}`,
+          click: () => openSnapshotPrompt(f),
+        }))
+        : [{ label: "No pinned folders", enabled: false }];
+
     return Menu.buildFromTemplate([
       {
         label: "Open DraftWolf", click: () => {
@@ -258,7 +360,9 @@ function createWindow() {
         }
       },
       { type: "separator" },
-      { label: "Pinned folders", submenu: pinnedSubmenu },
+      // { label: "Pinned folders", submenu: pinnedSubmenu },
+      // { type: "separator" },
+      { label: "\u26A1 Quick Snapshot", submenu: snapshotSubmenu },
       { type: "separator" },
       {
         label: "Settings", click: () => {
@@ -332,54 +436,8 @@ ipcMain.on("app:quit", () => {
 
 ipcMain.on("tray:set-pinned-folders", (_, folders) => {
   pinnedFoldersForTray = Array.isArray(folders) ? folders : [];
-  if (tray) {
-    const pinnedSubmenu =
-      pinnedFoldersForTray.length > 0
-        ? pinnedFoldersForTray.map((f) => ({
-          label: (f.name || f.path).slice(0, 50),
-          click: () => {
-            const win = BrowserWindow.getAllWindows()[0];
-            if (win) {
-              win.show();
-              win.focus();
-              win.webContents.send("tray:open-folder", f.path);
-            }
-          },
-        }))
-        : [{ label: "No pinned folders", enabled: false }];
-    tray.setContextMenu(
-      Menu.buildFromTemplate([
-        {
-          label: "Open DraftWolf", click: () => {
-            const win = BrowserWindow.getAllWindows()[0];
-            if (win) {
-              win.show();
-              win.focus();
-            }
-          }
-        },
-        { type: "separator" },
-        { label: "Pinned folders", submenu: pinnedSubmenu },
-        { type: "separator" },
-        {
-          label: "Settings", click: () => {
-            const win = BrowserWindow.getAllWindows()[0];
-            if (win) {
-              win.show();
-              win.focus();
-              win.webContents.send("tray:navigate", "/settings");
-            }
-          }
-        },
-        { type: "separator" },
-        {
-          label: "Quit", click: () => {
-            app.isQuitting = true;
-            app.quit();
-          }
-        },
-      ])
-    );
+  if (tray && buildTrayMenu) {
+    tray.setContextMenu(buildTrayMenu());
   }
 });
 
@@ -1120,5 +1178,78 @@ ipcMain.handle("monitor:testNotification", async () => {
   } catch (e) {
     console.error("Monitor Test Notification Failed:", e);
     return false;
+  }
+});
+
+// ─── Tray Quick Snapshot ────────────────────────────────────────
+
+ipcMain.on("tray-snapshot:submit", async (event, { label, projectPath, backupPath }) => {
+  try {
+    const dcs = new DraftControlSystem(projectPath, backupPath || undefined);
+    await dcs.init();
+    const versionId = await dcs.createSnapshot(projectPath, label);
+
+    // Native notification
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title: "DraftWolf \u2014 Snapshot Created",
+        body: `\u2705 "${label}"\nProject: ${projectPath.split(/[\\/]/).pop()}`,
+        silent: false,
+      });
+      notification.on("click", () => {
+        const win = BrowserWindow.getAllWindows().find(w => w !== event?.sender?.getOwnerBrowserWindow?.());
+        if (win || mainWindow) {
+          const target = win || mainWindow;
+          if (target.isMinimized()) target.restore();
+          target.show();
+          target.focus();
+        }
+      });
+      notification.show();
+    }
+
+    // Notify renderer if main window is open
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("tray:snapshot-complete", {
+        success: true,
+        label,
+        versionId,
+        projectPath,
+      });
+    }
+
+    console.log(`[TraySnapshot] Snapshot created: "${label}" for ${projectPath}`);
+  } catch (err) {
+    console.error("[TraySnapshot] Failed:", err);
+
+    if (Notification.isSupported()) {
+      new Notification({
+        title: "DraftWolf \u2014 Snapshot Failed",
+        body: `\u274C ${err.message || "Unknown error"}`,
+        silent: false,
+      }).show();
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("tray:snapshot-complete", {
+        success: false,
+        error: err.message,
+        projectPath,
+      });
+    }
+  }
+
+  // Close the prompt window
+  const promptWin = BrowserWindow.getAllWindows().find(w =>
+    w !== mainWindow && !w.isDestroyed() && w.getTitle() === "Quick Snapshot"
+  );
+  if (promptWin) promptWin.close();
+});
+
+ipcMain.on("tray-snapshot:cancel", (event) => {
+  // Close the prompt window
+  const senderWin = BrowserWindow.fromWebContents(event.sender);
+  if (senderWin && !senderWin.isDestroyed()) {
+    senderWin.close();
   }
 });

@@ -39,6 +39,11 @@ const api = {
     electronAPI.ipcRenderer.on('tray:navigate', sub);
     return () => electronAPI.ipcRenderer.removeListener('tray:navigate', sub);
   },
+  onTraySnapshotComplete: (callback) => {
+    const sub = (_event, data) => callback(data);
+    electronAPI.ipcRenderer.on('tray:snapshot-complete', sub);
+    return () => electronAPI.ipcRenderer.removeListener('tray:snapshot-complete', sub);
+  },
   draft: {
     init: (projectRoot, backupPath) => electronAPI.ipcRenderer.invoke('draft:init', { projectRoot, backupPath }),
     commit: (projectRoot, label, files, backupPath) => electronAPI.ipcRenderer.invoke('draft:commit', { projectRoot, label, files, backupPath }),

@@ -76,10 +76,31 @@ const Home = () => {
             return [];
         }
     });
+    const recentWorkspacesRef = useRef(recentWorkspaces);
 
     useEffect(() => {
+        recentWorkspacesRef.current = recentWorkspaces;
         localStorage.setItem('recentWorkspaces', JSON.stringify(recentWorkspaces));
     }, [recentWorkspaces]);
+
+    // Persist recent workspaces when window closes or hides (app closes to tray, so beforeunload may not run)
+    useEffect(() => {
+        const persist = () => {
+            try {
+                localStorage.setItem('recentWorkspaces', JSON.stringify(recentWorkspacesRef.current));
+            } catch (_) {}
+        };
+        const onBeforeUnload = () => persist();
+        const onVisibilityChange = () => {
+            if (document.hidden) persist();
+        };
+        window.addEventListener('beforeunload', onBeforeUnload);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => {
+            window.removeEventListener('beforeunload', onBeforeUnload);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    }, []);
 
     // Pinned Folders
     const [pinnedFolders, setPinnedFolders] = useState<{
@@ -210,7 +231,13 @@ const Home = () => {
     };
 
     const removeFromRecents = (path: string) => {
-        setRecentWorkspaces(prev => prev.filter(w => w.path !== path));
+        const normPath = path.toLowerCase().replaceAll('\\', '/');
+        setRecentWorkspaces(prev => {
+            const next = prev.filter(w => w.path.toLowerCase().replaceAll('\\', '/') !== normPath);
+            // Persist immediately so removal survives app close before next effect run
+            localStorage.setItem('recentWorkspaces', JSON.stringify(next));
+            return next;
+        });
     };
 
     useEffect(() => {

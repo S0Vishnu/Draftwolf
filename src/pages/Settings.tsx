@@ -5,7 +5,7 @@ import { Session } from '@supabase/supabase-js';
 import Sidebar from '../components/Sidebar';
 import {
     LogOut, User, Clock, Shield,
-    Edit2, X, Check, Coffee, Monitor, Bell
+    Edit2, X, Check, Coffee, Monitor, Bell, CreditCard, Sparkles
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
@@ -161,7 +161,7 @@ const Settings = () => {
     };
 
     // Determine Avatar URL for display
-    const avatarUrl = user?.user_metadata?.avatar_url || user?.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.email || 'DW'}`;
+    const avatarUrl = user?.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.email || 'DW'}`;
 
     return (
         <div className="settings-container">
@@ -488,6 +488,34 @@ const Settings = () => {
                                 </div>
                             </div>
 
+                            {/* Pricing & Plan */}
+                            <div className="glass-panel pricing-panel" style={{ marginBottom: '2rem' }}>
+                                <div className="panel-header">
+                                    <h2 className="panel-title">
+                                        <CreditCard size={20} className="text-accent" style={{ color: '#06b6d4' }} />
+                                        Pricing & Plan
+                                    </h2>
+                                    <div className="current-plan-badge">
+                                        <Sparkles size={18} />
+                                        <span>Free Beta</span>
+                                    </div>
+                                </div>
+                                <div className="pricing-section">
+                                    <p className="pricing-message">
+                                        We don&apos;t charge you for the beta, enjoy! You have full access to DraftWolf while we polish the experience and gather feedback.
+                                    </p>
+                                    <ul className="plan-includes">
+                                        <li>Unlimited projects & snapshots</li>
+                                        <li>File monitoring & change notifications</li>
+                                        <li>Free Blender Plugin</li>
+                                        <li>All features included</li>
+                                    </ul>
+                                    <p className="pricing-note">
+                                        When we launch paid plans, we&apos;ll give early supporters a heads-up. No surprises.
+                                    </p>
+                                </div>
+                            </div>
+
                             {/* Privacy & Danger Zone */}
                             <div className="glass-panel">
                                 <div className="panel-header">
@@ -519,7 +547,7 @@ const Settings = () => {
 
                                 <div className="danger-zone">
                                     <button onClick={handleSignOut} className="btn-signout">
-                                        <LogOut size={16} /> Sign Out
+                                        <LogOut size={16} /> Log Out
                                     </button>
                                 </div>
                             </div>

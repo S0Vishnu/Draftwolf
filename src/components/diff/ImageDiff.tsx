@@ -118,18 +118,25 @@ const ImageDiff: React.FC<ImageDiffProps> = ({
                 </div>
             )}
 
-            {/* Overlay (Onion Skin) Mode */}
+            {/* Overlay (Onion Skin) Mode — inner wrapper gives explicit size; base + top overlay with object-fit contain */}
             {mode === 'overlay' && (
                 <div className="diff-overlay-container">
                     <div className="diff-overlay-images">
-                        <img src={oldSrc} className="diff-overlay-img" alt={oldLabel} draggable={false} />
-                        <img
-                            src={newSrc}
-                            className="diff-overlay-img diff-overlay-img-top"
-                            alt={newLabel}
-                            style={{ opacity: overlayOpacity }}
-                            draggable={false}
-                        />
+                        <div className="diff-overlay-images-inner">
+                            <img
+                                src={oldSrc}
+                                className="diff-overlay-img diff-overlay-img-base"
+                                alt={oldLabel}
+                                draggable={false}
+                            />
+                            <img
+                                src={newSrc}
+                                className="diff-overlay-img diff-overlay-img-top"
+                                alt={newLabel}
+                                style={{ opacity: overlayOpacity }}
+                                draggable={false}
+                            />
+                        </div>
                     </div>
                     <div className="diff-overlay-controls">
                         <span className="diff-overlay-label">{oldLabel}</span>

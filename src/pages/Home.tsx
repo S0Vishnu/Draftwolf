@@ -23,11 +23,13 @@ import AICommitModal from '../components/AICommitModal';
 import { ChangeInfo, CommitProposal } from '../services/AIService';
 import { toast } from 'react-toastify';
 
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, EyeOff } from 'lucide-react';
 import logo from '../assets/icons/logo.png';
+import { IGNORE_PRESETS, mergePatterns } from '../utils/ignorePatterns';
 
 // Styles
 import '../styles/AuthShared.css';
+import '../styles/Settings.css';
 import Footer from '../components/Footer';
 
 
@@ -657,6 +659,10 @@ const Home = () => {
     const [backupSetupProject, setBackupSetupProject] = useState<string | null>(null);
     const [backupSetupPath, setBackupSetupPath] = useState<string>('');
 
+    // Ignore template (shown after backup location when opening new project)
+    const [ignoreTemplatePending, setIgnoreTemplatePending] = useState<{ projectPath: string; backupPath: string } | null>(null);
+    const [ignoreTemplatePresets, setIgnoreTemplatePresets] = useState<string[]>([]);
+
     // View Options
     const [showHiddenFiles, setShowHiddenFiles] = useState(() => localStorage.getItem('showHiddenFiles') === 'true');
     const [showExtensions, setShowExtensions] = useState(() => localStorage.getItem('showExtensions') === 'false');
@@ -1051,20 +1057,51 @@ const Home = () => {
         // Save backup path to pinned & recents
         saveBackupPath(projPath, bPath);
 
-        // Close popup and open workspace
+        // Close backup popup and show ignore template step
         setBackupSetupProject(null);
         setBackupSetupPath('');
-
-        // Proceed to open
-        setRootDir(projPath);
-        setHistory([projPath]);
-        setHistoryIndex(0);
-        setCurrentPath(projPath);
+        setIgnoreTemplatePending({ projectPath: projPath, backupPath: bPath });
+        setIgnoreTemplatePresets([]);
     };
 
     const cancelBackupSetup = () => {
         setBackupSetupProject(null);
         setBackupSetupPath('');
+    };
+
+    const openAfterIgnoreTemplate = () => {
+        if (!ignoreTemplatePending) return;
+        const { projectPath } = ignoreTemplatePending;
+        setRootDir(projectPath);
+        setHistory([projectPath]);
+        setHistoryIndex(0);
+        setCurrentPath(projectPath);
+        setIgnoreTemplatePending(null);
+        setIgnoreTemplatePresets([]);
+    };
+
+    const confirmIgnoreTemplate = async () => {
+        if (!ignoreTemplatePending) return;
+        const { projectPath, backupPath } = ignoreTemplatePending;
+        if (ignoreTemplatePresets.length > 0) {
+            let patterns: string[] = [];
+            for (const presetId of ignoreTemplatePresets) {
+                const preset = IGNORE_PRESETS.find(p => p.id === presetId);
+                if (preset) patterns = mergePatterns(patterns, preset.patterns);
+            }
+            try {
+                await globalThis.api.draft.writeDraftignore(projectPath, patterns, backupPath);
+                toast.success('Ignore patterns applied');
+            } catch (e) {
+                console.error('Write draftignore failed:', e);
+                toast.error('Failed to save ignore patterns');
+            }
+        }
+        openAfterIgnoreTemplate();
+    };
+
+    const skipIgnoreTemplate = () => {
+        openAfterIgnoreTemplate();
     };
 
     const handleOpenFolder = async () => {
@@ -2052,6 +2089,45 @@ const Home = () => {
                 >
                     Browse...
                 </button>
+            </CustomPopup>
+
+            {/* Ignore Template (after backup setup when opening new project) */}
+            <CustomPopup
+                isOpen={!!ignoreTemplatePending}
+                title="Choose ignore template"
+                message="Optionally select presets to exclude files from snapshots (e.g. node_modules, build output). You can change this later in Project Settings."
+                icon={<EyeOff size={24} color="#a78bfa" />}
+                confirmText="Apply & Open"
+                cancelText="Skip"
+                onConfirm={confirmIgnoreTemplate}
+                onCancel={skipIgnoreTemplate}
+            >
+                <div style={{ marginTop: 12 }}>
+                    <div className="ignore-preset-grid" style={{ marginTop: 8 }}>
+                        {IGNORE_PRESETS.map(preset => {
+                            const isActive = ignoreTemplatePresets.includes(preset.id);
+                            return (
+                                <button
+                                    key={preset.id}
+                                    type="button"
+                                    className={`ignore-preset-card ${isActive ? 'active' : ''}`}
+                                    onClick={() => {
+                                        if (isActive) {
+                                            setIgnoreTemplatePresets(prev => prev.filter(id => id !== preset.id));
+                                        } else {
+                                            setIgnoreTemplatePresets(prev => [...prev, preset.id]);
+                                        }
+                                    }}
+                                    title={preset.description}
+                                >
+                                    <span className="ignore-preset-icon">{preset.icon}</span>
+                                    <span className="ignore-preset-name">{preset.name}</span>
+                                    {isActive && <span className="ignore-preset-check">✓</span>}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
             </CustomPopup>
 
             <AICommitModal
